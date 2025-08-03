@@ -100,10 +100,10 @@ Esto generará el instalador en la carpeta `/out` listo para distribuir.
 
 ## 📝 Licencia
 
-MIT © Sergio Gael García Landa – 2025
+ScaleFlow © 2025
 
 ---
 
 ## 📬 Contacto
 
-Para soporte o colaboraciones, contáctame en [sergio@tuempresa.com](mailto:sergio@tuempresa.com)
+Para soporte o colaboraciones, contactanos en [ScaleFlow](https://scaleflow.tech/)
