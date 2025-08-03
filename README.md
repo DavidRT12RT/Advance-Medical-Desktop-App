@@ -82,8 +82,8 @@ Esto generará el instalador en la carpeta `/out` listo para distribuir.
 - 💻 Electron Forge
 - 🎨 TailwindCSS + Ant Design
 - 🔁 React Router DOM
-- 🧠 IA con TensorFlow.js / ONNX (integración futura)
-- 🧱 Arquitectura modular y escalable
+- 🧠 IA modular con CNN y Transformers 
+- �🧱 Arquitectura modular y escalable
 
 ---
 
