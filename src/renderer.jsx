@@ -2,7 +2,7 @@ import React from "react"
 import { createRoot } from "react-dom/client"
 import { BrowserRouter as Router } from "react-router"
 
-import App from "./App"
+import Root from "./Root"
 import "./index.css"
 
 const root = createRoot(document.getElementById("root"))
@@ -10,7 +10,7 @@ const root = createRoot(document.getElementById("root"))
 root.render(
   <React.StrictMode>
     <Router>
-      <App />
+      <Root />
     </Router>
   </React.StrictMode>
 )

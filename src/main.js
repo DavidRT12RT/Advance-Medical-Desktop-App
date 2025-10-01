@@ -1,8 +1,12 @@
-import { app, BrowserWindow } from 'electron';
-import path from 'node:path';
-import started from 'electron-squirrel-startup';
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
-// Handle creating/removing shortcuts on Windows when installing/uninstalling.
+import { app, BrowserWindow, ipcMain } from 'electron';
+import started from 'electron-squirrel-startup';
+import { machineId } from 'node-machine-id';
+import { networkInterfaces, hostname, platform, release, arch, totalmem, freemem, cpus, userInfo } from 'os';
+import * as electronStore from './services/electronStore.js';
+
 if (started) {
   app.quit();
 }
@@ -12,13 +16,13 @@ const createWindow = () => {
   const mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
-    icon: 'assets/icon.ico', 
+    icon: 'assets/icon.ico',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: true, // Acceso a FS
       enableRemoteModule: true, //Senales desde React a Electron
     },
-    title:"Advance Desktop App",
+    title: "Advance Desktop App",
   });
 
   //Ocultar barra de menu
@@ -35,14 +39,9 @@ const createWindow = () => {
   mainWindow.webContents.openDevTools();
 };
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
   createWindow();
 
-  // On OS X it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open.
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
@@ -50,14 +49,256 @@ app.whenReady().then(() => {
   });
 });
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
 });
 
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and import them here.
+// IPC handlers for device information
+ipcMain.handle('device:getMachineId', async () => {
+  try {
+    return await machineId();
+  } catch (error) {
+    console.error('Error getting machine ID:', error);
+    return null;
+  }
+});
+
+ipcMain.handle('device:getMacAddresses', async () => {
+  try {
+    const interfaces = networkInterfaces();
+    const macAddresses = [];
+
+    for (const interfaceName in interfaces) {
+      const networkInterface = interfaces[interfaceName];
+      if (networkInterface) {
+        networkInterface.forEach((details) => {
+          if (details.mac && details.mac !== '00:00:00:00:00:00') {
+            macAddresses.push(details.mac);
+          }
+        });
+      }
+    }
+
+    return [...new Set(macAddresses)]; // Remove duplicates
+  } catch (error) {
+    console.error('Error getting MAC addresses:', error);
+    return [];
+  }
+});
+
+ipcMain.handle('device:getIpAddresses', async () => {
+  try {
+    const interfaces = networkInterfaces();
+    const ips = [];
+    // Debug: list interface names
+    try { console.debug('[device:getIpAddresses] interfaces keys:', Object.keys(interfaces || {})); } catch { }
+    for (const name in interfaces) {
+      const list = interfaces[name];
+      if (!list) continue;
+      list.forEach((details) => {
+        const isValid = !details.internal && details.address;
+        if (!isValid) return;
+        if (details.family === 'IPv4' || details.family === 4) {
+          ips.push(details.address);
+        } else if (details.family === 'IPv6' || details.family === 6) {
+          // incluir IPv6 globales (no link-local fe80::)
+          if (!details.address.startsWith('fe80')) ips.push(details.address);
+        }
+      });
+    }
+    let unique = [...new Set(ips)];
+    // Fallback: include internal IPv4 if we didn't find any external
+    if (unique.length === 0) {
+      for (const name in interfaces) {
+        const list = interfaces[name];
+        if (!list) continue;
+        list.forEach((details) => {
+          if ((details.family === 'IPv4' || details.family === 4) && details.address) {
+            unique.push(details.address);
+          }
+        });
+      }
+      unique = [...new Set(unique)];
+    }
+    try { console.debug('[device:getIpAddresses] result:', unique); } catch { }
+    return unique;
+  } catch (error) {
+    console.error('Error getting IP addresses:', error);
+    return [];
+  }
+});
+
+ipcMain.handle('device:getNetworkSummary', async () => {
+  try {
+    const interfaces = networkInterfaces();
+    const summary = [];
+    for (const name in interfaces) {
+      const list = interfaces[name];
+      if (!list) continue;
+      list.forEach((details) => {
+        summary.push({
+          interface: name,
+          address: details.address,
+          family: typeof details.family === 'string' ? details.family : details.family === 4 ? 'IPv4' : 'IPv6',
+          internal: details.internal,
+          mac: details.mac,
+          netmask: details.netmask,
+          cidr: details.cidr,
+          scopeid: details.scopeid,
+        });
+      });
+    }
+    try { console.debug('[device:getNetworkSummary] result count:', summary.length); } catch { }
+    return summary;
+  } catch (error) {
+    console.error('Error getting network summary:', error);
+    return [];
+  }
+});
+
+ipcMain.handle('device:getSystemInfo', async () => {
+  try {
+    const cpuList = (() => { try { return cpus() || []; } catch { return []; } })();
+    const primaryCpu = cpuList[0] || { model: undefined, speed: undefined };
+    const totalBytes = (() => { try { return totalmem(); } catch { return undefined; } })();
+    const freeBytes = (() => { try { return freemem(); } catch { return undefined; } })();
+    const toGB = (n) => Math.round((n / (1024 ** 3)) * 100) / 100;
+    const getSystemVersion = () => {
+      try {
+        return typeof process.getSystemVersion === 'function' ? process.getSystemVersion() : undefined;
+      } catch {
+        return undefined;
+      }
+    };
+    const info = {
+      hostname: (() => { try { return hostname(); } catch { return undefined; } })(),
+      platform: (() => { try { return platform(); } catch { return process.platform; } })(),
+      release: (() => { try { return release(); } catch { return undefined; } })(),
+      arch: (() => { try { return arch(); } catch { return process.arch; } })(),
+      osVersion: getSystemVersion(),
+      totalmemBytes: totalBytes,
+      freememBytes: freeBytes,
+      totalmemGB: typeof totalBytes === 'number' ? toGB(totalBytes) : undefined,
+      freememGB: typeof freeBytes === 'number' ? toGB(freeBytes) : undefined,
+      cpuModel: primaryCpu.model,
+      cpuCores: cpuList.length,
+      cpuSpeedMHz: primaryCpu.speed,
+      username: (() => { try { return userInfo().username; } catch { return undefined; } })(),
+      nodeVersion: process.version,
+      electron: process.versions?.electron,
+      chrome: process.versions?.chrome,
+      appVersion: (() => { try { return app.getVersion(); } catch { return undefined; } })(),
+      timezone: (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return undefined; } })(),
+      locale: (() => { try { return Intl.DateTimeFormat().resolvedOptions().locale; } catch { return undefined; } })(),
+    };
+    try { console.debug('[device:getSystemInfo] result:', info); } catch { }
+    return info;
+  } catch (error) {
+    console.error('Error getting system info:', error);
+    return {};
+  }
+});
+
+ipcMain.handle('device:getAllDeviceInfo', async () => {
+  try {
+    const [id, macs, ips, sys] = await Promise.all([
+      machineId().catch(() => null),
+      (async () => {
+        const interfaces = networkInterfaces();
+        const macs = [];
+        for (const name in interfaces) {
+          const list = interfaces[name];
+          if (!list) continue;
+          list.forEach((details) => {
+            if (details.mac && details.mac !== '00:00:00:00:00:00') macs.push(details.mac);
+          });
+        }
+        return [...new Set(macs)];
+      })(),
+      (async () => {
+        const interfaces = networkInterfaces();
+        const ips = [];
+        for (const name in interfaces) {
+          const list = interfaces[name];
+          if (!list) continue;
+          list.forEach((details) => {
+            if (details.family === 'IPv4' && !details.internal && details.address) ips.push(details.address);
+          });
+        }
+        return [...new Set(ips)];
+      })(),
+      (async () => {
+        const cpuList = cpus() || [];
+        const primaryCpu = cpuList[0] || { model: undefined, speed: undefined };
+        return {
+          hostname: hostname(),
+          platform: platform(),
+          release: release(),
+          arch: arch(),
+          totalmemBytes: totalmem(),
+          freememBytes: freemem(),
+          cpuModel: primaryCpu.model,
+          cpuCores: cpuList.length,
+          cpuSpeedMHz: primaryCpu.speed,
+          username: (() => { try { return userInfo().username; } catch { return undefined; } })(),
+          nodeVersion: process.version,
+          versions: process.versions,
+          appVersion: app.getVersion(),
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          locale: Intl.DateTimeFormat().resolvedOptions().locale,
+        };
+      })(),
+    ]);
+
+    return {
+      machineId: id,
+      macAddresses: macs,
+      ipAddresses: ips,
+      system: sys,
+      capturedAt: new Date().toISOString(),
+    };
+  } catch (error) {
+    console.error('Error getting full device info:', error);
+    return {};
+  }
+});
+
+// IPC handlers for Electron Store
+ipcMain.handle('store:setUser', async (event, user) => {
+  electronStore.setUser(user);
+});
+
+ipcMain.handle('store:getAuthData', async () => {
+  return electronStore.getAuthData();
+});
+
+ipcMain.handle('store:setMachineId', async (event, machineId) => {
+  electronStore.setMachineId(machineId);
+});
+
+ipcMain.handle('store:logout', async () => {
+  electronStore.logout();
+});
+
+ipcMain.handle('store:setLicenseData', async (event, licenseData) => {
+  electronStore.setLicenseData(licenseData);
+});
+
+ipcMain.handle('store:getLicenseData', async () => {
+  return electronStore.getLicenseData();
+});
+
+ipcMain.handle('store:setLicenseValid', async (event, isValid, expiryDate, features) => {
+  electronStore.setLicenseValid(isValid, expiryDate, features);
+});
+
+ipcMain.handle('store:getAllData', async () => {
+  return electronStore.getAllData();
+});
+
+ipcMain.handle('store:isLicenseActiveWithGrace', async () => {
+  return electronStore.isLicenseActiveWithGrace();
+});
+
