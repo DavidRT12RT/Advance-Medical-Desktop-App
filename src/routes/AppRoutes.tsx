@@ -6,18 +6,21 @@ import LayoutMain from "../components/LayoutMain";
 
 // Pages
 import Home from "../pages/Home";
-// Agrega más páginas aquí...
-// import Doctors from "../pages/Doctors";
-// import Patients from "../pages/Patients";
+import Doctores from "../pages/Doctores";
+import Pacientes from "../pages/Pacientes";
+import Configuracion from "../pages/Configuracion";
 
 const AppRoutes = () => {
   return (
     <Routes>
       <Route element={<LayoutMain />}>
-        <Route path="/" element={<Home />} />
-        {/* <Route path="/doctores" element={<Doctors />} /> */}
+        {/* <Route path="/" element={<Home />} /> */}
+        {/* <Route path="/" element={<Doctores />} /> */}
+        {/* <Route path="/" element={<Pacientes />} /> */}
         {/* <Route path="/pacientes" element={<Patients />} /> */}
+        <Route path="/" element={<Configuracion />} />
       </Route>
+
     </Routes>
   );
 };

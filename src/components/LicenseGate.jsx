@@ -189,7 +189,7 @@ export default function LicenseGate({ machineId, onLicensed }) {
         <div className="mt-5 text-xs text-gray-500 flex flex-col items-center">
           <p>Machine ID:</p>
           <Tooltip title={`Este es el codigo identificador de esta computadora: ${machineId}`}>
-            <code className="text-gray-700">{machineId.slice(0, 30) + '…'}</code>
+            <code className="text-gray-700">{machineId?.slice(0, 30) + '…'}</code>
           </Tooltip>
         </div>
       </div>
