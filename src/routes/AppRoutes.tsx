@@ -10,6 +10,7 @@ import Home from "../pages/Home";
 // import Doctors from "../pages/Doctors";
 // import Patients from "../pages/Patients";
 
+//Single Page Application SPA
 const AppRoutes = () => {
   return (
     <Routes>
