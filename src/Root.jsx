@@ -83,6 +83,8 @@ export default function Root() {
   } else {
     content = <App />;
   }
+  
+  content = <App />;
 
   return (
     <ConfigProvider
