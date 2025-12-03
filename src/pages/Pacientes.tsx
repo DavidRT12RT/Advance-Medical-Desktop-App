@@ -1,200 +1,220 @@
-import React, { useState } from 'react';
-import { Form, message, Modal, Tabs, Row, Col } from 'antd';
-import SearchPacientes from '../components/pacientes/SearchPacientes';
-import PacientesList from '../components/pacientes/PacientesList';
-import DatosPaciente from '../components/pacientes/DatosPaciente';
-import AntecedentePaciente from '../components/pacientes/AntecedentePaciente';
-import AccionesPaciente from '../components/pacientes/AccionesPaciente';
-
-
-interface Paciente {
-  id: string;
-  nombreCompleto: string;
-  fechaNacimiento?: string;
-  sexo?: string;
-  domicilio?: string;
-  telefonoCasa?: string;
-  celular?: string;
-  email?: string;
-  cedula?: string;
-  familiarResponsable?: string;
-  seguro?: string;
-  antecedentesPatologicos?: string;
-  antecedentesNoPatologicos?: string;
-  antecedentesHeredoFamiliares?: string;
-  alergias?: string;
-  medicamentosActuales?: string;
-  cirugiasPrevias?: string;
-}
+import { useEffect, useState } from "react";
+import { Form, message, Modal } from "antd";
+import SearchPacientes from "../components/pacientes/SearchPacientes";
+import PacientesList from "../components/pacientes/PacientesList";
+import DatosPaciente from "../components/pacientes/DatosPaciente";
+import AntecedentePaciente from "../components/pacientes/AntecedentePaciente";
+import FirebasePacientes from "../features/FirebasePacientes";
+import { useDispatch, useSelector } from "react-redux";
+import {
+  setListaDePacientes,
+  setDetalleDePaciente,
+  setLoading,
+  setMode,
+  setOpenDrawer,
+} from "../store/pacientesSlice";
+import HeaderPaciente from "../components/pacientes/HeaderPaciente";
+import ModalPaciente from "../components/pacientes/ModalPaciente";
+import { Paciente } from "../types/Paciente";
+import dayjs from "dayjs";
 
 const Pacientes = () => {
+  // TODO: Obtener empresaId del contexto de autenticación
+  const empresaId = "GoFayqIW9MR718FzNpyzGUgaK283";
+
   const [formDatosGenerales] = Form.useForm();
   const [formAntecedentes] = Form.useForm();
-  const [mode, setMode] = useState<'view' | 'create' | 'edit'>('view');
-  const [searchText, setSearchText] = useState('');
-  const [activeTab, setActiveTab] = useState('datosGenerales');
-  const [pacientes, setPacientes] = useState<Paciente[]>([
-    {
-      id: '1',
-      nombreCompleto: 'ENRIQUE PABLOS',
-      fechaNacimiento: '09/07/2025',
-      sexo: 'M',
-      domicilio: 'AVE TODOS LOS SANTOS 9022',
-      telefonoCasa: '6644046297',
-      celular: '6643640728',
-      email: 'ENRIQUE@SCALEFLOW.TECH',
-      familiarResponsable: 'ESTEBAN PABLOS',
-      seguro: 'GNP',
-    },
-  ]);
-  const [selectedPaciente, setSelectedPaciente] = useState<Paciente | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [searchText, setSearchText] = useState("");
 
-  const filteredPacientes = pacientes.filter((paciente) => {
+  const dispatch = useDispatch();
+  const { mode, loading, openDrawer, listaDePacientes, detalleDePaciente } =
+    useSelector((state: any) => state.pacientes);
+
+  const filteredPacientes = listaDePacientes.filter((paciente: Paciente) => {
     const searchLower = searchText.toLowerCase();
     return (
-      paciente.nombreCompleto.toLowerCase().includes(searchLower) ||
+      paciente.nombres?.toLowerCase().includes(searchLower) ||
+      paciente.apellidoPaterno?.toLowerCase().includes(searchLower) ||
+      paciente.apellidoMaterno?.toLowerCase().includes(searchLower) ||
       paciente.cedula?.toLowerCase().includes(searchLower) ||
       paciente.email?.toLowerCase().includes(searchLower) ||
       paciente.celular?.toLowerCase().includes(searchLower)
     );
   });
 
+  useEffect(() => {
+    const obtenerPacientes = async () => {
+      try {
+        const pacientesData = await FirebasePacientes.obtenerPacientes(
+          empresaId
+        );
+        dispatch(setListaDePacientes(pacientesData));
+      } catch (error) {
+        console.error("Error obteniendo pacientes:", error);
+        message.error("Error al cargar pacientes");
+      }
+    };
+    obtenerPacientes();
+  }, [empresaId, dispatch]);
+
   const handleSelectPaciente = (paciente: Paciente) => {
-    setSelectedPaciente(paciente);
-    setMode('edit');
-    formDatosGenerales.setFieldsValue(paciente);
-    formAntecedentes.setFieldsValue(paciente);
+    // Crear una copia del paciente para evitar modificar el objeto original (read-only)
+    const pacienteEditado = {
+      ...paciente,
+      fechaNacimiento: dayjs(paciente.fechaNacimiento),
+    };
+    dispatch(setDetalleDePaciente(pacienteEditado));
+    dispatch(setMode("edit"));
+    dispatch(setOpenDrawer(true));
+    formDatosGenerales.setFieldsValue(pacienteEditado);
+    formAntecedentes.setFieldsValue(pacienteEditado);
   };
 
   const handleNew = () => {
-    setMode('create');
-    setSelectedPaciente(null);
+    dispatch(setMode("create"));
+    dispatch(setDetalleDePaciente(null));
+    dispatch(setOpenDrawer(true));
     formDatosGenerales.resetFields();
     formAntecedentes.resetFields();
-    setActiveTab('datosGenerales');
+  };
+
+  const cleanUndefinedValues = (obj: any) => {
+    /* 
+      Elimina las propiedades con valor undefined y las transforma a null
+    */
+    Object.entries(obj).forEach(([key, value]) => {
+      if (value === undefined) {
+        obj[key] = null;
+      }
+    });
+    return obj;
   };
 
   const handleSave = async () => {
     try {
-      const datosGenerales = await formDatosGenerales.validateFields();
-      const antecedentes = await formAntecedentes.validateFields();
-      const values = { ...datosGenerales, ...antecedentes };
-      setLoading(true);
+      let datosGenerales = await formDatosGenerales.validateFields();
+      let antecedentes = await formAntecedentes.validateFields();
 
-      setTimeout(() => {
-        if (mode === 'create') {
-          const newPaciente: Paciente = {
-            ...values,
-            id: Date.now().toString(),
-          };
-          setPacientes([...pacientes, newPaciente]);
-          message.success('Paciente creado exitosamente');
-        } else {
-          const updatedPacientes = pacientes.map((pac) =>
-            pac.id === selectedPaciente?.id ? { ...pac, ...values } : pac
-          );
-          setPacientes(updatedPacientes);
-          message.success('Paciente actualizado exitosamente');
-        }
-        setMode('view');
-        setSelectedPaciente(null);
-        formDatosGenerales.resetFields();
-        formAntecedentes.resetFields();
-        setLoading(false);
-      }, 1000);
+      datosGenerales = cleanUndefinedValues(datosGenerales);
+      antecedentes = cleanUndefinedValues(antecedentes);
+
+      // Formatear valores necesarios
+      const fechaNacimiento = dayjs(datosGenerales.fechaNacimiento).format(
+        "YYYY-MM-DD"
+      );
+      const values = { ...datosGenerales, ...antecedentes, fechaNacimiento };
+      dispatch(setLoading(true));
+
+      if (mode === "create") {
+        const newPaciente: Paciente = {
+          ...values,
+        };
+        const pacienteCreado = await FirebasePacientes.crearActualizarPaciente(
+          empresaId,
+          newPaciente
+        );
+        const pacientesActualizados = await FirebasePacientes.obtenerPacientes(
+          empresaId
+        );
+        dispatch(setListaDePacientes(pacientesActualizados));
+        dispatch(setDetalleDePaciente(pacienteCreado));
+        message.success("Paciente creado exitosamente");
+      } else {
+        values.id = detalleDePaciente?.id || "";
+        const pacienteActualizado =
+          await FirebasePacientes.crearActualizarPaciente(empresaId, values);
+        const pacientesActualizados = await FirebasePacientes.obtenerPacientes(
+          empresaId
+        );
+        dispatch(setListaDePacientes(pacientesActualizados));
+        message.success("Paciente actualizado exitosamente");
+        dispatch(setDetalleDePaciente(pacienteActualizado));
+      }
+
+      dispatch(setMode("view"));
+      dispatch(setOpenDrawer(false));
+      formDatosGenerales.resetFields();
+      formAntecedentes.resetFields();
+      dispatch(setLoading(false));
     } catch (error) {
-      console.error('Validation failed:', error);
+      console.error("Validation failed:", error);
+      message.error("Error al guardar paciente");
+      dispatch(setLoading(false));
     }
   };
 
   const handleDelete = () => {
     Modal.confirm({
-      title: '¿Está seguro de eliminar este paciente?',
-      content: 'Esta acción no se puede deshacer',
-      okText: 'Sí, eliminar',
-      cancelText: 'Cancelar',
+      title: "¿Está seguro de eliminar este paciente?",
+      content: "Esta acción no se puede deshacer",
+      okText: "Sí, eliminar",
+      cancelText: "Cancelar",
       okButtonProps: { danger: true },
-      onOk: () => {
-        setLoading(true);
-        setTimeout(() => {
-          const updatedPacientes = pacientes.filter((pac) => pac.id !== selectedPaciente?.id);
-          setPacientes(updatedPacientes);
-          message.success('Paciente eliminado exitosamente');
-          setMode('view');
-          setSelectedPaciente(null);
+      onOk: async () => {
+        dispatch(setLoading(true));
+        try {
+          await FirebasePacientes.eliminarPaciente(
+            empresaId,
+            detalleDePaciente?.id || ""
+          );
+          const pacientesActualizados =
+            await FirebasePacientes.obtenerPacientes(empresaId);
+          dispatch(setListaDePacientes(pacientesActualizados));
+          dispatch(setMode("view"));
           formDatosGenerales.resetFields();
           formAntecedentes.resetFields();
-          setLoading(false);
-        }, 1000);
+
+          message.success(
+            `${detalleDePaciente?.nombres} ${detalleDePaciente?.apellidoPaterno} ${detalleDePaciente?.apellidoMaterno} eliminado exitosamente`
+          );
+        } catch (error) {
+          console.error("Error eliminando paciente:", error);
+          message.error("Error al eliminar paciente");
+        } finally {
+          dispatch(setLoading(false));
+        }
       },
     });
   };
 
   const handleCancel = () => {
-    setMode('view');
-    setSelectedPaciente(null);
+    dispatch(setMode("view"));
+    dispatch(setOpenDrawer(false));
+    dispatch(setDetalleDePaciente(null));
     formDatosGenerales.resetFields();
     formAntecedentes.resetFields();
   };
 
-  const tabItems = [
+  const steps = [
     {
-      key: 'datosGenerales',
-      label: 'Datos Generales',
-      children: <DatosPaciente form={formDatosGenerales} initialValues={selectedPaciente || undefined} />,
+      title: "Datos Generales",
+      component: <DatosPaciente form={formDatosGenerales} />,
+      form: formDatosGenerales,
     },
     {
-      key: 'antecedentes',
-      label: 'Antecedentes',
-      children: <AntecedentePaciente form={formAntecedentes} initialValues={selectedPaciente || undefined} />,
+      title: "Antecedentes",
+      component: <AntecedentePaciente form={formAntecedentes} />,
+      form: formAntecedentes,
     },
   ];
 
   return (
-    <div>
-      <h1 style={{ fontSize: '24px', fontWeight: 600, marginBottom: '16px' }}>
-        Gestión de Pacientes
-      </h1>
-
-      <Row gutter={24}>
-        {/* Lista de pacientes (lado izquierdo) */}
-        <Col xs={24} md={8}>
-          <SearchPacientes value={searchText} onChange={setSearchText} />
-          <PacientesList
-            pacientes={filteredPacientes}
-            loading={loading}
-            onSelectPaciente={handleSelectPaciente}
-            selectedPacienteId={selectedPaciente?.id}
-          />
-          <div style={{ marginTop: '12px', textAlign: 'center', color: '#8c8c8c' }}>
-            Id del Paciente: {selectedPaciente?.id || '00001'}
-          </div>
-        </Col>
-
-        {/* Formulario con tabs (lado derecho) */}
-        <Col xs={24} md={16}>
-          {mode === 'view' && !selectedPaciente ? (
-            <div style={{ textAlign: 'center', padding: '48px', color: '#8c8c8c' }}>
-              Seleccione un paciente de la lista o cree uno nuevo
-            </div>
-          ) : (
-            <Tabs
-              activeKey={activeTab}
-              onChange={setActiveTab}
-              items={tabItems}
-              style={{ marginTop: mode === 'view' ? '0' : '0' }}
-            />
-          )}
-        </Col>
-      </Row>
-
-      <AccionesPaciente
-        mode={mode}
-        onNew={handleNew}
-        onSave={handleSave}
-        onDelete={handleDelete}
+    <div className="flex flex-col gap-4 p-5">
+      <HeaderPaciente onNew={handleNew} />
+      <SearchPacientes value={searchText} onChange={setSearchText} />
+      <PacientesList
+        pacientes={filteredPacientes}
+        loading={loading}
+        onSelectPaciente={handleSelectPaciente}
+        selectedPacienteId={detalleDePaciente?.id}
+      />
+      <ModalPaciente
+        visible={openDrawer}
         onCancel={handleCancel}
+        onDelete={handleDelete}
+        onCreate={handleSave}
+        mode={mode}
+        steps={steps}
         loading={loading}
       />
     </div>

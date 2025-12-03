@@ -9,13 +9,22 @@ import {
   LogoutOutlined,
 } from "@ant-design/icons";
 
-import { Outlet } from "react-router-dom";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
 // @ts-ignore
 import logoEmpresa from "../../assets/logo.png";
 
 const { Header, Content } = Layout;
 
 const LayoutMain = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  let selectedKey = "2";
+  if (location.pathname.startsWith("/configuracion")) {
+    selectedKey = "5";
+  } else if (location.pathname.startsWith("/")) {
+    selectedKey = "2";
+  }
 
   return (
     <Layout style={{ minHeight: "100vh", backgroundColor: "#fff" }}>
@@ -29,7 +38,6 @@ const LayoutMain = () => {
           zIndex: 10,
         }}
       >
-
         <img
           src={logoEmpresa}
           alt="Advance logo"
@@ -39,19 +47,52 @@ const LayoutMain = () => {
         <Menu
           mode="horizontal"
           theme="light"
-          defaultSelectedKeys={["1"]}
+          selectedKeys={[selectedKey]}
           style={{
             flex: 1,
             backgroundColor: "transparent",
             borderBottom: "none",
           }}
           items={[
-            { key: "1", icon: <UserOutlined />, label: "Doctores" },
-            { key: "2", icon: <TeamOutlined />, label: "Pacientes" },
-            { key: "3", icon: <ScheduleOutlined />, label: "Consultas" },
-            { key: "4", icon: <FileTextOutlined />, label: "Estudios" },
-            { key: "5", icon: <SettingOutlined />, label: "Configuraciones" },
-            { key: "6", icon: <LogoutOutlined />, label: "Cerrar Sesión" },
+            {
+              key: "2",
+              icon: <TeamOutlined />,
+              label: "Pacientes",
+              onClick: () => navigate("/"),
+            },
+            {
+              key: "3",
+              icon: <ScheduleOutlined />,
+              label: "Consultas",
+              onClick: () => {
+                // pendiente definir ruta real de consultas
+                navigate("/");
+              },
+            },
+            {
+              key: "4",
+              icon: <FileTextOutlined />,
+              label: "Estudios",
+              onClick: () => {
+                // pendiente definir ruta real de estudios
+                navigate("/");
+              },
+            },
+            {
+              key: "5",
+              icon: <SettingOutlined />,
+              label: "Configuraciones",
+              onClick: () => navigate("/configuracion"),
+            },
+            {
+              key: "6",
+              icon: <LogoutOutlined />,
+              label: "Cerrar Sesión",
+              onClick: () => {
+                // TODO: implementar logout real cuando exista autenticación
+                navigate("/");
+              },
+            },
           ]}
         />
       </Header>

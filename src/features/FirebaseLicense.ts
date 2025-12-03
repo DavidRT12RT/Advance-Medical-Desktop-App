@@ -24,7 +24,6 @@ class FirebaseLicense {
    */
   async validateLicenseData(license: any): Promise<boolean> {
     // If no license or already marked invalid, consider it invalid
-    console.log("Lo que recibo", license);
     if (!license || !license.isValid) {
       return false;
     }
@@ -49,7 +48,8 @@ class FirebaseLicense {
       // Verificar estado y expiración
       const today = new Date().toISOString().slice(0, 10);
       const isActive =
-        licencia.estado === "activa" && (!licencia.fechaExpiracion || licencia.fechaExpiracion >= today);
+        licencia.estado === "activa" &&
+        (!licencia.fechaExpiracion || licencia.fechaExpiracion >= today);
       if (!isActive) {
         return false;
       }

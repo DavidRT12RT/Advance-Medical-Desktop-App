@@ -1,6 +1,6 @@
-import React from 'react';
-import { Input } from 'antd';
-import { SearchOutlined } from '@ant-design/icons';
+import React, { useState } from "react";
+import { Button, Input, Modal, Form } from "antd";
+import { FilterFilled, SearchOutlined } from "@ant-design/icons";
 
 interface SearchPacientesProps {
   value: string;
@@ -11,18 +11,22 @@ interface SearchPacientesProps {
 const SearchPacientes: React.FC<SearchPacientesProps> = ({
   value,
   onChange,
-  placeholder = 'Buscar por nombre, cédula, teléfono o email...',
+  placeholder = "Buscar por nombre, cédula, teléfono o email...",
 }) => {
   return (
-    <Input
-      placeholder={placeholder}
-      prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      size="large"
-      allowClear
-      style={{ maxWidth: '500px', marginBottom: '16px' }}
-    />
+    <div className="flex items-center gap-5">
+      <Input
+        placeholder={placeholder}
+        prefix={<SearchOutlined style={{ color: "#bfbfbf" }} />}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        size="large"
+        allowClear
+      />
+      {/* <Button type="primary" icon={<FilterFilled />} size="large">
+        Filtros
+      </Button> */}
+    </div>
   );
 };
 

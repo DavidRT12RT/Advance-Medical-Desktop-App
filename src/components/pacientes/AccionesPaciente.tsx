@@ -1,9 +1,15 @@
-import React from 'react';
-import { Button, Space } from 'antd';
-import { PlusOutlined, SaveOutlined, DeleteOutlined, CloseOutlined, SearchOutlined } from '@ant-design/icons';
+import React from "react";
+import { Button, Space } from "antd";
+import {
+  PlusOutlined,
+  SaveOutlined,
+  DeleteOutlined,
+  CloseOutlined,
+  SearchOutlined,
+} from "@ant-design/icons";
 
 interface AccionesPacienteProps {
-  mode: 'view' | 'create' | 'edit';
+  mode: "view" | "create" | "edit";
   onNew: () => void;
   onSave: () => void;
   onDelete: () => void;
@@ -22,20 +28,22 @@ const AccionesPaciente: React.FC<AccionesPacienteProps> = ({
   loading = false,
 }) => {
   return (
-    <Space style={{ marginTop: '24px', width: '100%', justifyContent: 'flex-end' }}>
-      {mode === 'view' && (
+    <Space
+      style={{ marginTop: "24px", width: "100%", justifyContent: "flex-end" }}
+    >
+      {mode === "view" && (
         <Button
           type="primary"
           icon={<PlusOutlined />}
           onClick={onNew}
           size="large"
-          style={{ minWidth: '150px' }}
+          style={{ minWidth: "150px" }}
         >
           Nuevo
         </Button>
       )}
 
-      {(mode === 'create' || mode === 'edit') && (
+      {(mode === "create" || mode === "edit") && (
         <>
           <Button
             type="primary"
@@ -43,41 +51,29 @@ const AccionesPaciente: React.FC<AccionesPacienteProps> = ({
             onClick={onSave}
             loading={loading}
             size="large"
-            style={{ minWidth: '150px', backgroundColor: '#722ed1' }}
           >
-            {mode === 'create' ? 'Crear' : 'Actualizar datos'}
+            {mode === "create" ? "Crear" : "Actualizar datos"}
           </Button>
 
-          {mode === 'edit' && (
+          {mode === "edit" && (
             <Button
               danger
               icon={<DeleteOutlined />}
               onClick={onDelete}
               loading={loading}
               size="large"
-              style={{ minWidth: '150px' }}
             >
               Borrar
             </Button>
           )}
 
           {onSearch && (
-            <Button
-              icon={<SearchOutlined />}
-              onClick={onSearch}
-              size="large"
-              style={{ minWidth: '150px', backgroundColor: '#722ed1', color: 'white' }}
-            >
+            <Button icon={<SearchOutlined />} onClick={onSearch} size="large">
               Buscar
             </Button>
           )}
 
-          <Button
-            icon={<CloseOutlined />}
-            onClick={onCancel}
-            size="large"
-            style={{ minWidth: '150px', backgroundColor: '#722ed1', color: 'white' }}
-          >
+          <Button icon={<CloseOutlined />} onClick={onCancel} size="large">
             Cancelar
           </Button>
         </>
