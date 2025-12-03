@@ -6,6 +6,7 @@ import LicenseGate from './components/LicenseGate';
 import Login from './components/Login';
 import App from './App';
 import { ConfigProvider } from 'antd';
+import FirebaseLicense from './features/FirebaseLicense';
 
 export default function Root() {
   const auth = getAuth(app); // <- Aqui inicializamos Firebase!!!!
@@ -42,11 +43,12 @@ export default function Root() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // User logged in - save to Electron Store
+        //Obtener informacion del usuario
+
+        const userInfo = await FirebaseLicense.obtenerInformacionDelUsuarioPorUIDFirebase(firebaseUser.uid);
+
         await setUser({
-          uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          displayName: firebaseUser.displayName,
+          ...userInfo
         });
       } else {
         // User logged out
@@ -70,6 +72,8 @@ export default function Root() {
     }
   };
 
+  console.log("User desde el ROOT:", user);
+
   let content = null;
   if (loading) {
     content = (
@@ -83,8 +87,7 @@ export default function Root() {
   } else {
     content = <App />;
   }
-  
-  content = <App />;
+  // content = <App />;
 
   return (
     <ConfigProvider

@@ -1,4 +1,4 @@
-import { Avatar, Button, Dropdown, Tooltip } from "antd";
+import { Avatar, Button, Dropdown, Form, Skeleton, Tooltip } from "antd";
 import {
   PlusOutlined,
   MoreOutlined,
@@ -6,18 +6,113 @@ import {
   EditOutlined,
 } from "@ant-design/icons";
 
-import { useDispatch } from "react-redux";
-import { setOpenModalConsultas } from "../../store/pacientesSlice";
+import { useDispatch, useSelector } from "react-redux";
+import {
+  setDetalleDePaciente,
+  setListaDePacientes,
+  setLoading,
+  setMode,
+  setOpenDrawer,
+  setOpenModalConsultas,
+  setRefresh,
+} from "../../store/pacientesSlice";
+import ModalPaciente from "../pacientes/ModalPaciente";
+
+import DatosPaciente from "../pacientes/DatosPaciente";
+import AntecedentePaciente from "../pacientes/AntecedentePaciente";
+import dayjs from "dayjs";
+import { cleanUndefinedValues } from "../../helpers/cleanUndefinedValues";
+import { message } from "antd";
+import FirebasePacientes from "../../features/FirebasePacientes";
 
 const HeaderPacienteDetalle = () => {
   const dispatch = useDispatch();
+  // TODO: Obtener empresaId del contexto de autenticación
+  const empresaId = "GoFayqIW9MR718FzNpyzGUgaK283";
+
+  const detalleDePaciente = useSelector(
+    (state: any) => state.pacientes.detalleDePaciente
+  );
+  const loading = useSelector((state: any) => state.pacientes.loading);
+
+  const [formDatosGenerales] = Form.useForm();
+  const [formAntecedentes] = Form.useForm();
+
+  const {
+    mode,
+    loading: loadingModal,
+    openDrawer,
+  } = useSelector((state: any) => state.pacientes);
+
+  const steps = [
+    {
+      title: "Datos Generales",
+      component: <DatosPaciente form={formDatosGenerales} />,
+      form: formDatosGenerales,
+    },
+    {
+      title: "Antecedentes",
+      component: <AntecedentePaciente form={formAntecedentes} />,
+      form: formAntecedentes,
+    },
+  ];
+
+  const handleEditPaciente = async () => {
+    try {
+      let datosGenerales = await formDatosGenerales.validateFields();
+      let antecedentes = await formAntecedentes.validateFields();
+
+      datosGenerales = cleanUndefinedValues(datosGenerales);
+      antecedentes = cleanUndefinedValues(antecedentes);
+
+      // Formatear valores necesarios
+      const fechaNacimiento = dayjs(datosGenerales.fechaNacimiento).format(
+        "YYYY-MM-DD"
+      );
+      const values = { ...datosGenerales, ...antecedentes, fechaNacimiento };
+      dispatch(setLoading(true));
+
+      values.id = detalleDePaciente?.id || "";
+      const pacienteActualizado =
+        await FirebasePacientes.crearActualizarPaciente(empresaId, values);
+      const pacientesActualizados = await FirebasePacientes.obtenerPacientes(
+        empresaId
+      );
+      dispatch(setListaDePacientes(pacientesActualizados));
+      message.success("Paciente actualizado exitosamente");
+      dispatch(setDetalleDePaciente(pacienteActualizado));
+
+      dispatch(setMode("view"));
+      dispatch(setOpenDrawer(false));
+      formDatosGenerales.resetFields();
+      formAntecedentes.resetFields();
+      dispatch(setLoading(false));
+      dispatch(setRefresh(Math.random()));
+    } catch (error) {
+      console.error("Validation failed:", error);
+      message.error("Error al guardar paciente");
+      dispatch(setLoading(false));
+    }
+  };
 
   const getMenuItems = (): any[] => [
     {
       key: 0,
       label: "Editar paciente",
       icon: <EditOutlined />,
-      onClick: () => {},
+      onClick: () => {
+        dispatch(setMode("edit"));
+        dispatch(setOpenDrawer(true));
+        const pacienteParaForm = {
+          ...detalleDePaciente,
+          fechaNacimiento: detalleDePaciente.fechaNacimiento
+            ? dayjs(detalleDePaciente.fechaNacimiento as any)
+            : null,
+        };
+
+        formDatosGenerales.setFieldsValue(pacienteParaForm);
+        formAntecedentes.setFieldsValue(pacienteParaForm);
+      },
     },
     {
       type: "divider",
@@ -29,13 +124,17 @@ const HeaderPacienteDetalle = () => {
     },
   ];
 
+  if (loading) {
+    return <Skeleton />;
+  }
+
   return (
     <div className="flex items-center justify-between gap-4">
       <div className="flex items-center gap-2">
         <Avatar size={50} />
-        <h1 style={{ fontSize: "24px", fontWeight: 600 }}>
-          David Arcos Melgarejo
-        </h1>
+        <h1
+          style={{ fontSize: "24px", fontWeight: 600 }}
+        >{`${detalleDePaciente?.nombres} ${detalleDePaciente?.apellidoPaterno} ${detalleDePaciente?.apellidoMaterno}`}</h1>
       </div>
       <div className="flex items-center gap-2">
         <Button
@@ -58,6 +157,15 @@ const HeaderPacienteDetalle = () => {
           </Tooltip>
         </Dropdown>
       </div>
+      <ModalPaciente
+        visible={openDrawer}
+        onCancel={() => dispatch(setOpenDrawer(false))}
+        onDelete={() => dispatch(setOpenDrawer(false))}
+        onCreate={handleEditPaciente}
+        mode={mode}
+        steps={steps}
+        loading={loadingModal}
+      />
     </div>
   );
 };

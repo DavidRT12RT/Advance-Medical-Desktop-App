@@ -12,10 +12,14 @@ import {
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 // @ts-ignore
 import logoEmpresa from "../../assets/logo.png";
+import { useElectronStore } from "../hooks/useElectronStore";
 
 const { Header, Content } = Layout;
 
 const LayoutMain = () => {
+  // Electron Store with local state
+  const { logout } = useElectronStore();
+
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -89,8 +93,7 @@ const LayoutMain = () => {
               icon: <LogoutOutlined />,
               label: "Cerrar Sesión",
               onClick: () => {
-                // TODO: implementar logout real cuando exista autenticación
-                navigate("/");
+                logout();
               },
             },
           ]}

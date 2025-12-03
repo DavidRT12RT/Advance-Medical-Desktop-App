@@ -7,15 +7,11 @@ import { useNavigate } from "react-router-dom";
 interface PacientesListProps {
   pacientes: Paciente[];
   loading?: boolean;
-  onSelectPaciente: (paciente: Paciente) => void;
-  selectedPacienteId?: string;
 }
 
 const PacientesList: React.FC<PacientesListProps> = ({
   pacientes,
   loading = false,
-  onSelectPaciente,
-  selectedPacienteId,
 }) => {
   const navigate = useNavigate();
 
@@ -40,7 +36,7 @@ const PacientesList: React.FC<PacientesListProps> = ({
             padding: "12px 16px",
           }}
           actions={[
-            <a key="list-loadmore-edit">Editar</a>,
+            // <a key="list-loadmore-edit">Editar</a>,
             <a
               key="list-loadmore-more"
               onClick={() => navigate(`/paciente-detalle/${paciente.id}`)}

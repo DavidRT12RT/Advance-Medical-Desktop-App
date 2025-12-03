@@ -103,6 +103,40 @@ class FirebaseLicense {
 
     return licencia;
   }
+
+  async obtenerInformacionDelUsuarioPorUIDFirebase(firebaseUID: string) {
+    let finalData = {};
+
+    //Buscar la coleccion del usuario
+    const usuariosRef = collection(firestore, "usuarios");
+    const q = query(usuariosRef, where("firebaseUID", "==", firebaseUID));
+    const querySnapshot = await getDocs(q);
+
+    if (!querySnapshot.empty) {
+      const userData = querySnapshot.docs[0].data();
+      finalData = { ...userData };
+    }
+
+    // Buscar la empresa del usuario
+    if (!querySnapshot.empty) {
+      const userData = querySnapshot.docs[0].data();
+      const empresaId = userData.idEmpresa;
+
+      if (empresaId) {
+        const empresaRef = doc(firestore, "empresas", empresaId);
+        const empresaDoc = await getDoc(empresaRef);
+        if (empresaDoc.exists()) {
+          finalData = { ...finalData, empresa: empresaDoc.data() };
+        }
+      }
+    }
+
+    if (!querySnapshot.empty) {
+      return finalData;
+    }
+
+    return null;
+  }
 }
 
 export default new FirebaseLicense();

@@ -10,6 +10,7 @@ interface PacientesState {
   listaDePacientes: Paciente[];
   detalleDePaciente: Paciente | null;
   error: string | null;
+  refresh: number | boolean;
 }
 
 const initialState: PacientesState = {
@@ -21,6 +22,7 @@ const initialState: PacientesState = {
   listaDePacientes: [],
   detalleDePaciente: null,
   error: null,
+  refresh: false,
 };
 
 export const pacientesSlice = createSlice({
@@ -68,6 +70,9 @@ export const pacientesSlice = createSlice({
     setMode: (state, action: PayloadAction<"view" | "create" | "edit">) => {
       state.mode = action.payload;
     },
+    setRefresh: (state, action: PayloadAction<number | boolean>) => {
+      state.refresh = action.payload;
+    },
   },
 });
 
@@ -83,6 +88,7 @@ export const {
   eliminarPacienteDelista,
   setError,
   setMode,
+  setRefresh,
 } = pacientesSlice.actions;
 
 export default pacientesSlice.reducer;

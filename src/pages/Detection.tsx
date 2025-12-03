@@ -6,6 +6,7 @@ import Webcam from "react-webcam";
 import io, { Socket } from "socket.io-client";
 import FirebaseConsultas from "../features/FirebaseConsultas";
 import FirebasePacientes from "../features/FirebasePacientes";
+import FirebaseMedia from "../features/FirebaseMedia";
 import SectionTitle from "../components/common/SectionTitle";
 
 const SERVER_URL =
@@ -67,6 +68,93 @@ interface LLMAnalysis {
 
 const MAX_SEGMENTS_SAVED = 10;
 const MIN_SEGMENT_CONFIDENCE = 0.8;
+
+// Frames que mantenemos encendido el indicador de pólipos en la UI
+// después de la última detección > 0, para evitar parpadeos rápidos.
+const POLYP_UI_HOLD_FRAMES = TARGET_FPS / 4; // ~250ms
+
+// Imágenes representativas por sesión para no saturar Storage
+const MAX_POLYP_IMAGES_PER_SESSION = 6;
+// Definimos un gap máximo entre frames con pólipo para considerar un nuevo segmento visual
+const MAX_POLYP_IMAGE_FRAME_GAP = TARGET_FPS; // ~1 segundo a 60 FPS
+
+const dataUrlToBlob = (dataUrl: string): Blob => {
+  const parts = dataUrl.split(",");
+  const base64Data = parts[1];
+  const contentTypeMatch = parts[0].match(/data:(.*);base64/);
+  const contentType = contentTypeMatch ? contentTypeMatch[1] : "image/jpeg";
+  const byteCharacters = atob(base64Data);
+  const byteNumbers = new Array(byteCharacters.length);
+  for (let i = 0; i < byteCharacters.length; i++) {
+    byteNumbers[i] = byteCharacters.charCodeAt(i);
+  }
+  const byteArray = new Uint8Array(byteNumbers);
+  return new Blob([byteArray], { type: contentType });
+};
+
+const drawDetectionsOnImage = (
+  base64Image: string,
+  detections: any[]
+): Promise<Blob> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = FRAME_WIDTH;
+      canvas.height = FRAME_HEIGHT;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("No se pudo obtener el contexto del canvas"));
+        return;
+      }
+
+      // Dibujar la imagen base
+      ctx.drawImage(img, 0, 0, FRAME_WIDTH, FRAME_HEIGHT);
+
+      // Dibujar detecciones en verde (mismo estilo que overlay)
+      ctx.strokeStyle = "#00FF00";
+      ctx.lineWidth = 2;
+      ctx.font = "14px Arial";
+
+      (detections || []).forEach((d: any) => {
+        const bbox = d.bbox;
+        if (!bbox) return;
+        const { x1, y1, x2, y2 } = bbox;
+        const width = x2 - x1;
+        const height = y2 - y1;
+
+        ctx.strokeRect(x1, y1, width, height);
+
+        const className = d.class ?? d.className ?? "polyp";
+        const confidence = d.confidence ?? 0;
+        const label = `${className} (${(confidence * 100).toFixed(1)}%)`;
+
+        const textMetrics = ctx.measureText(label);
+        const textHeight = 18;
+
+        ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+        ctx.fillRect(x1, y2 + 2, textMetrics.width + 4, textHeight);
+
+        ctx.fillStyle = "#00FF00";
+        ctx.fillText(label, x1 + 2, y2 + 16);
+      });
+
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            reject(new Error("No se pudo generar el blob de la imagen"));
+          } else {
+            resolve(blob);
+          }
+        },
+        "image/jpeg",
+        0.9
+      );
+    };
+    img.onerror = (err) => reject(err);
+    img.src = base64Image;
+  });
+};
 
 const buildPolypSegments = (events: CnnPolypEvent[]): CnnPolypSegment[] => {
   if (!events || events.length === 0) return [];
@@ -147,6 +235,12 @@ const Detection: React.FC = () => {
   const frameIndexRef = useRef(0);
   const isCapturingRef = useRef(false);
   const polypEventsRef = useRef<CnnPolypEvent[]>([]);
+  const polypImageUrlsRef = useRef<string[]>([]);
+  const lastPolypFrameWithImageRef = useRef<number | null>(null);
+  const lastDetectionsRef = useRef<any[]>([]);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const polypHoldCounterRef = useRef(0);
 
   const [isConnected, setIsConnected] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -156,6 +250,7 @@ const Detection: React.FC = () => {
     polyps: 0,
     time: 0,
   });
+  const [displayPolyps, setDisplayPolyps] = useState(0);
   const [llmAnalysis, setLlmAnalysis] = useState<LLMAnalysis | null>(null);
   const [isLlmExpanded, setIsLlmExpanded] = useState(false);
   const [paciente, setPaciente] = useState<any | null>(null);
@@ -372,6 +467,22 @@ const Detection: React.FC = () => {
         time: data.processing_time_ms,
       });
 
+      // Suavizar indicador de pólipos en UI para evitar parpadeos 0 ↔ 1
+      if (data.num_polyps > 0) {
+        polypHoldCounterRef.current = POLYP_UI_HOLD_FRAMES;
+        setDisplayPolyps(data.num_polyps);
+      } else {
+        if (polypHoldCounterRef.current > 0) {
+          polypHoldCounterRef.current -= 1;
+          // mantenemos el displayPolyps actual
+        } else {
+          setDisplayPolyps(0);
+        }
+      }
+
+      // Guardar últimas detecciones para poder pintarlas en el canvas de video
+      lastDetectionsRef.current = data.detections || [];
+
       // Registrar eventos de pólipos (solo cuando hay al menos un pólipo)
       if (data.num_polyps > 0) {
         polypEventsRef.current.push({
@@ -385,6 +496,42 @@ const Detection: React.FC = () => {
             confidence: d.confidence,
           })),
         });
+
+        // Capturar una imagen representativa por "segmento" de pólipo
+        // definido por un gap máximo de frames entre detecciones.
+        const lastFrame = lastPolypFrameWithImageRef.current;
+        const isNewSegment =
+          lastFrame === null ||
+          data.frame_index - lastFrame > MAX_POLYP_IMAGE_FRAME_GAP;
+
+        const canCaptureMore =
+          polypImageUrlsRef.current.length < MAX_POLYP_IMAGES_PER_SESSION;
+
+        if (isNewSegment && canCaptureMore) {
+          const screenshot = webcamRef.current?.getScreenshot();
+          if (screenshot && pacienteId && consultaId) {
+            const sessionKey = sessionId || "default";
+
+            drawDetectionsOnImage(screenshot, data.detections || [])
+              .then((blob) =>
+                FirebaseMedia.subirFrameDeConsulta(
+                  empresaId,
+                  pacienteId,
+                  consultaId,
+                  sessionKey,
+                  data.frame_index,
+                  blob
+                )
+              )
+              .then((url) => {
+                polypImageUrlsRef.current.push(url);
+                lastPolypFrameWithImageRef.current = data.frame_index;
+              })
+              .catch((error) => {
+                console.error("Error subiendo imagen de pólipo:", error);
+              });
+          }
+        }
       }
 
       // Dibujar detecciones en el canvas overlay
@@ -466,6 +613,34 @@ const Detection: React.FC = () => {
     setIsCapturing(true);
     frameIndexRef.current = 0;
     polypEventsRef.current = [];
+    polypImageUrlsRef.current = [];
+    lastPolypFrameWithImageRef.current = null;
+    recordedChunksRef.current = [];
+
+    // Reiniciar detecciones para video
+    lastDetectionsRef.current = [];
+
+    const canvas = canvasRef.current as HTMLCanvasElement | null;
+    const mediaStream =
+      canvas && (canvas as any).captureStream
+        ? (canvas as any).captureStream(TARGET_FPS)
+        : undefined;
+    if (mediaStream && typeof MediaRecorder !== "undefined") {
+      try {
+        const recorder = new MediaRecorder(mediaStream, {
+          mimeType: "video/webm",
+        });
+        mediaRecorderRef.current = recorder;
+        recorder.ondataavailable = (event: BlobEvent) => {
+          if (event.data && event.data.size > 0) {
+            recordedChunksRef.current.push(event.data);
+          }
+        };
+        recorder.start();
+      } catch (error) {
+        console.error("No se pudo iniciar la grabación de video:", error);
+      }
+    }
   }, [isConnected, empresaId, pacienteId, consultaId, doctorId]);
 
   // Capturar y enviar frames
@@ -491,6 +666,36 @@ const Detection: React.FC = () => {
             if (!ctx) return;
 
             ctx.drawImage(img, 0, 0, FRAME_WIDTH, FRAME_HEIGHT);
+
+            // Dibujar también los bounding boxes en el canvas de procesamiento
+            const detections = lastDetectionsRef.current || [];
+            ctx.strokeStyle = "#00FF00";
+            ctx.lineWidth = 2;
+            ctx.font = "14px Arial";
+
+            (detections || []).forEach((d: any) => {
+              const bbox = d.bbox;
+              if (!bbox) return;
+              const { x1, y1, x2, y2 } = bbox;
+              const width = x2 - x1;
+              const height = y2 - y1;
+
+              ctx.strokeRect(x1, y1, width, height);
+
+              const className = d.class ?? d.className ?? "polyp";
+              const confidence = d.confidence ?? 0;
+              const label = `${className} (${(confidence * 100).toFixed(1)}%)`;
+
+              const textMetrics = ctx.measureText(label);
+              const textHeight = 18;
+
+              ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+              ctx.fillRect(x1, y2 + 2, textMetrics.width + 4, textHeight);
+
+              ctx.fillStyle = "#00FF00";
+              ctx.fillText(label, x1 + 2, y2 + 16);
+            });
+
             const imageData = ctx.getImageData(0, 0, FRAME_WIDTH, FRAME_HEIGHT);
             const data = imageData.data;
 
@@ -541,6 +746,15 @@ const Detection: React.FC = () => {
     socketRef.current?.emit("finish");
     setIsCapturing(false);
 
+    // Detener la grabación de video si está activa
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      await new Promise<void>((resolve) => {
+        recorder.onstop = () => resolve();
+        recorder.stop();
+      });
+    }
+
     if (pacienteId && consultaId) {
       const allEvents = polypEventsRef.current;
       const allSegments = buildPolypSegments(allEvents);
@@ -575,10 +789,33 @@ const Detection: React.FC = () => {
 
       //Obtener las sesiones actuales
       const newSecciones = consulta?.secciones_ai || [];
+
+      // Subir video completo de la sesión si existe
+      let videoUrl: string | null = null;
+      if (recordedChunksRef.current.length > 0) {
+        try {
+          const videoBlob = new Blob(recordedChunksRef.current, {
+            type: "video/webm",
+          });
+          const sessionKey = sessionId || "general";
+          videoUrl = await FirebaseMedia.subirVideoDeConsulta(
+            empresaId,
+            pacienteId,
+            consultaId,
+            sessionKey,
+            videoBlob
+          );
+        } catch (error) {
+          console.error("Error subiendo video de consulta:", error);
+        }
+      }
+
       newSecciones.push({
         ia_cnn: cnnData,
         ia_llm: llmAnalysis,
         timestamp: new Date().toISOString(),
+        polypImages: polypImageUrlsRef.current,
+        videoUrl,
       });
 
       try {
@@ -730,10 +967,10 @@ const Detection: React.FC = () => {
                   <div className="flex flex-col items-center">
                     <span
                       className={`text-2xl font-bold ${
-                        stats.polyps > 0 ? "text-red-400" : "text-green-400"
+                        displayPolyps > 0 ? "text-red-400" : "text-green-400"
                       }`}
                     >
-                      {stats.polyps}
+                      {displayPolyps}
                     </span>
                     <span className="text-[11px] text-gray-200">Pólipos</span>
                   </div>

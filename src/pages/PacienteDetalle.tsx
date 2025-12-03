@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import HeaderPacienteDetalle from "../components/pacientes-detalle/HeaderPacienteDetalle";
 import InformacionPacienteDetalle from "../components/pacientes-detalle/InformacionPacienteDetalle";
@@ -6,9 +6,20 @@ import ConsultasPacienteDetalle from "../components/pacientes-detalle/ConsultasP
 import ConsultasPendientesPacienteDetalle from "../components/pacientes-detalle/ConsultasPendientesPacienteDetalle";
 import ModalConsultaPacienteDetalle from "../components/pacientes-detalle/ModalConsultaPacienteDetalle";
 import RegistrosMedicosPacienteDetalle from "../components/pacientes-detalle/RegistrosMedicosPacienteDetalle";
+import FirebasePacientes from "../features/FirebasePacientes";
+import { Skeleton } from "antd";
+import { useDispatch, useSelector } from "react-redux";
+import {
+  setDetalleDePaciente,
+  setLoading,
+  setRefresh,
+} from "../store/pacientesSlice";
+import ScalyMedicoChat from "../components/pacientes-detalle/ScalyMedicoChat";
 
 const PacienteDetalle = () => {
-  const { id } = useParams();
+  const { id: pacienteId } = useParams<{ id: string }>();
+  const empresaId = "GoFayqIW9MR718FzNpyzGUgaK283";
+
   const [activeTab, setActiveTab] = useState("informacion");
 
   const tabs = [
@@ -16,7 +27,46 @@ const PacienteDetalle = () => {
     { id: "historial", label: "Historial de Consultas" },
     { id: "proximos", label: "Próximos Tratamientos" },
     { id: "registros", label: "Registros Médicos" },
+    { id: "scaly", label: "Scaly Asistente Médico" },
   ];
+
+  const dispatch = useDispatch();
+  const detalleDePaciente = useSelector(
+    (state: any) => state.pacientes.detalleDePaciente
+  );
+  const loading = useSelector((state: any) => state.pacientes.loading);
+  const refresh = useSelector((state: any) => state.pacientes.refresh);
+
+  useEffect(() => {
+    const fetchPaciente = async () => {
+      if (!pacienteId) {
+        return;
+      }
+
+      try {
+        const data = await FirebasePacientes.obtenerPacientePorId(
+          empresaId,
+          pacienteId
+        );
+        dispatch(setDetalleDePaciente(data));
+      } catch (error) {
+        console.error("Error obteniendo paciente:", error);
+      } finally {
+        dispatch(setLoading(false));
+        dispatch(setRefresh(false));
+      }
+    };
+
+    fetchPaciente();
+  }, [empresaId, pacienteId, refresh]);
+
+  if (loading) {
+    return <Skeleton />;
+  }
+
+  if (!detalleDePaciente) {
+    return <div>No se encontró el paciente</div>;
+  }
 
   return (
     <section className="flex flex-col gap-6 p-5">
@@ -47,6 +97,7 @@ const PacienteDetalle = () => {
         {activeTab === "historial" && <ConsultasPacienteDetalle />}
         {activeTab === "proximos" && <ConsultasPendientesPacienteDetalle />}
         {activeTab === "registros" && <RegistrosMedicosPacienteDetalle />}
+        {activeTab === "scaly" && <ScalyMedicoChat />}
       </div>
 
       {/* Modal consulta*/}

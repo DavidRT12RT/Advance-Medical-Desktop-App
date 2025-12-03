@@ -1,3 +1,4 @@
+import React, { useState } from "react";
 import { Modal } from "antd";
 import dayjs from "dayjs";
 
@@ -14,6 +15,8 @@ const ModalInfoSeccionAI = ({
   selectedSessionIndex,
   aiSessions,
 }: ModalInfoSeccionAIProps) => {
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+
   return (
     <Modal
       open={isSessionModalOpen}
@@ -42,9 +45,66 @@ const ModalInfoSeccionAI = ({
         const cnnSummary = cnn?.summary;
         const segments = cnn?.segments || [];
         const llm = session?.ia_llm;
+        const polypImages: string[] = Array.isArray(session?.polypImages)
+          ? session.polypImages
+          : [];
+        const videoUrl: string | undefined = session?.videoUrl;
 
         return (
-          <div className="space-y-4">
+          <div className="space-y-5">
+            {(videoUrl || polypImages.length > 0) && (
+              <div className="bg-gray-900 rounded-lg p-4 border border-gray-800 space-y-4">
+                {videoUrl && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-gray-300 uppercase tracking-wide">
+                      Video de la sesión
+                    </p>
+                    <div className="aspect-video w-full rounded-md overflow-hidden bg-black">
+                      <video
+                        src={videoUrl}
+                        controls
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {polypImages.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-semibold text-gray-300 uppercase tracking-wide">
+                        Imágenes capturadas
+                      </p>
+                      <span className="text-[11px] text-gray-400">
+                        {polypImages.length === 1
+                          ? "1 imagen"
+                          : `${polypImages.length} imágenes`}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-40 overflow-auto pr-1">
+                      {polypImages.map((url, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setPreviewImage(url)}
+                          className="relative group rounded-md overflow-hidden border border-gray-700 hover:border-indigo-400 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                        >
+                          <img
+                            src={url}
+                            alt={`Polipo ${idx + 1}`}
+                            className="w-full h-20 object-cover transform group-hover:scale-105 transition"
+                          />
+                          <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded-full bg-black/70 text-[10px] text-gray-100">
+                            #{idx + 1}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-gray-50 rounded-lg p-4 border border-gray-100">
                 <p className="text-xs font-semibold text-gray-500 uppercase mb-1">
@@ -157,6 +217,24 @@ const ModalInfoSeccionAI = ({
                   ))}
                 </div>
               </div>
+            )}
+
+            {previewImage && (
+              <Modal
+                open={!!previewImage}
+                footer={null}
+                onCancel={() => setPreviewImage(null)}
+                centered
+                width={900}
+              >
+                <div className="w-full flex items-center justify-center bg-black rounded-md overflow-hidden">
+                  <img
+                    src={previewImage}
+                    alt="Detalle de pólipo"
+                    className="max-h-[75vh] w-auto object-contain"
+                  />
+                </div>
+              </Modal>
             )}
           </div>
         );

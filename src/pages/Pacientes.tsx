@@ -17,6 +17,7 @@ import HeaderPaciente from "../components/pacientes/HeaderPaciente";
 import ModalPaciente from "../components/pacientes/ModalPaciente";
 import { Paciente } from "../types/Paciente";
 import dayjs from "dayjs";
+import { cleanUndefinedValues } from "../helpers/cleanUndefinedValues";
 
 const Pacientes = () => {
   // TODO: Obtener empresaId del contexto de autenticación
@@ -76,18 +77,6 @@ const Pacientes = () => {
     dispatch(setOpenDrawer(true));
     formDatosGenerales.resetFields();
     formAntecedentes.resetFields();
-  };
-
-  const cleanUndefinedValues = (obj: any) => {
-    /* 
-      Elimina las propiedades con valor undefined y las transforma a null
-    */
-    Object.entries(obj).forEach(([key, value]) => {
-      if (value === undefined) {
-        obj[key] = null;
-      }
-    });
-    return obj;
   };
 
   const handleSave = async () => {
@@ -202,12 +191,7 @@ const Pacientes = () => {
     <div className="flex flex-col gap-4 p-5">
       <HeaderPaciente onNew={handleNew} />
       <SearchPacientes value={searchText} onChange={setSearchText} />
-      <PacientesList
-        pacientes={filteredPacientes}
-        loading={loading}
-        onSelectPaciente={handleSelectPaciente}
-        selectedPacienteId={detalleDePaciente?.id}
-      />
+      <PacientesList pacientes={filteredPacientes} loading={loading} />
       <ModalPaciente
         visible={openDrawer}
         onCancel={handleCancel}

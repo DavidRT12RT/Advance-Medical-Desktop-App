@@ -15,7 +15,6 @@ import {
 
 const RegistrosMedicosPacienteDetalle: React.FC = () => {
   const { id: pacienteId } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const empresaId = "GoFayqIW9MR718FzNpyzGUgaK283";
 
   const [loading, setLoading] = useState(true);

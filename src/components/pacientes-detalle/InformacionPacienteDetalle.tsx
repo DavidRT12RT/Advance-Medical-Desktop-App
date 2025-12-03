@@ -1,39 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { Skeleton } from "antd";
-import { useParams } from "react-router-dom";
 import dayjs from "dayjs";
-import FirebasePacientes from "../../features/FirebasePacientes";
 import { Paciente } from "../../types/Paciente";
+import { useSelector } from "react-redux";
 
 const InformacionPacienteDetalle = () => {
-  const { id: pacienteId } = useParams<{ id: string }>();
-  const empresaId = "GoFayqIW9MR718FzNpyzGUgaK283";
-
-  const [loading, setLoading] = useState(true);
-  const [paciente, setPaciente] = useState<Paciente | null>(null);
-
-  useEffect(() => {
-    const fetchPaciente = async () => {
-      if (!pacienteId) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const data = await FirebasePacientes.obtenerPacientePorId(
-          empresaId,
-          pacienteId
-        );
-        setPaciente(data);
-      } catch (error) {
-        console.error("Error obteniendo paciente:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPaciente();
-  }, [empresaId, pacienteId]);
+  const detalleDePaciente = useSelector(
+    (state: any) => state.pacientes.detalleDePaciente
+  );
+  const loading = useSelector((state: any) => state.pacientes.loading);
 
   const calcularEdad = (
     fechaNacimiento?: Paciente["fechaNacimiento"]
@@ -92,7 +67,7 @@ const InformacionPacienteDetalle = () => {
     );
   }
 
-  if (!paciente) {
+  if (!detalleDePaciente) {
     return (
       <section className="space-y-2">
         <h2 className="text-lg font-semibold text-gray-800 border-l-4 border-blue-600 pl-3">
@@ -105,21 +80,22 @@ const InformacionPacienteDetalle = () => {
     );
   }
 
-  const fechaNacimientoDayjs = paciente.fechaNacimiento
-    ? dayjs.isDayjs(paciente.fechaNacimiento)
-      ? paciente.fechaNacimiento
-      : dayjs(paciente.fechaNacimiento as any)
+  const fechaNacimientoDayjs = detalleDePaciente.fechaNacimiento
+    ? dayjs.isDayjs(detalleDePaciente.fechaNacimiento)
+      ? detalleDePaciente.fechaNacimiento
+      : dayjs(detalleDePaciente.fechaNacimiento as any)
     : null;
 
   const edad = fechaNacimientoDayjs
     ? dayjs().diff(fechaNacimientoDayjs, "year")
-    : calcularEdad(paciente.fechaNacimiento);
+    : calcularEdad(detalleDePaciente.fechaNacimiento);
 
   const fechaNacimientoTexto = fechaNacimientoDayjs
     ? fechaNacimientoDayjs.format("DD/MM/YYYY")
     : "-";
 
-  const telefono = paciente.celular || paciente.telefonoCasa || "-";
+  const telefono =
+    detalleDePaciente.celular || detalleDePaciente.telefonoCasa || "-";
 
   return (
     <section className="space-y-8">
@@ -138,7 +114,7 @@ const InformacionPacienteDetalle = () => {
           <div className="space-y-1">
             <p className="text-sm text-gray-500 font-medium">Género</p>
             <p className="text-base font-semibold text-gray-900">
-              {paciente.sexo || "-"}
+              {detalleDePaciente.sexo || "-"}
             </p>
           </div>
           <div className="space-y-1">
@@ -146,7 +122,7 @@ const InformacionPacienteDetalle = () => {
               Correo Electrónico
             </p>
             <p className="text-base font-semibold text-gray-900">
-              {paciente.email || "-"}
+              {detalleDePaciente.email || "-"}
             </p>
           </div>
 
@@ -167,7 +143,7 @@ const InformacionPacienteDetalle = () => {
               Cédula de Identidad
             </p>
             <p className="text-base font-semibold text-gray-900">
-              {paciente.cedula || "-"}
+              {detalleDePaciente.cedula || "-"}
             </p>
           </div>
         </div>
@@ -179,7 +155,7 @@ const InformacionPacienteDetalle = () => {
           Observaciones generales del Médico
         </p>
         <p className="text-sm text-gray-700">
-          {paciente.observaciones || "Sin observaciones"}
+          {detalleDePaciente.observaciones || "Sin observaciones"}
         </p>
       </div>
     </section>
