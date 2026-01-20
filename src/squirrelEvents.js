@@ -37,13 +37,12 @@ function executeSquirrelCommand(args, callback) {
  */
 function createInstallWindow(title, message, isUninstall = false) {
   const installWindow = new BrowserWindow({
-    width: 550,
-    height: 450,
+    width: 600,
+    height: 500,
     frame: false,
     transparent: false,
     backgroundColor: '#f9fafb',
     alwaysOnTop: true,
-    skipTaskbar: true,
     resizable: false,
     center: true,
     webPreferences: {
@@ -52,113 +51,96 @@ function createInstallWindow(title, message, isUninstall = false) {
     },
   });
 
-  // Asegurar que siempre esté al frente
   installWindow.setAlwaysOnTop(true, 'screen-saver');
-  installWindow.focus();
 
-  // Leer el logo desde assets
   const fs = require('fs');
   let logoBase64 = '';
-
   try {
-    // En producción, __dirname apunta a resources/app.asar/dist
-    // Necesitamos ir a resources/assets
     const logoPath = path.join(process.resourcesPath, 'assets', 'logo.png');
-    console.log('[Squirrel] Intentando cargar logo desde:', logoPath);
-
     if (fs.existsSync(logoPath)) {
       logoBase64 = fs.readFileSync(logoPath).toString('base64');
-      console.log('[Squirrel] Logo cargado exitosamente');
     } else {
-      console.log('[Squirrel] Logo no encontrado en:', logoPath);
-      // Fallback: intentar desde __dirname
       const fallbackPath = path.join(__dirname, '../assets/logo.png');
       if (fs.existsSync(fallbackPath)) {
         logoBase64 = fs.readFileSync(fallbackPath).toString('base64');
-        console.log('[Squirrel] Logo cargado desde fallback');
       }
     }
   } catch (error) {
     console.error('[Squirrel] Error cargando logo:', error);
   }
 
-  // HTML con diseño idéntico a LicenseGate
   const html = `
     <!DOCTYPE html>
     <html>
     <head>
       <style>
-        * {
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          background: #f9fafb;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+          background-color: #f9fafb;
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
           height: 100vh;
-          overflow: hidden;
           padding: 24px;
-          gap: 20px;
         }
         .logo {
-          width: 200px;
-          height: 200px;
-          margin-bottom: 0;
-        }
-        .logo img {
-          width: 100%;
-          height: 100%;
+          width: 180px;
+          height: 180px;
           object-fit: contain;
+          margin-bottom: 20px;
         }
         .card {
           width: 100%;
-          max-width: 28rem;
+          max-width: 400px;
           background: white;
+          border-radius: 12px;
           box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
           border: 1px solid #e5e7eb;
-          border-radius: 12px;
-          padding: 24px;
-        }
-        .message {
-          font-size: 16px;
-          color: #4b5563;
-          margin-bottom: 20px;
-          line-height: 1.5;
+          padding: 32px;
           text-align: center;
         }
+        h2 {
+          color: #111827;
+          font-size: 20px;
+          font-weight: 600;
+          margin-bottom: 8px;
+        }
+        p {
+          color: #4b5563;
+          font-size: 14px;
+          line-height: 1.5;
+          margin-bottom: 24px;
+        }
         .button {
+          display: inline-block;
           width: 100%;
-          background: #1890ff;
+          background-color: #009b9b;
           color: white;
           border: none;
-          padding: 10px 16px;
+          padding: 10px 20px;
           border-radius: 6px;
           font-size: 14px;
           font-weight: 500;
           cursor: pointer;
-          transition: all 0.2s ease;
-          outline: none;
-          box-shadow: 0 2px 0 rgba(0, 0, 0, 0.045);
+          transition: background-color 0.2s;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         .button:hover {
-          background: #40a9ff;
-        }
-        .button:active {
-          background: #096dd9;
+          background-color: #008181;
         }
       </style>
     </head>
     <body>
-      ${logoBase64 ? `<img class="logo" src="data:image/png;base64,${logoBase64}" alt="Logo">` : ''}
+      ${logoBase64 ? `<img class="logo" src="data:image/png;base64,${logoBase64}">` : ''}
       <div class="card">
-        <div class="message">
-          ${isUninstall ? 'Software de asistencia médica avanzada desinstalado' : 'Software de asistencia médica avanzada instalado'}
-        </div>
+        <h2>${isUninstall ? 'Desinstalación exitosa' : '¡Instalación completa!'}</h2>
+        <p>
+          ${isUninstall
+      ? 'El software de asistencia médica avanzada ha sido eliminado de este equipo.'
+      : 'El software de asistencia médica avanzada se ha instalado correctamente y está listo para usarse.'}
+        </p>
         <button class="button" onclick="window.close()">Cerrar</button>
       </div>
     </body>
@@ -166,9 +148,9 @@ function createInstallWindow(title, message, isUninstall = false) {
   `;
 
   installWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
-
   return installWindow;
 }
+
 
 /**
  * Maneja los eventos de Squirrel
