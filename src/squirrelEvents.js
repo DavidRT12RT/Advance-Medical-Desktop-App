@@ -154,26 +154,26 @@ export function handleSquirrelEvent() {
       // Instalación o actualización completada
       console.log('[Squirrel] Instalación/Actualización completada');
 
-      // Crear accesos directos primero
-      executeSquirrelCommand(['--createShortcut', path.basename(process.execPath)], () => {
-        console.log('[Squirrel] Accesos directos creados');
+      // Crear accesos directos
+      executeSquirrelCommand(['--createShortcut', path.basename(process.execPath)]);
 
-        // Mostrar ventana de instalación
-        app.whenReady().then(() => {
-          console.log('[Squirrel] App ready, creando ventana de instalación');
+      // Mostrar ventana de instalación
+      app.whenReady().then(() => {
+        console.log('[Squirrel] App ready, creando ventana de instalación');
 
-          const window = createInstallWindow(
-            '¡Instalación Exitosa!',
-            'AdvanceInteligentSystem se ha instalado correctamente'
-          );
+        const window = createInstallWindow(
+          '¡Instalación Exitosa!',
+          'AdvanceInteligentSystem se ha instalado correctamente'
+        );
 
-          // Cerrar después de 3 segundos
-          setTimeout(() => {
-            console.log('[Squirrel] Cerrando ventana y app');
+        // Cerrar después de 3 segundos
+        setTimeout(() => {
+          console.log('[Squirrel] Cerrando ventana y app');
+          if (window && !window.isDestroyed()) {
             window.close();
-            app.quit();
-          }, 3000);
-        });
+          }
+          app.quit();
+        }, 3000);
       });
 
       return true;
@@ -183,24 +183,24 @@ export function handleSquirrelEvent() {
       console.log('[Squirrel] Desinstalando aplicación');
 
       // Eliminar accesos directos
-      executeSquirrelCommand(['--removeShortcut', path.basename(process.execPath)], () => {
-        console.log('[Squirrel] Accesos directos eliminados');
+      executeSquirrelCommand(['--removeShortcut', path.basename(process.execPath)]);
 
-        // Mostrar ventana de desinstalación
-        app.whenReady().then(() => {
-          console.log('[Squirrel] App ready, creando ventana de desinstalación');
+      // Mostrar ventana de desinstalación
+      app.whenReady().then(() => {
+        console.log('[Squirrel] App ready, creando ventana de desinstalación');
 
-          const window = createInstallWindow(
-            'Desinstalando...',
-            'Eliminando AdvanceInteligentSystem de tu sistema'
-          );
+        const window = createInstallWindow(
+          'Desinstalando...',
+          'Eliminando AdvanceInteligentSystem de tu sistema'
+        );
 
-          setTimeout(() => {
-            console.log('[Squirrel] Cerrando ventana y app');
+        setTimeout(() => {
+          console.log('[Squirrel] Cerrando ventana y app');
+          if (window && !window.isDestroyed()) {
             window.close();
-            app.quit();
-          }, 2000);
-        });
+          }
+          app.quit();
+        }, 2000);
       });
 
       return true;
