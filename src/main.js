@@ -1,18 +1,27 @@
-const path = require('path');
-
-// Cargar dotenv solo en desarrollo
-try {
-  require('dotenv').config({ path: path.join(__dirname, '../.env') });
-} catch (error) {
-  // En producción, dotenv puede no estar disponible o no ser necesario
-  console.log('[Main] Running in production mode, dotenv not loaded');
-}
-
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { app, BrowserWindow, ipcMain } from 'electron';
 import started from 'electron-squirrel-startup';
 import { machineId } from 'node-machine-id';
 import { networkInterfaces, hostname, platform, release, arch, totalmem, freemem, cpus, userInfo } from 'os';
 import * as electronStore from './services/electronStore.js';
+import { createRequire } from 'module';
+
+// Para usar __dirname en ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Para importar módulos CommonJS en ES modules
+const require = createRequire(import.meta.url);
+
+// Cargar dotenv solo en desarrollo (sin await)
+try {
+  require('dotenv').config({ path: path.join(__dirname, '../.env') });
+} catch (error) {
+  console.log('[Main] Running in production mode, dotenv not loaded');
+}
+
+// Importar autoUpdater (CommonJS)
 const autoUpdater = require('./services/autoUpdater.js');
 
 if (started) {
