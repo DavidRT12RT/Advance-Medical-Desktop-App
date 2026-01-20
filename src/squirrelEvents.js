@@ -37,11 +37,11 @@ function executeSquirrelCommand(args, callback) {
  */
 function createInstallWindow(title, message, isUninstall = false) {
   const installWindow = new BrowserWindow({
-    width: 450,
-    height: 280,
+    width: 550,
+    height: 450,
     frame: false,
     transparent: false,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f9fafb',
     alwaysOnTop: true,
     skipTaskbar: true,
     resizable: false,
@@ -82,7 +82,7 @@ function createInstallWindow(title, message, isUninstall = false) {
     console.error('[Squirrel] Error cargando logo:', error);
   }
 
-  // HTML compacto con logo de Advance
+  // HTML con diseño idéntico a LicenseGate
   const html = `
     <!DOCTYPE html>
     <html>
@@ -95,77 +95,67 @@ function createInstallWindow(title, message, isUninstall = false) {
         }
         body {
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          background: #f9fafb;
           display: flex;
-          justify-content: center;
+          flex-direction: column;
           align-items: center;
+          justify-content: center;
           height: 100vh;
           overflow: hidden;
-        }
-        .container {
-          background: white;
-          border-radius: 16px;
-          padding: 30px;
-          text-align: center;
-          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-          max-width: 380px;
+          padding: 24px;
+          gap: 20px;
         }
         .logo {
-          width: 80px;
-          height: 80px;
-          margin: 0 auto 20px;
-          border-radius: 12px;
-          overflow: hidden;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          display: flex;
-          align-items: center;
-          justify-content: center;
+          width: 200px;
+          height: 200px;
+          margin-bottom: 0;
         }
         .logo img {
           width: 100%;
           height: 100%;
           object-fit: contain;
         }
-        .logo-fallback {
-          width: 50px;
-          height: 50px;
+        .card {
+          width: 100%;
+          max-width: 28rem;
           background: white;
-          border-radius: 8px;
+          box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+          border: 1px solid #e5e7eb;
+          border-radius: 12px;
+          padding: 24px;
         }
         .message {
           font-size: 16px;
-          color: #334155;
-          margin-bottom: 24px;
+          color: #4b5563;
+          margin-bottom: 20px;
           line-height: 1.5;
-          font-weight: 500;
+          text-align: center;
         }
         .button {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          width: 100%;
+          background: #1890ff;
           color: white;
           border: none;
-          padding: 12px 32px;
-          border-radius: 8px;
+          padding: 10px 16px;
+          border-radius: 6px;
           font-size: 14px;
-          font-weight: 600;
+          font-weight: 500;
           cursor: pointer;
           transition: all 0.2s ease;
-          box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
           outline: none;
+          box-shadow: 0 2px 0 rgba(0, 0, 0, 0.045);
         }
         .button:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 6px 16px rgba(102, 126, 234, 0.5);
+          background: #40a9ff;
         }
         .button:active {
-          transform: translateY(0);
+          background: #096dd9;
         }
       </style>
     </head>
     <body>
-      <div class="container">
-        <div class="logo">
-          ${logoBase64 ? `<img src="data:image/png;base64,${logoBase64}" alt="Advance Logo">` : '<div class="logo-fallback"></div>'}
-        </div>
+      ${logoBase64 ? `<img class="logo" src="data:image/png;base64,${logoBase64}" alt="Logo">` : ''}
+      <div class="card">
         <div class="message">
           ${isUninstall ? 'Software de asistencia médica avanzada desinstalado' : 'Software de asistencia médica avanzada instalado'}
         </div>
