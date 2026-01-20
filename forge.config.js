@@ -11,10 +11,10 @@ module.exports = {
     {
       name: '@electron-forge/maker-squirrel',
       config: {
-        setupIcon: "assets/icon.ico",
-        iconUrl: 'file://' + require('path').resolve(__dirname, 'assets/icon.ico'),
-        // Instalación silenciosa para actualizaciones
-        loadingGif: 'assets/loading.gif', // Opcional: GIF durante instalación
+        // setupIcon:"assets/icon.ico",
+        // iconUrl: 'file://' + require('path').resolve(__dirname, 'assets/icon.ico'),
+        // loadingGif: 'assets/loading.gif', // Opcional: GIF durante instalación
+        // Comentados hasta que existan los archivos de assets
       },
     },
     // macOS - ZIP para desarrollo (mantener para compatibilidad)
