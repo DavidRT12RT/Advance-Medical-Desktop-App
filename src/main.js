@@ -5,7 +5,7 @@ import { machineId } from 'node-machine-id';
 import { networkInterfaces, hostname, platform, release, arch, totalmem, freemem, cpus, userInfo } from 'os';
 import * as electronStore from './services/electronStore.js';
 import autoUpdater from './services/autoUpdater.js';
-import { handleSquirrelEvent } from './squirrelEvents.js';
+import { handleSquirrelEvent } from './squirrelEventsSimple.js';
 import { createRequire } from 'module';
 
 // Para usar __dirname en ES modules

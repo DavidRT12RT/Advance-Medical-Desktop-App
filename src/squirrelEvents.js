@@ -14,13 +14,22 @@ const __dirname = path.dirname(__filename);
 /**
  * Ejecuta el Update.exe con los argumentos especificados
  */
-function executeSquirrelCommand(args) {
+function executeSquirrelCommand(args, callback) {
   const updateExe = path.resolve(path.dirname(process.execPath), '..', 'Update.exe');
 
-  spawn(updateExe, args, { detached: true })
-    .on('close', () => {
-      app.quit();
-    });
+  console.log(`[Squirrel] Ejecutando: ${updateExe} ${args.join(' ')}`);
+
+  const child = spawn(updateExe, args, { detached: true });
+
+  child.on('close', (code) => {
+    console.log(`[Squirrel] Comando completado con código: ${code}`);
+    if (callback) callback();
+  });
+
+  child.on('error', (err) => {
+    console.error(`[Squirrel] Error ejecutando comando:`, err);
+    if (callback) callback();
+  });
 }
 
 /**
@@ -136,27 +145,35 @@ export function handleSquirrelEvent() {
 
   const squirrelCommand = process.argv[1];
 
+  console.log('[Squirrel] Argumentos recibidos:', process.argv);
+  console.log('[Squirrel] Comando detectado:', squirrelCommand);
+
   switch (squirrelCommand) {
     case '--squirrel-install':
     case '--squirrel-updated':
       // Instalación o actualización completada
       console.log('[Squirrel] Instalación/Actualización completada');
 
-      // Crear accesos directos
-      executeSquirrelCommand(['--createShortcut', path.basename(process.execPath)]);
+      // Crear accesos directos primero
+      executeSquirrelCommand(['--createShortcut', path.basename(process.execPath)], () => {
+        console.log('[Squirrel] Accesos directos creados');
 
-      // Mostrar ventana de instalación
-      app.whenReady().then(() => {
-        const window = createInstallWindow(
-          '¡Instalación Exitosa!',
-          'AdvanceInteligentSystem se ha instalado correctamente'
-        );
+        // Mostrar ventana de instalación
+        app.whenReady().then(() => {
+          console.log('[Squirrel] App ready, creando ventana de instalación');
 
-        // Cerrar después de 3 segundos
-        setTimeout(() => {
-          window.close();
-          app.quit();
-        }, 3000);
+          const window = createInstallWindow(
+            '¡Instalación Exitosa!',
+            'AdvanceInteligentSystem se ha instalado correctamente'
+          );
+
+          // Cerrar después de 3 segundos
+          setTimeout(() => {
+            console.log('[Squirrel] Cerrando ventana y app');
+            window.close();
+            app.quit();
+          }, 3000);
+        });
       });
 
       return true;
@@ -166,19 +183,24 @@ export function handleSquirrelEvent() {
       console.log('[Squirrel] Desinstalando aplicación');
 
       // Eliminar accesos directos
-      executeSquirrelCommand(['--removeShortcut', path.basename(process.execPath)]);
+      executeSquirrelCommand(['--removeShortcut', path.basename(process.execPath)], () => {
+        console.log('[Squirrel] Accesos directos eliminados');
 
-      // Mostrar ventana de desinstalación
-      app.whenReady().then(() => {
-        const window = createInstallWindow(
-          'Desinstalando...',
-          'Eliminando AdvanceInteligentSystem de tu sistema'
-        );
+        // Mostrar ventana de desinstalación
+        app.whenReady().then(() => {
+          console.log('[Squirrel] App ready, creando ventana de desinstalación');
 
-        setTimeout(() => {
-          window.close();
-          app.quit();
-        }, 2000);
+          const window = createInstallWindow(
+            'Desinstalando...',
+            'Eliminando AdvanceInteligentSystem de tu sistema'
+          );
+
+          setTimeout(() => {
+            console.log('[Squirrel] Cerrando ventana y app');
+            window.close();
+            app.quit();
+          }, 2000);
+        });
       });
 
       return true;
@@ -199,6 +221,7 @@ export function handleSquirrelEvent() {
 
     default:
       // No es un evento de Squirrel, la app debe continuar normalmente
+      console.log('[Squirrel] No es un evento de Squirrel, continuando normalmente');
       return false;
   }
 }
