@@ -1,11 +1,11 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { app, BrowserWindow, ipcMain } from 'electron';
-import started from 'electron-squirrel-startup';
 import { machineId } from 'node-machine-id';
 import { networkInterfaces, hostname, platform, release, arch, totalmem, freemem, cpus, userInfo } from 'os';
 import * as electronStore from './services/electronStore.js';
 import autoUpdater from './services/autoUpdater.js';
+import { handleSquirrelEvent } from './squirrelEvents.js';
 import { createRequire } from 'module';
 
 // Para usar __dirname en ES modules
@@ -23,8 +23,10 @@ try {
 }
 
 // Manejar eventos de Squirrel (instalación, actualización, desinstalación)
-if (started) {
-  app.quit();
+// Si es un evento de Squirrel, la app se cierra automáticamente
+if (handleSquirrelEvent()) {
+  // La función handleSquirrelEvent() ya maneja el quit
+  // Este código no se ejecutará porque la app ya se cerró
 }
 
 // Crear acceso directo en escritorio después de la instalación (solo Windows)
@@ -80,8 +82,10 @@ const createWindow = () => {
     mainWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
   }
 
-  // Open the DevTools.
-  mainWindow.webContents.openDevTools();
+  // Open the DevTools solo en desarrollo
+  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+    mainWindow.webContents.openDevTools();
+  }
 
   // Configurar autoUpdater con la ventana principal
   autoUpdater.setMainWindow(mainWindow);
