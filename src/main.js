@@ -1,5 +1,12 @@
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '../.env') });
+
+// Cargar dotenv solo en desarrollo
+try {
+  require('dotenv').config({ path: path.join(__dirname, '../.env') });
+} catch (error) {
+  // En producción, dotenv puede no estar disponible o no ser necesario
+  console.log('[Main] Running in production mode, dotenv not loaded');
+}
 
 import { app, BrowserWindow, ipcMain } from 'electron';
 import started from 'electron-squirrel-startup';
