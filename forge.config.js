@@ -28,7 +28,6 @@ module.exports = {
         iconUrl: 'https://raw.githubusercontent.com/scaleflow/aim-desktop/main/assets/icon.ico',
         noMsi: true,
         loadingGif: 'assets/transparent.gif',
-        loadingGifDuration: 0,
       },
     },
     // macOS - ZIP para desarrollo (mantener para compatibilidad)
