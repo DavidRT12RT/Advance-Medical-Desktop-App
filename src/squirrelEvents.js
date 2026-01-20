@@ -37,11 +37,11 @@ function executeSquirrelCommand(args, callback) {
  */
 function createInstallWindow(title, message, isUninstall = false) {
   const installWindow = new BrowserWindow({
-    width: 550,
-    height: 400,
+    width: 450,
+    height: 280,
     frame: false,
     transparent: false,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f8fafc',
     alwaysOnTop: true,
     skipTaskbar: true,
     resizable: false,
@@ -56,7 +56,12 @@ function createInstallWindow(title, message, isUninstall = false) {
   installWindow.setAlwaysOnTop(true, 'screen-saver');
   installWindow.focus();
 
-  // HTML de la ventana de instalación con diseño profesional
+  // Leer el logo desde assets
+  const logoPath = path.join(__dirname, '../assets/logo.png');
+  const fs = require('fs');
+  const logoBase64 = fs.readFileSync(logoPath).toString('base64');
+
+  // HTML compacto con logo de Advance
   const html = `
     <!DOCTYPE html>
     <html>
@@ -68,8 +73,8 @@ function createInstallWindow(title, message, isUninstall = false) {
           box-sizing: border-box;
         }
         body {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-          background: #ffffff;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
           display: flex;
           justify-content: center;
           align-items: center;
@@ -77,160 +82,63 @@ function createInstallWindow(title, message, isUninstall = false) {
           overflow: hidden;
         }
         .container {
-          width: 100%;
-          height: 100%;
-          display: flex;
-          flex-direction: column;
-          background: #ffffff;
-        }
-        .header {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          padding: 40px;
+          background: white;
+          border-radius: 16px;
+          padding: 30px;
           text-align: center;
-          color: white;
-          flex-shrink: 0;
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+          max-width: 380px;
         }
-        .icon-container {
+        .logo {
           width: 80px;
           height: 80px;
-          background: rgba(255, 255, 255, 0.2);
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
           margin: 0 auto 20px;
-          backdrop-filter: blur(10px);
+          border-radius: 12px;
+          overflow: hidden;
         }
-        .icon {
-          width: 50px;
-          height: 50px;
-          background: white;
-          border-radius: 8px;
-          position: relative;
-        }
-        .icon::before {
-          content: '';
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          transform: translate(-50%, -50%);
-          width: 30px;
-          height: 30px;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          border-radius: 4px;
-        }
-        h1 {
-          font-size: 28px;
-          margin-bottom: 8px;
-          font-weight: 600;
-          letter-spacing: -0.5px;
-        }
-        .subtitle {
-          font-size: 15px;
-          opacity: 0.95;
-          font-weight: 400;
-        }
-        .content {
-          flex: 1;
-          padding: 40px;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          align-items: center;
+        .logo img {
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
         }
         .message {
           font-size: 16px;
-          color: #4a5568;
-          text-align: center;
-          margin-bottom: 30px;
-          line-height: 1.6;
-          max-width: 400px;
-        }
-        .status {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          margin-bottom: 40px;
-          padding: 16px 24px;
-          background: ${isUninstall ? '#fff5f5' : '#f0fdf4'};
-          border-radius: 12px;
-          border: 1px solid ${isUninstall ? '#fed7d7' : '#bbf7d0'};
-        }
-        .status-icon {
-          width: 24px;
-          height: 24px;
-          border-radius: 50%;
-          background: ${isUninstall ? '#fc8181' : '#4ade80'};
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: white;
-          font-weight: bold;
-          font-size: 16px;
-        }
-        .status-text {
-          color: ${isUninstall ? '#c53030' : '#166534'};
+          color: #334155;
+          margin-bottom: 24px;
+          line-height: 1.5;
           font-weight: 500;
-          font-size: 15px;
         }
         .button {
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
           color: white;
           border: none;
-          padding: 14px 40px;
-          border-radius: 10px;
-          font-size: 15px;
+          padding: 12px 32px;
+          border-radius: 8px;
+          font-size: 14px;
           font-weight: 600;
           cursor: pointer;
-          transition: all 0.3s ease;
+          transition: all 0.2s ease;
           box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
           outline: none;
         }
         .button:hover {
           transform: translateY(-2px);
-          box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+          box-shadow: 0 6px 16px rgba(102, 126, 234, 0.5);
         }
         .button:active {
           transform: translateY(0);
-        }
-        .footer {
-          padding: 20px;
-          text-align: center;
-          color: #a0aec0;
-          font-size: 13px;
-          border-top: 1px solid #e2e8f0;
-          flex-shrink: 0;
-        }
-        .company {
-          font-weight: 600;
-          color: #667eea;
         }
       </style>
     </head>
     <body>
       <div class="container">
-        <div class="header">
-          <div class="icon-container">
-            <div class="icon"></div>
-          </div>
-          <h1>${title}</h1>
-          <div class="subtitle">AdvanceInteligentSystem</div>
+        <div class="logo">
+          <img src="data:image/png;base64,${logoBase64}" alt="Advance Logo">
         </div>
-        
-        <div class="content">
-          <div class="message">${message}</div>
-          
-          <div class="status">
-            <div class="status-icon">${isUninstall ? '!' : '✓'}</div>
-            <div class="status-text">${isUninstall ? 'Proceso completado' : 'Instalación completada exitosamente'}</div>
-          </div>
-          
-          <button class="button" onclick="window.close()">Aceptar</button>
+        <div class="message">
+          ${isUninstall ? 'Software de asistencia médica avanzada desinstalado' : 'Software de asistencia médica avanzada instalado'}
         </div>
-        
-        <div class="footer">
-          Desarrollado por <span class="company">ScaleFlow</span> © 2026
-        </div>
+        <button class="button" onclick="window.close()">Cerrar</button>
       </div>
     </body>
     </html>
@@ -269,11 +177,7 @@ export function handleSquirrelEvent() {
       app.whenReady().then(() => {
         console.log('[Squirrel] App ready, creando ventana de instalación');
 
-        const window = createInstallWindow(
-          'Instalación Completada',
-          'El sistema ha sido instalado correctamente en tu equipo. Ya puedes comenzar a utilizarlo.',
-          false
-        );
+        const window = createInstallWindow('', '', false);
 
         // Cerrar cuando el usuario haga clic en el botón
         window.on('closed', () => {
@@ -295,11 +199,7 @@ export function handleSquirrelEvent() {
       app.whenReady().then(() => {
         console.log('[Squirrel] App ready, creando ventana de desinstalación');
 
-        const window = createInstallWindow(
-          'Desinstalación Completada',
-          'El sistema ha sido eliminado correctamente de tu equipo. Gracias por utilizar nuestros servicios.',
-          true
-        );
+        const window = createInstallWindow('', '', true);
 
         // Cerrar cuando el usuario haga clic en el botón
         window.on('closed', () => {
