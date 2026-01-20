@@ -164,49 +164,30 @@ export function handleSquirrelEvent() {
 
   const squirrelCommand = process.argv[1];
 
-  console.log('[Squirrel] Argumentos recibidos:', process.argv);
-  console.log('[Squirrel] Comando detectado:', squirrelCommand);
-
   switch (squirrelCommand) {
+    // En tu archivo de eventos de Squirrel
     case '--squirrel-install':
     case '--squirrel-updated':
-      // Instalación o actualización completada
-      console.log('[Squirrel] Instalación/Actualización completada');
-
-      // Crear accesos directos
-      executeSquirrelCommand(['--createShortcut', path.basename(process.execPath)]);
-
-      // Mostrar ventana de instalación
-      app.whenReady().then(() => {
-        console.log('[Squirrel] App ready, creando ventana de instalación');
-
-        const window = createInstallWindow('', '', false);
-
-        // Cerrar cuando el usuario haga clic en el botón
-        window.on('closed', () => {
-          console.log('[Squirrel] Ventana cerrada por el usuario');
-          app.quit();
+      // 1. Crear accesos directos primero
+      executeSquirrelCommand(['--createShortcut', path.basename(process.execPath)], () => {
+        // 2. Mostrar la ventana solo después de que Squirrel termine su trabajo
+        app.whenReady().then(() => {
+          createInstallWindow('', '', false);
         });
       });
-
       return true;
 
     case '--squirrel-uninstall':
       // Desinstalación
-      console.log('[Squirrel] Desinstalando aplicación');
-
       // Eliminar accesos directos
       executeSquirrelCommand(['--removeShortcut', path.basename(process.execPath)]);
 
       // Mostrar ventana de desinstalación
       app.whenReady().then(() => {
-        console.log('[Squirrel] App ready, creando ventana de desinstalación');
-
         const window = createInstallWindow('', '', true);
 
         // Cerrar cuando el usuario haga clic en el botón
         window.on('closed', () => {
-          console.log('[Squirrel] Ventana cerrada por el usuario');
           app.quit();
         });
       });
@@ -215,13 +196,11 @@ export function handleSquirrelEvent() {
 
     case '--squirrel-obsolete':
       // Esta versión de la app está obsoleta (después de una actualización)
-      console.log('[Squirrel] Versión obsoleta, cerrando');
       app.quit();
       return true;
 
     case '--squirrel-firstrun':
       // Primera ejecución después de la instalación
-      console.log('[Squirrel] Primera ejecución después de instalación');
 
       // Aquí puedes mostrar un tutorial o configuración inicial
       // Por ahora, solo dejamos que la app continúe normalmente
@@ -229,7 +208,6 @@ export function handleSquirrelEvent() {
 
     default:
       // No es un evento de Squirrel, la app debe continuar normalmente
-      console.log('[Squirrel] No es un evento de Squirrel, continuando normalmente');
       return false;
   }
 }

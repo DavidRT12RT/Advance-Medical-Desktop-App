@@ -2,6 +2,7 @@ const { FusesPlugin } = require('@electron-forge/plugin-fuses');
 const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 
 module.exports = {
+  //Configuracion del empaquetado basico
   packagerConfig: {
     asar: true,
     appBundleId: 'com.scaleflow.aim-desktop',
@@ -14,6 +15,7 @@ module.exports = {
     ],
   },
   rebuildConfig: {},
+  //Configuracion de los instaladores (Windows, MAC y LINUX)
   makers: [
     //Windows - Instalador automático
     {
@@ -25,6 +27,8 @@ module.exports = {
         setupIcon: 'assets/icon.ico',
         iconUrl: 'https://raw.githubusercontent.com/scaleflow/aim-desktop/main/assets/icon.ico',
         noMsi: true,
+        loadingGif: 'assets/transparent.gif',
+        loadingGifDuration: 0,
       },
     },
     // macOS - ZIP para desarrollo (mantener para compatibilidad)
