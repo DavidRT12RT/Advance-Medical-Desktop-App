@@ -6,6 +6,7 @@ import started from 'electron-squirrel-startup';
 import { machineId } from 'node-machine-id';
 import { networkInterfaces, hostname, platform, release, arch, totalmem, freemem, cpus, userInfo } from 'os';
 import * as electronStore from './services/electronStore.js';
+const autoUpdater = require('./services/autoUpdater.js');
 
 if (started) {
   app.quit();
@@ -21,6 +22,8 @@ const createWindow = () => {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: true, // Acceso a FS
       enableRemoteModule: true, //Senales desde React a Electron
+      contextIsolation: false, // Permite acceso completo al contexto
+      webSecurity: false, // Deshabilita CORS para desarrollo (permite SSE/WebSocket con localhost)
     },
     title: "Advance Desktop App",
   });
@@ -37,6 +40,11 @@ const createWindow = () => {
 
   // Open the DevTools.
   mainWindow.webContents.openDevTools();
+
+  // Configurar autoUpdater con la ventana principal
+  autoUpdater.setMainWindow(mainWindow);
+
+  return mainWindow;
 };
 
 app.whenReady().then(() => {
@@ -300,5 +308,51 @@ ipcMain.handle('store:getAllData', async () => {
 
 ipcMain.handle('store:isLicenseActiveWithGrace', async () => {
   return electronStore.isLicenseActiveWithGrace();
+});
+
+// ============================================
+// IPC handlers for Auto Updates
+// ============================================
+
+ipcMain.handle('update:getCurrentVersion', async () => {
+  return autoUpdater.getCurrentVersion();
+});
+
+ipcMain.handle('update:checkForUpdate', async (event, updateInfo) => {
+  try {
+    return autoUpdater.checkForUpdate(updateInfo);
+  } catch (error) {
+    console.error('[IPC] Error checking for update:', error);
+    return false;
+  }
+});
+
+ipcMain.handle('update:downloadUpdate', async () => {
+  try {
+    const downloadPath = await autoUpdater.downloadUpdate();
+    return { success: true, path: downloadPath };
+  } catch (error) {
+    console.error('[IPC] Error downloading update:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('update:installUpdate', async () => {
+  try {
+    await autoUpdater.installUpdate();
+    return { success: true };
+  } catch (error) {
+    console.error('[IPC] Error installing update:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('update:cancelDownload', async () => {
+  autoUpdater.cancelDownload();
+  return { success: true };
+});
+
+ipcMain.handle('update:getDownloadProgress', async () => {
+  return autoUpdater.downloadProgress;
 });
 

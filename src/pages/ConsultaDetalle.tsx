@@ -5,30 +5,27 @@ import {
   Form,
   Input,
   Button,
-  Select,
-  DatePicker,
   Tag,
-  Divider,
   message,
-  Modal,
+  Collapse,
+  List,
+  Empty,
 } from "antd";
 import {
   SaveOutlined,
-  RobotOutlined,
-  MedicineBoxOutlined,
   FileTextOutlined,
   ExperimentOutlined,
   ArrowLeftOutlined,
+  UserOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import FirebaseConsultas from "../features/FirebaseConsultas";
 import FirebasePacientes from "../features/FirebasePacientes";
-import ConsultaBasicaDetalle from "../components/pacientes-detalle/ConsultaBasicaDetalle";
+import FirebaseEstudios from "../features/FirebaseEstudios";
 import SectionTitle from "../components/common/SectionTitle";
-import ModalInfoSeccionAI from "../components/consulta-detalle/ModalInfoSeccionAI";
-
+import { useElectronStore } from "../hooks/useElectronStore";
 const { TextArea } = Input;
-const { Option } = Select;
+const { Panel } = Collapse;
 
 const ConsultaDetalle: React.FC = () => {
   const { id: pacienteId, consultaId } = useParams<{
@@ -36,107 +33,80 @@ const ConsultaDetalle: React.FC = () => {
     consultaId: string;
   }>();
   const navigate = useNavigate();
-  // TODO: Obtener empresaId del contexto de autenticación
-  const empresaId = "GoFayqIW9MR718FzNpyzGUgaK283";
+  const { user } = useElectronStore();
+  const empresaId = user?.empresa?.id;
 
   const [loading, setLoading] = useState(true);
   const [consulta, setConsulta] = useState<any | null>(null);
   const [paciente, setPaciente] = useState<any | null>(null);
+  const [estudios, setEstudios] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm();
   const [finalizeOnSave, setFinalizeOnSave] = useState(false);
-  const [selectedSessionIndex, setSelectedSessionIndex] = useState<
-    number | null
-  >(null);
-  const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
-
-  console.log("la consulta luce asi", consulta);
 
   useEffect(() => {
-    const fetchConsulta = async () => {
+    const fetchData = async () => {
       if (!pacienteId || !consultaId) {
         setLoading(false);
         return;
       }
 
       try {
-        const data: any = await FirebaseConsultas.obtenerConsultaPorId(
+        // Obtener consulta
+        const consultaData: any = await FirebaseConsultas.obtenerConsultaPorId(
           empresaId,
           pacienteId,
           consultaId
         );
 
-        if (!data) {
+        if (!consultaData) {
           setLoading(false);
           return;
         }
 
-        setConsulta(data);
+        setConsulta(consultaData);
 
-        if (data.paciente_id) {
-          const pacienteData = await FirebasePacientes.obtenerPacientePorId(
-            empresaId,
-            data.paciente_id
-          );
-          setPaciente(pacienteData);
-        }
+        // Obtener paciente
+        const pacienteData = await FirebasePacientes.obtenerPacientePorId(
+          empresaId,
+          pacienteId
+        );
+        setPaciente(pacienteData);
 
-        const fechaSeguimiento = data.seguimiento
-          ? dayjs(data.seguimiento)
-          : null;
+        // Obtener estudios del paciente
+        const estudiosData = await FirebaseEstudios.obtenerEstudiosDePaciente(
+          empresaId,
+          pacienteId
+        );
+        setEstudios(estudiosData || []);
 
-        // Setear explícitamente todos los campos clínicos que usamos en el detalle
+        // Setear valores del formulario
         form.setFieldsValue({
-          resultado: data.resultado,
-          hallazgos: data.hallazgos,
-          polipo: data.polipo,
-          tamano: data.tamano || data.tamaño,
-          ubicacion: data.ubicacion,
-          clasificacion: data.clasificacion,
-          accion: data.accion,
-          biopsia: data.biopsia,
-          medicamentos: data.medicamentos,
-          complicaciones: data.complicaciones,
-          seguimiento: fechaSeguimiento,
-          intervaloSeguimiento: data.intervaloSeguimiento,
-          tolerancia: data.tolerancia,
+          motivo_consulta: consultaData.motivo_consulta || "",
+          hallazgos_generales: consultaData.hallazgos_generales || "",
+          notas: consultaData.notas || "",
         });
       } catch (error) {
-        console.error("Error obteniendo detalle de consulta:", error);
+        console.error("Error obteniendo datos:", error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchConsulta();
+    fetchData();
   }, [empresaId, pacienteId, consultaId, form]);
 
-  const handleSaveDetalle = async (values: any) => {
+  const handleSave = async () => {
     if (!pacienteId || !consultaId) return;
+
     try {
       setSaving(true);
-
-      // Aseguramos que todos los campos del formulario clínico se envíen de forma explícita
-      const allValues = form.getFieldsValue(true);
-
-      const seguimientoValue = allValues.seguimiento;
+      const values = form.getFieldsValue(true);
 
       const payload: any = {
-        resultado: allValues.resultado ?? null,
-        hallazgos: allValues.hallazgos ?? null,
-        polipo: allValues.polipo ?? null,
-        tamano: allValues.tamano ?? null,
-        ubicacion: allValues.ubicacion ?? null,
-        clasificacion: allValues.clasificacion ?? null,
-        accion: allValues.accion ?? null,
-        biopsia: allValues.biopsia ?? null,
-        medicamentos: allValues.medicamentos ?? null,
-        complicaciones: allValues.complicaciones ?? null,
-        seguimiento: seguimientoValue
-          ? seguimientoValue.format("YYYY-MM-DD")
-          : null,
-        intervaloSeguimiento: allValues.intervaloSeguimiento ?? null,
-        tolerancia: allValues.tolerancia ?? null,
+        motivo_consulta: values.motivo_consulta ?? "",
+        hallazgos_generales: values.hallazgos_generales ?? "",
+        notas: values.notas ?? "",
       };
 
       if (finalizeOnSave) {
@@ -151,31 +121,35 @@ const ConsultaDetalle: React.FC = () => {
       );
 
       setConsulta((prev: any) => (prev ? { ...prev, ...payload } : prev));
+
       if (finalizeOnSave) {
         message.success("Consulta finalizada correctamente");
         navigate(`/paciente-detalle/${pacienteId}`);
       } else {
-        message.success("Consulta actualizada exitosamente");
+        message.success("Consulta guardada exitosamente");
       }
     } catch (error) {
-      console.error("Error actualizando consulta:", error);
-      message.error("Error al actualizar la consulta");
+      console.error("Error guardando consulta:", error);
+      message.error("Error al guardar la consulta");
     } finally {
       setSaving(false);
       setFinalizeOnSave(false);
     }
   };
 
-  const aiSessions = Array.isArray(consulta?.secciones_ai)
-    ? consulta.secciones_ai
-    : [];
-
-  const lastSessionAI = aiSessions.length
-    ? aiSessions[aiSessions.length - 1]
-    : null;
-
-  const hasIaData = aiSessions.length > 0;
   const isFinalizada = consulta?.estado === "finalizada";
+
+  const antecedentes = paciente
+    ? {
+        patologicos: paciente.antecedentesPatologicos || "No registrados",
+        noPatologicos: paciente.antecedentesNoPatologicos || "No registrados",
+        alergias: paciente.alergias || "Ninguna conocida",
+        medicamentosActuales: paciente.medicamentosActuales || "Ninguno",
+        cirugiasPrevias: paciente.cirugiasPrevias || "Ninguna",
+        antecedentesFamiliares:
+          paciente.antecedentesFamiliares || "No registrados",
+      }
+    : null;
 
   return (
     <div className="min-h-screen bg-gray-50/50 pb-10">
@@ -188,6 +162,7 @@ const ConsultaDetalle: React.FC = () => {
         >
           Volver al paciente
         </Button>
+
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-semibold text-gray-800 flex items-center gap-3">
             <span>
@@ -223,7 +198,7 @@ const ConsultaDetalle: React.FC = () => {
                 loading={saving}
                 onClick={() => {
                   setFinalizeOnSave(false);
-                  form.submit();
+                  handleSave();
                 }}
               >
                 Guardar cambios
@@ -234,7 +209,7 @@ const ConsultaDetalle: React.FC = () => {
                 loading={saving}
                 onClick={() => {
                   setFinalizeOnSave(true);
-                  form.submit();
+                  handleSave();
                 }}
               >
                 Finalizar consulta
@@ -244,328 +219,231 @@ const ConsultaDetalle: React.FC = () => {
         </div>
 
         {loading ? (
-          <Skeleton active paragraph={{ rows: 6 }} />
+          <Skeleton active paragraph={{ rows: 8 }} />
         ) : (
-          <>
-            {/* Resumen básico de la consulta */}
-            <div className="mb-8">
-              <ConsultaBasicaDetalle
-                loading={false}
-                consulta={
-                  consulta
-                    ? {
-                        tipo: consulta.tipo,
-                        fecha: consulta.fecha,
-                        observaciones: consulta.observaciones || "",
-                        estado: consulta.estado,
-                      }
-                    : null
-                }
-              />
-            </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Columna principal - Formulario */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Info básica */}
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <div className="flex items-center gap-4 mb-4">
+                  <div>
+                    <p className="text-sm text-gray-500">Fecha de consulta</p>
+                    <p className="text-lg font-semibold">
+                      {consulta?.fecha
+                        ? dayjs(consulta.fecha).format("DD/MM/YYYY")
+                        : "-"}
+                    </p>
+                  </div>
+                </div>
+              </div>
 
-            {/* Formulario clínico */}
-            <div className="space-y-8">
+              {/* Formulario de consulta */}
               <Form
                 layout="vertical"
                 form={form}
-                onFinish={handleSaveDetalle}
                 autoComplete="off"
                 size="large"
                 disabled={isFinalizada}
               >
-                <div className="space-y-8">
-                  {/* Sección 1: Información clínica y hallazgos */}
-                  <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <SectionTitle
-                      title="Información clínica y hallazgos"
-                      icon={<FileTextOutlined className="text-indigo-600" />}
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                  <SectionTitle
+                    title="Información de la consulta"
+                    icon={<FileTextOutlined className="text-indigo-600" />}
+                  />
+
+                  <Form.Item
+                    label="Motivo de consulta"
+                    name="motivo_consulta"
+                    className="mb-4"
+                  >
+                    <TextArea
+                      rows={2}
+                      placeholder="Describa el motivo de la consulta..."
+                      className="bg-gray-50"
                     />
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <Form.Item
-                        label="Resultado general"
-                        name="resultado"
-                        className="md:col-span-2"
-                      >
-                        <Input placeholder="Ej. Colonoscopia completa hasta ciego, preparación adecuada..." />
-                      </Form.Item>
-                      <Form.Item
-                        label="Hallazgos generales"
-                        name="hallazgos"
-                        className="md:col-span-2"
-                      >
-                        <TextArea
-                          rows={4}
-                          placeholder="Describa detalladamente los hallazgos visuales..."
-                          className="bg-gray-50"
-                        />
-                      </Form.Item>
-                    </div>
-                  </div>
+                  </Form.Item>
 
-                  {/* Sección 2: Detalle de pólipos */}
-                  <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-20 h-20 bg-indigo-50 rounded-bl-full -mr-10 -mt-10 z-0" />
-                    <div className="relative z-10">
-                      <SectionTitle
-                        title="Detalle de lesiones / pólipos"
-                        icon={
-                          <ExperimentOutlined className="text-indigo-600" />
-                        }
-                      />
-                      <div className="bg-indigo-50/50 p-5 rounded-lg border border-indigo-100">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <Form.Item label="Tipo / morfología" name="polipo">
-                            <Select placeholder="Seleccionar tipo de pólipo">
-                              <Option value="Sin pólipo">Sin pólipo</Option>
-                              <Option value="Adenomatoso">Adenomatoso</Option>
-                              <Option value="Hiperplásico">Hiperplásico</Option>
-                              <Option value="Sésil (Is)">Sésil (Is)</Option>
-                              <Option value="Pediculado (Ip)">
-                                Pediculado (Ip)
-                              </Option>
-                              <Option value="LST">LST</Option>
-                            </Select>
-                          </Form.Item>
-                          <Form.Item label="Tamaño (mm)" name="tamano">
-                            <Input suffix="mm" placeholder="8" />
-                          </Form.Item>
-                          <Form.Item label="Ubicación" name="ubicacion">
-                            <Select placeholder="Seleccionar...">
-                              <Option value="Ciego">Ciego</Option>
-                              <Option value="Colon Ascendente">
-                                Colon Ascendente
-                              </Option>
-                              <Option value="Transverso">Transverso</Option>
-                              <Option value="Descendente">Descendente</Option>
-                              <Option value="Sigmoides">Sigmoides</Option>
-                              <Option value="Recto">Recto</Option>
-                            </Select>
-                          </Form.Item>
-                          <Form.Item
-                            label="Clasificación (NICE/JNET)"
-                            name="clasificacion"
-                          >
-                            <Select placeholder="Seleccionar clasificación">
-                              <Option value="NICE I">NICE I</Option>
-                              <Option value="NICE II">NICE II</Option>
-                              <Option value="NICE III">NICE III</Option>
-                              <Option value="JNET 1">JNET 1</Option>
-                              <Option value="JNET 2A">JNET 2A</Option>
-                              <Option value="JNET 2B">JNET 2B</Option>
-                              <Option value="JNET 3">JNET 3</Option>
-                            </Select>
-                          </Form.Item>
-                          <Form.Item label="Acción terapéutica" name="accion">
-                            <Input placeholder="Ej. Mucosectomía" />
-                          </Form.Item>
-                          <Form.Item label="¿Se tomó biopsia?" name="biopsia">
-                            <Select placeholder="Seleccionar...">
-                              <Option value="Sí">Sí</Option>
-                              <Option value="No">No</Option>
-                            </Select>
-                          </Form.Item>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Sección 3: Plan y seguimiento */}
-                  <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <SectionTitle
-                      title="Plan y seguimiento"
-                      icon={<MedicineBoxOutlined className="text-indigo-600" />}
+                  <Form.Item
+                    label="Hallazgos generales"
+                    name="hallazgos_generales"
+                    className="mb-4"
+                  >
+                    <TextArea
+                      rows={4}
+                      placeholder="Describa los hallazgos durante la consulta..."
+                      className="bg-gray-50"
                     />
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <Form.Item
-                        label="Medicamentos utilizados"
-                        name="medicamentos"
-                      >
-                        <TextArea
-                          rows={2}
-                          placeholder="Sedación, antiespasmódicos..."
-                        />
-                      </Form.Item>
-                      <Form.Item
-                        label="Complicaciones intraprocedimiento"
-                        name="complicaciones"
-                      >
-                        <TextArea
-                          rows={2}
-                          placeholder="Ninguna o describir..."
-                        />
-                      </Form.Item>
+                  </Form.Item>
 
-                      <Divider className="md:col-span-2 my-2" />
-
-                      <Form.Item
-                        label="Fecha sugerida próximo control"
-                        name="seguimiento"
-                      >
-                        <DatePicker
-                          style={{ width: "100%" }}
-                          format="DD/MM/YYYY"
-                          placeholder="Seleccionar fecha"
-                        />
-                      </Form.Item>
-                      <Form.Item
-                        label="Intervalo (texto)"
-                        name="intervaloSeguimiento"
-                      >
-                        <Input placeholder="Ej. 3 años si biopsia confirma adenoma" />
-                      </Form.Item>
-                      <Form.Item
-                        label="Tolerancia del paciente"
-                        name="tolerancia"
-                        className="md:col-span-2"
-                      >
-                        <Input placeholder="Ej. Buena tolerancia, alta satisfactoria" />
-                      </Form.Item>
-                    </div>
-                  </div>
+                  <Form.Item label="Notas adicionales" name="notas">
+                    <TextArea
+                      rows={4}
+                      placeholder="Notas, observaciones, indicaciones para el paciente..."
+                      className="bg-gray-50"
+                    />
+                  </Form.Item>
                 </div>
               </Form>
 
-              {/* Sección de IA como bloque independiente */}
-              <section className="mt-8">
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                  <SectionTitle
-                    title="Detección asistida por IA"
-                    icon={<RobotOutlined className="text-indigo-600" />}
+              {/* Estudios relacionados */}
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mt-5">
+                <SectionTitle
+                  title="Estudios del paciente"
+                  icon={<ExperimentOutlined className="text-indigo-600" />}
+                />
+
+                {estudios.length === 0 ? (
+                  <Empty
+                    description="No hay estudios registrados"
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
                   />
-                  {!hasIaData ? (
-                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                      <p className="text-sm text-gray-700 md:max-w-xl">
-                        Aún no hay resultados de detección registrados para esta
-                        consulta.
-                      </p>
-                      {!isFinalizada && (
-                        <div className="flex justify-end">
-                          <Button
-                            type="primary"
-                            onClick={() => {
-                              if (!pacienteId || !consultaId) return;
-                              navigate(
-                                `/paciente-detalle/${pacienteId}/consultas/${consultaId}/deteccion`
-                              );
-                            }}
-                          >
-                            Comenzar detección con IA
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                        <span className="text-xs text-gray-500">
-                          {`Sesiones AI registradas: ${aiSessions.length}`}
-                        </span>
-                        {!isFinalizada && (
-                          <div className="flex justify-end">
-                            <Button
-                              type="primary"
-                              onClick={() => {
-                                if (!pacienteId || !consultaId) return;
-                                navigate(
-                                  `/paciente-detalle/${pacienteId}/consultas/${consultaId}/deteccion`
-                                );
-                              }}
-                            >
-                              Nueva detección con IA
-                            </Button>
+                ) : (
+                  <List
+                    size="small"
+                    dataSource={estudios}
+                    renderItem={(estudio: any) => (
+                      <List.Item
+                        className="cursor-pointer hover:bg-gray-50 rounded px-2"
+                        onClick={() =>
+                          navigate(
+                            `/paciente-detalle/${pacienteId}/estudios/${estudio.id}`
+                          )
+                        }
+                      >
+                        <div className="flex justify-between w-full items-center">
+                          <div>
+                            <span className="font-medium">{estudio.tipo}</span>
+                            <span className="text-gray-500 ml-2">
+                              {estudio.fecha
+                                ? dayjs(estudio.fecha).format("DD/MM/YYYY")
+                                : "-"}
+                            </span>
                           </div>
-                        )}
-                      </div>
+                          <Tag
+                            color={
+                              estudio.estado === "finalizado"
+                                ? "green"
+                                : estudio.estado === "en_progreso"
+                                ? "blue"
+                                : "orange"
+                            }
+                          >
+                            {estudio.estado || "Pendiente"}
+                          </Tag>
+                        </div>
+                      </List.Item>
+                    )}
+                  />
+                )}
 
-                      <div className="space-y-3">
-                        {aiSessions.map((session: any, index: number) => {
-                          const cnnSummary = session?.ia_cnn?.summary;
-                          const llm = session?.ia_llm;
-                          const timestamp = session?.timestamp;
-
-                          return (
-                            <button
-                              key={index}
-                              type="button"
-                              className="w-full text-left border border-gray-200 rounded-lg px-4 py-3 hover:border-indigo-400 hover:bg-indigo-50/40 transition flex flex-col md:flex-row md:items-center md:justify-between gap-3"
-                              onClick={() => {
-                                setSelectedSessionIndex(index);
-                                setIsSessionModalOpen(true);
-                              }}
-                            >
-                              <div className="flex-1 space-y-1">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs font-semibold text-indigo-600 uppercase">
-                                    {`Sesión ${index + 1}`}
-                                  </span>
-                                  {timestamp && (
-                                    <span className="text-[11px] text-gray-500">
-                                      {dayjs(timestamp).format(
-                                        "DD/MM/YYYY HH:mm"
-                                      )}
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-xs text-gray-600">
-                                  {cnnSummary ? (
-                                    <>
-                                      {`Segmentos: ${
-                                        cnnSummary.totalSegments ??
-                                        session?.ia_cnn?.segments?.length ??
-                                        0
-                                      }`}
-                                      {" · "}
-                                      {`Último conteo de pólipos: ${
-                                        cnnSummary.lastPolypCount ?? 0
-                                      }`}
-                                    </>
-                                  ) : (
-                                    "Sin datos CNN"
-                                  )}
-                                </p>
-                              </div>
-
-                              <div className="flex-1 md:text-right space-y-1">
-                                <p className="text-xs font-semibold text-gray-500 uppercase">
-                                  Resumen LLM
-                                </p>
-                                {llm ? (
-                                  <p className="text-xs text-gray-600">
-                                    {llm.has_polyp
-                                      ? "Pólipo detectado"
-                                      : "Sin pólipos"}
-                                    {llm.severity &&
-                                      ` · Severidad: ${llm.severity}`}
-                                    {llm.confidence_level &&
-                                      ` · Confianza: ${llm.confidence_level}`}
-                                  </p>
-                                ) : (
-                                  <p className="text-xs text-gray-500">
-                                    Sin análisis LLM
-                                  </p>
-                                )}
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </section>
+                <Button
+                  type="dashed"
+                  className="w-full mt-4"
+                  onClick={() => navigate(`/paciente-detalle/${pacienteId}`)}
+                >
+                  Ver todos los estudios
+                </Button>
+              </div>
             </div>
-          </>
+
+            {/* Columna lateral - Antecedentes */}
+            <div className="space-y-6">
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <SectionTitle
+                  title="Antecedentes del paciente"
+                  icon={<UserOutlined className="text-indigo-600" />}
+                />
+
+                {antecedentes ? (
+                  <Collapse
+                    defaultActiveKey={["1", "2"]}
+                    ghost
+                    className="bg-transparent"
+                  >
+                    <Panel
+                      header={
+                        <span className="font-medium text-gray-700">
+                          Antecedentes patológicos
+                        </span>
+                      }
+                      key="1"
+                    >
+                      <p className="text-sm text-gray-600">
+                        {antecedentes.patologicos}
+                      </p>
+                    </Panel>
+                    <Panel
+                      header={
+                        <span className="font-medium text-gray-700">
+                          Antecedentes no patológicos
+                        </span>
+                      }
+                      key="2"
+                    >
+                      <p className="text-sm text-gray-600">
+                        {antecedentes.noPatologicos}
+                      </p>
+                    </Panel>
+                    <Panel
+                      header={
+                        <span className="font-medium text-gray-700">
+                          Alergias
+                        </span>
+                      }
+                      key="3"
+                    >
+                      <p className="text-sm text-gray-600">
+                        {antecedentes.alergias}
+                      </p>
+                    </Panel>
+                    <Panel
+                      header={
+                        <span className="font-medium text-gray-700">
+                          Medicamentos actuales
+                        </span>
+                      }
+                      key="4"
+                    >
+                      <p className="text-sm text-gray-600">
+                        {antecedentes.medicamentosActuales}
+                      </p>
+                    </Panel>
+                    <Panel
+                      header={
+                        <span className="font-medium text-gray-700">
+                          Cirugías previas
+                        </span>
+                      }
+                      key="5"
+                    >
+                      <p className="text-sm text-gray-600">
+                        {antecedentes.cirugiasPrevias}
+                      </p>
+                    </Panel>
+                    <Panel
+                      header={
+                        <span className="font-medium text-gray-700">
+                          Antecedentes familiares
+                        </span>
+                      }
+                      key="6"
+                    >
+                      <p className="text-sm text-gray-600">
+                        {antecedentes.antecedentesFamiliares}
+                      </p>
+                    </Panel>
+                  </Collapse>
+                ) : (
+                  <p className="text-sm text-gray-500">
+                    No hay antecedentes registrados
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
         )}
       </div>
-      {selectedSessionIndex !== null && aiSessions[selectedSessionIndex] && (
-        <ModalInfoSeccionAI
-          isSessionModalOpen={isSessionModalOpen}
-          setIsSessionModalOpen={setIsSessionModalOpen}
-          selectedSessionIndex={selectedSessionIndex}
-          aiSessions={aiSessions}
-        />
-      )}
     </div>
   );
 };

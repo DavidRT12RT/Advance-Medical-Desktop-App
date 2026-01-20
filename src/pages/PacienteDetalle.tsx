@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import HeaderPacienteDetalle from "../components/pacientes-detalle/HeaderPacienteDetalle";
 import InformacionPacienteDetalle from "../components/pacientes-detalle/InformacionPacienteDetalle";
+import EstudiosPacienteDetalle from "../components/pacientes-detalle/EstudiosPacienteDetalle";
+import EstudiosPendientesPacienteDetalle from "../components/pacientes-detalle/EstudiosPendientesPacienteDetalle";
+import ModalEstudioPacienteDetalle from "../components/pacientes-detalle/ModalEstudioPacienteDetalle";
 import ConsultasPacienteDetalle from "../components/pacientes-detalle/ConsultasPacienteDetalle";
 import ConsultasPendientesPacienteDetalle from "../components/pacientes-detalle/ConsultasPendientesPacienteDetalle";
 import ModalConsultaPacienteDetalle from "../components/pacientes-detalle/ModalConsultaPacienteDetalle";
@@ -15,19 +18,23 @@ import {
   setRefresh,
 } from "../store/pacientesSlice";
 import ScalyMedicoChat from "../components/pacientes-detalle/ScalyMedicoChat";
+import { useElectronStore } from "../hooks/useElectronStore";
 
 const PacienteDetalle = () => {
   const { id: pacienteId } = useParams<{ id: string }>();
-  const empresaId = "GoFayqIW9MR718FzNpyzGUgaK283";
+  const { user } = useElectronStore();
+  const empresaId = user?.empresa?.id;
 
   const [activeTab, setActiveTab] = useState("informacion");
 
   const tabs = [
     { id: "informacion", label: "Información del Paciente" },
-    { id: "historial", label: "Historial de Consultas" },
-    { id: "proximos", label: "Próximos Tratamientos" },
+    { id: "consultas", label: "Consultas" },
+    { id: "consultas_pendientes", label: "Consultas Pendientes" },
+    { id: "historial", label: "Historial de Estudios" },
+    { id: "proximos", label: "Próximos Estudios" },
     { id: "registros", label: "Registros Médicos" },
-    { id: "scaly", label: "Scaly Asistente Médico" },
+    // { id: "scaly", label: "Scaly Asistente Médico" },
   ];
 
   const dispatch = useDispatch();
@@ -94,12 +101,18 @@ const PacienteDetalle = () => {
       {/* Tab Content */}
       <div className="bg-white rounded-lg p-6">
         {activeTab === "informacion" && <InformacionPacienteDetalle />}
-        {activeTab === "historial" && <ConsultasPacienteDetalle />}
-        {activeTab === "proximos" && <ConsultasPendientesPacienteDetalle />}
+        {activeTab === "consultas" && <ConsultasPacienteDetalle />}
+        {activeTab === "consultas_pendientes" && (
+          <ConsultasPendientesPacienteDetalle />
+        )}
+        {activeTab === "historial" && <EstudiosPacienteDetalle />}
+        {activeTab === "proximos" && <EstudiosPendientesPacienteDetalle />}
         {activeTab === "registros" && <RegistrosMedicosPacienteDetalle />}
-        {activeTab === "scaly" && <ScalyMedicoChat />}
+        {/* {activeTab === "scaly" && <ScalyMedicoChat />} */}
       </div>
 
+      {/* Modal estudio*/}
+      <ModalEstudioPacienteDetalle />
       {/* Modal consulta*/}
       <ModalConsultaPacienteDetalle />
     </section>

@@ -1,6 +1,7 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { ipcRenderer } = require('electron');
 
-contextBridge.exposeInMainWorld('device', {
+// Sin contextIsolation, exponemos directamente en window
+window.device = {
   getMachineId: () => ipcRenderer.invoke('device:getMachineId'),
   getMacAddresses: () => ipcRenderer.invoke('device:getMacAddresses'),
   getIpAddresses: () => ipcRenderer.invoke('device:getIpAddresses'),
@@ -49,9 +50,9 @@ contextBridge.exposeInMainWorld('device', {
       return {};
     }
   },
-});
+};
 
-contextBridge.exposeInMainWorld('electronStore', {
+window.electronStore = {
   // Auth methods
   setUser: (user) => ipcRenderer.invoke('store:setUser', user),
   getAuthData: () => ipcRenderer.invoke('store:getAuthData'),
@@ -66,4 +67,4 @@ contextBridge.exposeInMainWorld('electronStore', {
   // Utility methods
   getAllData: () => ipcRenderer.invoke('store:getAllData'),
   isLicenseActiveWithGrace: () => ipcRenderer.invoke('store:isLicenseActiveWithGrace'),
-});
+};

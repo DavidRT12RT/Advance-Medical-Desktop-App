@@ -1,18 +1,9 @@
 import { useAppSelector, useAppDispatch } from "../../store/hooks";
-import {
-  Modal,
-  Form,
-  Input,
-  Select,
-  DatePicker,
-  Button,
-  Row,
-  Col,
-  message,
-} from "antd";
+import { Modal, Form, Input, DatePicker, Button, message } from "antd";
 import { useParams } from "react-router-dom";
 import { setOpenModalConsultas } from "../../store/pacientesSlice";
 import FirebaseConsultas from "../../features/FirebaseConsultas";
+import { useElectronStore } from "../../hooks/useElectronStore";
 
 const ModalConsultaPacienteDetalle = () => {
   const isOpenModal = useAppSelector(
@@ -21,8 +12,8 @@ const ModalConsultaPacienteDetalle = () => {
   const dispatch = useAppDispatch();
   const [form] = Form.useForm();
   const { id: pacienteId } = useParams<{ id: string }>();
-  // TODO: Obtener empresaId del contexto de autenticación
-  const empresaId = "GoFayqIW9MR718FzNpyzGUgaK283";
+  const { user } = useElectronStore();
+  const empresaId = user?.empresa?.id;
 
   const handleCancel = () => {
     form.resetFields();
@@ -46,9 +37,11 @@ const ModalConsultaPacienteDetalle = () => {
         : null;
 
       const consultaBasica = {
-        tipo: values.tipo,
+        tipo: "Consulta",
         fecha: fechaFormatoApi,
-        observaciones: values.observaciones || "",
+        motivo_consulta: values.motivo_consulta || "",
+        notas: values.notas || "",
+        hallazgos_generales: "",
         estado: "pendiente",
       };
 
@@ -90,46 +83,35 @@ const ModalConsultaPacienteDetalle = () => {
         onFinish={handleSubmit}
         autoComplete="off"
       >
-        <Row gutter={16}>
-          <Col span={12}>
-            <Form.Item
-              label="Tipo de Procedimiento"
-              name="tipo"
-              initialValue="Colonoscopia"
-              rules={[
-                {
-                  required: true,
-                  message: "Selecciona el tipo de procedimiento",
-                },
-              ]}
-            >
-              <Select
-                options={[
-                  { label: "Colonoscopia", value: "Colonoscopia" },
-                  { label: "Endoscopia", value: "Endoscopia" },
-                ]}
-              />
-            </Form.Item>
-          </Col>
-          <Col span={12}>
-            <Form.Item
-              label="Fecha de Procedimiento"
-              name="fecha"
-              rules={[{ required: true, message: "Selecciona la fecha" }]}
-            >
-              <DatePicker style={{ width: "100%" }} format="DD/MM/YYYY" />
-            </Form.Item>
-          </Col>
-        </Row>
+        <Form.Item
+          label="Fecha de Consulta"
+          name="fecha"
+          rules={[{ required: true, message: "Selecciona la fecha" }]}
+        >
+          <DatePicker style={{ width: "100%" }} format="DD/MM/YYYY" />
+        </Form.Item>
 
         <Form.Item
-          label="Observaciones Iniciales"
-          name="observaciones"
+          label="Motivo de Consulta"
+          name="motivo_consulta"
+          rules={[
+            { required: true, message: "Ingresa el motivo de la consulta" },
+          ]}
+        >
+          <Input.TextArea
+            rows={2}
+            placeholder="Motivo principal de la consulta"
+          />
+        </Form.Item>
+
+        <Form.Item
+          label="Notas Iniciales"
+          name="notas"
           rules={[{ required: false }]}
         >
           <Input.TextArea
             rows={3}
-            placeholder="Notas iniciales sobre el procedimiento (opcional)"
+            placeholder="Notas u observaciones iniciales (opcional)"
           />
         </Form.Item>
       </Form>

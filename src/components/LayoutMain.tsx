@@ -7,7 +7,10 @@ import {
   FileTextOutlined,
   SettingOutlined,
   LogoutOutlined,
+  CloudDownloadOutlined,
 } from "@ant-design/icons";
+import { getAuth, signOut } from "firebase/auth";
+import { app } from "../firebaseConfig";
 
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 // @ts-ignore
@@ -23,9 +26,32 @@ const LayoutMain = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const handleLogout = async () => {
+    try {
+      // Logout from Firebase
+      const auth = getAuth(app);
+      await signOut(auth);
+
+      // Logout from Electron Store
+      await logout();
+
+      // Redirect to login
+      navigate("/login");
+    } catch (error) {
+      console.error("Error during logout:", error);
+      // Even if Firebase logout fails, still logout from Electron Store
+      await logout();
+      navigate("/login");
+    }
+  };
+
   let selectedKey = "2";
   if (location.pathname.startsWith("/configuracion")) {
     selectedKey = "5";
+  } else if (location.pathname.startsWith("/actualizacion")) {
+    selectedKey = "6";
+  } else if (location.pathname.startsWith("/estudios")) {
+    selectedKey = "4";
   } else if (location.pathname.startsWith("/")) {
     selectedKey = "2";
   }
@@ -69,7 +95,6 @@ const LayoutMain = () => {
               icon: <ScheduleOutlined />,
               label: "Consultas",
               onClick: () => {
-                // pendiente definir ruta real de consultas
                 navigate("/");
               },
             },
@@ -78,8 +103,7 @@ const LayoutMain = () => {
               icon: <FileTextOutlined />,
               label: "Estudios",
               onClick: () => {
-                // pendiente definir ruta real de estudios
-                navigate("/");
+                navigate("/estudios");
               },
             },
             {
@@ -90,10 +114,16 @@ const LayoutMain = () => {
             },
             {
               key: "6",
+              icon: <CloudDownloadOutlined />,
+              label: "Actualización",
+              onClick: () => navigate("/actualizacion"),
+            },
+            {
+              key: "7",
               icon: <LogoutOutlined />,
               label: "Cerrar Sesión",
               onClick: () => {
-                logout();
+                handleLogout();
               },
             },
           ]}

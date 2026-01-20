@@ -1,110 +1,58 @@
-import React, { useState } from 'react';
-import { Form, message, Tabs } from 'antd';
-import { SettingOutlined, VideoCameraOutlined } from '@ant-design/icons';
-import DatosSistema from '../components/configuraciones/DatosSistema';
-import ConfiguracionGrabador from '../components/configuraciones/ConfiguracionGrabador';
+import { useState } from "react";
+import { Tabs } from "antd";
+import { FileTextOutlined, UserOutlined } from "@ant-design/icons";
+import ConfiguracionReporte from "../components/configuraciones/ConfiguracionReporte";
+import DatosMedicoDoctor from "../components/configuraciones/DatosMedicoDoctor";
+import { useElectronStore } from "../hooks/useElectronStore";
 
 const Configuracion = () => {
-  const [formSistema] = Form.useForm();
-  const [formGrabador] = Form.useForm();
-  const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('sistema');
+  const [activeTab, setActiveTab] = useState("reporte");
+  const { user } = useElectronStore();
 
-  const handleSaveSistema = async () => {
-    try {
-      const values = await formSistema.validateFields();
-      setLoading(true);
-
-      // Simular guardado
-      setTimeout(() => {
-        console.log('Datos del sistema:', values);
-        message.success('Sistema registrado exitosamente');
-        setLoading(false);
-      }, 1000);
-    } catch (error) {
-      console.error('Validation failed:', error);
-    }
-  };
-
-  const handleSaveGrabador = async () => {
-    try {
-      const values = await formGrabador.validateFields();
-      setLoading(true);
-
-      // Simular guardado
-      setTimeout(() => {
-        console.log('Configuración de grabador e IA:', values);
-        message.success('Configuración guardada exitosamente');
-        setLoading(false);
-      }, 1000);
-    } catch (error) {
-      console.error('Validation failed:', error);
-    }
-  };
-
-  const handleCancelGrabador = () => {
-    formGrabador.resetFields();
-    message.info('Cambios descartados');
-  };
+  const idEmpresa = user?.empresa?.id;
+  const idOrganizacion = user?.usuarioDetail?.idOrganizacion;
+  const idUsuario = user?.usuarioDetail?.id;
 
   const tabItems = [
     {
-      key: 'sistema',
-      label: (
-        <span>
-          <SettingOutlined />
-          Datos del Sistema
-        </span>
-      ),
-      children: (
-        <DatosSistema
-          form={formSistema}
-          onSave={handleSaveSistema}
-          loading={loading}
-          initialValues={{
-            empresa: 'ADVANCE',
-            nombreResponsable: 'RAFAEL MARTINEZ GODINEZ',
-            domicilio: 'MD 130',
-            colonia: 'NUEVA SANTA MARIA',
-            telefono: '50564620',
-            email: 'ALEJANDROEG88@GMAIL.COM',
-            serieProducto: 'VACAMED211212',
-            serieEquipo: 'HBYBL13ICNQMK00360FD',
-          }}
-        />
-      ),
+      key: "reporte",
+      label: <span>Configuración del Reporte</span>,
+      children:
+        idEmpresa && idOrganizacion && idUsuario ? (
+          <ConfiguracionReporte
+            idEmpresa={idEmpresa}
+            idOrganizacion={idOrganizacion}
+            idUsuario={idUsuario}
+            usuarioData={user?.usuarioDetail}
+          />
+        ) : (
+          <div style={{ padding: "24px", color: "#999" }}>
+            No se pudo cargar la configuración del reporte. Verifica tu sesión.
+          </div>
+        ),
     },
     {
-      key: 'grabador',
-      label: (
-        <span>
-          <VideoCameraOutlined />
-          Configuración de Grabador
-        </span>
-      ),
-      children: (
-        <ConfiguracionGrabador
-          form={formGrabador}
-          onSave={handleSaveGrabador}
-          onCancel={handleCancelGrabador}
-          loading={loading}
-          initialValues={{
-            fps: 30,
-            proveedorIA: 'openai',
-            modelo: 'gpt-4-turbo',
-            temperatura: 0.7,
-            maxTokens: 2000,
-            habilitarIA: true,
-            idioma: 'es',
-          }}
-        />
-      ),
+      key: "datosMedicos",
+      label: <span>Datos Médicos Profesionales</span>,
+      children:
+        idEmpresa && idOrganizacion && idUsuario ? (
+          <DatosMedicoDoctor
+            idEmpresa={idEmpresa}
+            idOrganizacion={idOrganizacion}
+            idUsuario={idUsuario}
+            usuarioData={user?.usuarioDetail}
+          />
+        ) : (
+          <div style={{ padding: "24px", color: "#999" }}>
+            No se pudo cargar los datos médicos. Verifica tu sesión.
+          </div>
+        ),
     },
   ];
 
   return (
     <div>
-      <h1 style={{ fontSize: '24px', fontWeight: 600, marginBottom: '16px' }}>
+      <h1 style={{ fontSize: "24px", fontWeight: 600, marginBottom: "16px" }}>
         Configuraciones del Sistema
       </h1>
 
@@ -112,7 +60,7 @@ const Configuracion = () => {
         activeKey={activeTab}
         onChange={setActiveTab}
         items={tabItems}
-        style={{ marginTop: '24px' }}
+        style={{ marginTop: "24px" }}
       />
     </div>
   );

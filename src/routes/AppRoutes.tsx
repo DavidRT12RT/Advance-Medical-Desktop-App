@@ -12,7 +12,10 @@ import Configuracion from "../pages/Configuracion";
 import Detection from "../pages/Detection";
 import Patients from "../pages/Pacientes";
 import PacienteDetalle from "../pages/PacienteDetalle";
+import EstudioDetalle from "../pages/EstudioDetalle";
 import ConsultaDetalle from "../pages/ConsultaDetalle";
+import Estudios from "../pages/Estudios";
+import ActualizacionSoftware from "../pages/ActualizacionSoftware";
 
 //Single Page Application SPA
 const AppRoutes = () => {
@@ -24,14 +27,20 @@ const AppRoutes = () => {
         <Route path="/" element={<Patients />} />
         <Route path="/configuracion" element={<Configuracion />} />
         <Route path="/paciente-detalle/:id" element={<PacienteDetalle />} />
+        <Route path="/estudios" element={<Estudios />} />
+        <Route
+          path="/paciente-detalle/:id/estudios/:estudioId"
+          element={<EstudioDetalle />}
+        />
+        <Route
+          path="/paciente-detalle/:id/estudios/:estudioId/deteccion"
+          element={<Detection />}
+        />
         <Route
           path="/paciente-detalle/:id/consultas/:consultaId"
           element={<ConsultaDetalle />}
         />
-        <Route
-          path="/paciente-detalle/:id/consultas/:consultaId/deteccion"
-          element={<Detection />}
-        />
+        <Route path="/actualizacion" element={<ActualizacionSoftware />} />
         {/* <Route path="/" element={<Configuracion />} /> */}
         {/* <Route path="/" element={<Detection />} /> */}
       </Route>

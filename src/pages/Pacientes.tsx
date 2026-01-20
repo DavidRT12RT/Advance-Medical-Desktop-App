@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Form, message, Modal } from "antd";
 import SearchPacientes from "../components/pacientes/SearchPacientes";
-import PacientesList from "../components/pacientes/PacientesList";
+import PacientesTable from "../components/pacientes/PacientesTable";
 import DatosPaciente from "../components/pacientes/DatosPaciente";
 import AntecedentePaciente from "../components/pacientes/AntecedentePaciente";
 import FirebasePacientes from "../features/FirebasePacientes";
@@ -18,10 +18,11 @@ import ModalPaciente from "../components/pacientes/ModalPaciente";
 import { Paciente } from "../types/Paciente";
 import dayjs from "dayjs";
 import { cleanUndefinedValues } from "../helpers/cleanUndefinedValues";
+import { useElectronStore } from "../hooks/useElectronStore";
 
 const Pacientes = () => {
-  // TODO: Obtener empresaId del contexto de autenticación
-  const empresaId = "GoFayqIW9MR718FzNpyzGUgaK283";
+  const { user } = useElectronStore();
+  const empresaId = user?.empresa?.id;
 
   const [formDatosGenerales] = Form.useForm();
   const [formAntecedentes] = Form.useForm();
@@ -191,7 +192,7 @@ const Pacientes = () => {
     <div className="flex flex-col gap-4 p-5">
       <HeaderPaciente onNew={handleNew} />
       <SearchPacientes value={searchText} onChange={setSearchText} />
-      <PacientesList pacientes={filteredPacientes} loading={loading} />
+      <PacientesTable pacientes={filteredPacientes} loading={loading} />
       <ModalPaciente
         visible={openDrawer}
         onCancel={handleCancel}

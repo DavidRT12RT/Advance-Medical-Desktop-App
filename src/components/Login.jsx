@@ -1,11 +1,17 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
+import { jwtDecode } from 'jwt-decode';
 import { app } from '../firebaseConfig';
 import { Button } from 'antd';
 import logo from "../assets/logo.png";
+import FirebaseLicense from '../features/FirebaseLicense';
+import { useElectronStore } from '../hooks/useElectronStore';
+import { useNavigate } from 'react-router-dom';
 
-export default function Login({ onLoggedIn }) {
+export default function Login() {
   const auth = getAuth(app);
+  const { setUser, licenseData } = useElectronStore();
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -16,8 +22,74 @@ export default function Login({ onLoggedIn }) {
     setError('');
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      if (onLoggedIn) onLoggedIn();
+      const resp = await signInWithEmailAndPassword(auth, email, password);
+
+      // Obtener el token del usuario
+      const idToken = resp.user.stsTokenManager.accessToken;
+      const decodedToken = jwtDecode(idToken);
+
+      // Extraer datos del JWT
+      const firebaseUID = resp.user.uid;
+      const idEmpresa = decodedToken.idEmpresa;
+      const idOrganizacion = decodedToken.idOrganizacion;
+
+
+
+      // Obtener el perfil desde la estructura de organizaciones
+      // El usuario DEBE estar en el perfil de la organización para poder iniciar sesión
+      if (!idEmpresa || !idOrganizacion) {
+        setError('El usuario NO esta en una organizacion medica (NO tiene un perfil registrado dentro de la organizacion)');
+        setLoading(false);
+        return;
+      }
+
+      const perfil = await FirebaseLicense.obtenerPerfilDelUsuarioPorUID(
+        firebaseUID,
+        idEmpresa,
+        idOrganizacion
+      );
+
+      if (!perfil) {
+        setError('Usuario no encontrado en la organización. Contacta al administrador.');
+        setLoading(false);
+        return;
+      }
+
+      //Checar si la licencia actual de la maquina es compatible con la organizacion del usuario que quiere logearse
+      if (licenseData?.organizacion !== idOrganizacion) {
+        setError('La licencia actual de la máquina no es compatible con la organización del usuario.');
+        setLoading(false);
+        return;
+      }
+
+      // Obtener datos completos de la organización y empresa
+      const organizacion = await FirebaseLicense.obtenerOrganizacion(idEmpresa, idOrganizacion);
+      const empresa = await FirebaseLicense.obtenerEmpresa(idEmpresa);
+
+      if (!organizacion || !empresa) {
+        setError('Error al cargar datos de la organización o empresa.');
+        setLoading(false);
+        return;
+      }
+
+      // Guardar usuario en Electron Store con datos completos
+      const userData = {
+        usuarioDetail: {
+          ...perfil,
+          id: perfil.id,
+          firebaseUID: firebaseUID,
+          idOrganizacion
+        },
+        organizacion: organizacion, // Objeto completo de la organización
+        empresa: empresa, // Objeto completo de la empresa
+        uid: firebaseUID,
+        firebaseUID: firebaseUID,
+      };
+
+      await setUser(userData);
+      console.log("Usuario guardado en Electron Store:", userData);
+      navigate("/");
+
     } catch (e) {
       console.error(e);
       setError('Credenciales inválidas');

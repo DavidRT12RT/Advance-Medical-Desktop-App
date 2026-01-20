@@ -105,7 +105,7 @@ class FirebaseLicense {
   }
 
   async obtenerInformacionDelUsuarioPorUIDFirebase(firebaseUID: string) {
-    let finalData = {};
+    let finalData: any = {};
 
     //Buscar la coleccion del usuario
     const usuariosRef = collection(firestore, "usuarios");
@@ -114,7 +114,13 @@ class FirebaseLicense {
 
     if (!querySnapshot.empty) {
       const userData = querySnapshot.docs[0].data();
-      finalData = { ...userData };
+      const docId = querySnapshot.docs[0].id;
+      finalData = {
+        ...userData,
+        id: docId,
+        uid: firebaseUID,
+        firebaseUID: firebaseUID,
+      };
     }
 
     // Buscar la empresa del usuario
@@ -126,7 +132,13 @@ class FirebaseLicense {
         const empresaRef = doc(firestore, "empresas", empresaId);
         const empresaDoc = await getDoc(empresaRef);
         if (empresaDoc.exists()) {
-          finalData = { ...finalData, empresa: empresaDoc.data() };
+          finalData = {
+            ...finalData,
+            empresa: {
+              ...empresaDoc.data(),
+              id: empresaId,
+            },
+          };
         }
       }
     }
@@ -136,6 +148,92 @@ class FirebaseLicense {
     }
 
     return null;
+  }
+
+  async obtenerPerfilDelUsuarioPorUID(
+    firebaseUID: string,
+    idEmpresa: string,
+    idOrganizacion: string
+  ) {
+    try {
+      // Ruta: empresas/{idEmpresa}/organizaciones/{idOrganizacion}/perfiles
+      const perfilesRef = collection(
+        firestore,
+        `empresas/${idEmpresa}/organizaciones/${idOrganizacion}/perfiles`
+      );
+
+      // Buscar el perfil que coincida con el firebaseUID
+      const q = query(perfilesRef, where("firebaseUID", "==", firebaseUID));
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        const perfilData = querySnapshot.docs[0].data();
+        const perfilId = querySnapshot.docs[0].id;
+
+        return {
+          ...perfilData,
+          id: perfilId,
+          firebaseUID: firebaseUID,
+        };
+      }
+
+      return null;
+    } catch (error) {
+      console.error("Error obteniendo perfil del usuario:", error);
+      return null;
+    }
+  }
+
+  /**
+   * Obtener datos completos de la organización
+   * @param idEmpresa ID de la empresa
+   * @param idOrganizacion ID de la organización
+   * @returns Objeto con todos los datos de la organización
+   */
+  async obtenerOrganizacion(idEmpresa: string, idOrganizacion: string) {
+    try {
+      const organizacionRef = doc(
+        firestore,
+        `empresas/${idEmpresa}/organizaciones/${idOrganizacion}`
+      );
+      const organizacionSnap = await getDoc(organizacionRef);
+
+      if (organizacionSnap.exists()) {
+        return {
+          id: organizacionSnap.id,
+          ...organizacionSnap.data(),
+        };
+      }
+
+      return null;
+    } catch (error) {
+      console.error("Error obteniendo organización:", error);
+      return null;
+    }
+  }
+
+  /**
+   * Obtener datos completos de la empresa
+   * @param idEmpresa ID de la empresa
+   * @returns Objeto con todos los datos de la empresa
+   */
+  async obtenerEmpresa(idEmpresa: string) {
+    try {
+      const empresaRef = doc(firestore, `empresas/${idEmpresa}`);
+      const empresaSnap = await getDoc(empresaRef);
+
+      if (empresaSnap.exists()) {
+        return {
+          id: empresaSnap.id,
+          ...empresaSnap.data(),
+        };
+      }
+
+      return null;
+    } catch (error) {
+      console.error("Error obteniendo empresa:", error);
+      return null;
+    }
   }
 }
 

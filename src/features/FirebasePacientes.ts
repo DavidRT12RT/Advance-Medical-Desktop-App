@@ -14,6 +14,11 @@ import { Paciente } from "../types/Paciente";
 class FirebasePacientes {
   // Metodos para pacientes
   async obtenerPacientes(empresa_id: string): Promise<Paciente[]> {
+    if (!empresa_id) {
+      console.error("empresa_id es undefined en obtenerPacientes");
+      return [];
+    }
+
     const pacientesRef = collection(
       firestore,
       "empresas",

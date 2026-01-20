@@ -7,25 +7,42 @@ module.exports = {
   },
   rebuildConfig: {},
   makers: [
-    //Windows
+    //Windows - Instalador automático con wizard
     {
       name: '@electron-forge/maker-squirrel',
       config: {
-        setupIcon:"assets/icon.ico",
+        setupIcon: "assets/icon.ico",
         iconUrl: 'file://' + require('path').resolve(__dirname, 'assets/icon.ico'),
+        // Instalación silenciosa para actualizaciones
+        loadingGif: 'assets/loading.gif', // Opcional: GIF durante instalación
       },
     },
-    //Multi platform
+    // macOS - ZIP para desarrollo (mantener para compatibilidad)
     {
       name: '@electron-forge/maker-zip',
       platforms: ['darwin'],
     },
-    // Linux
+    // macOS - DMG con instalación automática
+    {
+      name: '@electron-forge/maker-dmg',
+      config: {
+        format: 'ULFO',
+        // No especificar icon ni background si no existen
+        // icon: 'assets/icon.icns',
+        // background: 'assets/dmg-background.png',
+      },
+    },
+    // Linux - DEB (Ubuntu/Debian)
     {
       name: '@electron-forge/maker-deb',
-      config: {},
+      config: {
+        options: {
+          maintainer: 'David Melgarejo',
+          homepage: 'https://advance-intelligence.com'
+        }
+      },
     },
-    // Linux
+    // Linux - RPM (Fedora/RedHat)
     {
       name: '@electron-forge/maker-rpm',
       config: {},

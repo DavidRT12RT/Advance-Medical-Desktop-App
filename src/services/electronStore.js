@@ -55,9 +55,11 @@ const setUser = (user) => {
 const logout = () => {
   const auth = getAuthData();
   return setAuthData({
-    ...DEFAULTS.auth,
+    user: null,
+    isAuthenticated: false,
     machineId: auth.machineId,
     lastUpdatedAt: new Date().toISOString(),
+    lastMachineIdSync: auth.lastMachineIdSync,
   });
 };
 

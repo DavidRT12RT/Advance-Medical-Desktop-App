@@ -8,7 +8,7 @@ const SectionTitle = ({
   icon: React.ReactNode;
 }) => {
   return (
-    <h2 className="text-lg font-bold text-gray-800 border-l-4 border-indigo-600 pl-3 mb-6 flex items-center gap-2">
+    <h2 className="text-lg font-bold text-gray-800 border-l-4 border-indigo-600 pl-3 mb-6 flex items-center gap-2 w-full">
       {icon} {title}
     </h2>
   );

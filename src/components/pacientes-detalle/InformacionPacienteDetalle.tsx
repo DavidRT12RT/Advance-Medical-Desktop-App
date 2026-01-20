@@ -149,14 +149,64 @@ const InformacionPacienteDetalle = () => {
         </div>
       </div>
 
-      {/* Observaciones */}
-      <div className="bg-blue-50 border-l-4 border-blue-600 p-4 rounded">
-        <p className="text-sm text-gray-500 font-medium mb-2">
-          Observaciones generales del Médico
-        </p>
-        <p className="text-sm text-gray-700">
-          {detalleDePaciente.observaciones || "Sin observaciones"}
-        </p>
+      {/* Antecedentes del Paciente */}
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold text-gray-800 border-l-4 border-blue-600 pl-3">
+          Antecedentes del Paciente
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-6 rounded-lg">
+          <div className="space-y-1">
+            <p className="text-sm text-gray-500 font-medium">
+              Antecedentes Patológicos
+            </p>
+            <p className="text-sm text-gray-700">
+              {detalleDePaciente.antecedentesPatologicos ||
+                "Sin antecedentes patológicos registrados"}
+            </p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-sm text-gray-500 font-medium">
+              Antecedentes No Patológicos
+            </p>
+            <p className="text-sm text-gray-700">
+              {detalleDePaciente.antecedentesNoPatologicos ||
+                "Sin antecedentes no patológicos registrados"}
+            </p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-sm text-gray-500 font-medium">
+              Antecedentes Heredo-Familiares
+            </p>
+            <p className="text-sm text-gray-700">
+              {detalleDePaciente.antecedentesHeredoFamiliares ||
+                "Sin antecedentes heredo-familiares registrados"}
+            </p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-sm text-gray-500 font-medium">Alergias</p>
+            <p className="text-sm text-gray-700">
+              {detalleDePaciente.alergias || "Sin alergias registradas"}
+            </p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-sm text-gray-500 font-medium">
+              Medicamentos Actuales
+            </p>
+            <p className="text-sm text-gray-700">
+              {detalleDePaciente.medicamentosActuales ||
+                "Sin medicamentos registrados"}
+            </p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-sm text-gray-500 font-medium">
+              Cirugías Previas
+            </p>
+            <p className="text-sm text-gray-700">
+              {detalleDePaciente.cirugiasPrevias ||
+                "Sin cirugías previas registradas"}
+            </p>
+          </div>
+        </div>
       </div>
     </section>
   );

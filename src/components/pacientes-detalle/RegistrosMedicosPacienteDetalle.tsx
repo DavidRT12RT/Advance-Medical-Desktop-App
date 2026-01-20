@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Skeleton, Tag, Modal } from "antd";
 import { useParams, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
-import FirebaseConsultas from "../../features/FirebaseConsultas";
+import FirebaseEstudios from "../../features/FirebaseEstudios";
 import {
   ResponsiveContainer,
   LineChart,
@@ -12,28 +12,30 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts";
+import { useElectronStore } from "../../hooks/useElectronStore";
 
 const RegistrosMedicosPacienteDetalle: React.FC = () => {
   const { id: pacienteId } = useParams<{ id: string }>();
-  const empresaId = "GoFayqIW9MR718FzNpyzGUgaK283";
+  const { user } = useElectronStore();
+  const empresaId = user?.empresa?.id;
 
   const [loading, setLoading] = useState(true);
-  const [consultas, setConsultas] = useState<any[]>([]);
-  const [selectedConsulta, setSelectedConsulta] = useState<any | null>(null);
+  const [estudios, setEstudios] = useState<any[]>([]);
+  const [selectedEstudio, setSelectedEstudio] = useState<any | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
-    const fetchConsultas = async () => {
+    const fetchEstudios = async () => {
       if (!pacienteId) {
         setLoading(false);
         return;
       }
       try {
-        const data = await FirebaseConsultas.obtenerConsultasDePaciente(
+        const data = await FirebaseEstudios.obtenerEstudiosDePaciente(
           empresaId,
           pacienteId
         );
-        setConsultas((data as any[]) || []);
+        setEstudios((data as any[]) || []);
       } catch (error) {
         console.error("Error obteniendo registros médicos:", error);
       } finally {
@@ -41,7 +43,7 @@ const RegistrosMedicosPacienteDetalle: React.FC = () => {
       }
     };
 
-    fetchConsultas();
+    fetchEstudios();
   }, [empresaId, pacienteId]);
 
   if (loading) {
@@ -82,60 +84,60 @@ const RegistrosMedicosPacienteDetalle: React.FC = () => {
     );
   }
 
-  if (!consultas || consultas.length === 0) {
+  if (!estudios || estudios.length === 0) {
     return (
       <section className="space-y-2">
         <h2 className="text-lg font-semibold text-gray-800 border-l-4 border-indigo-600 pl-3">
           Registros médicos
         </h2>
         <p className="text-sm text-gray-500">
-          Aún no hay consultas registradas para este paciente.
+          Aún no hay estudios registrados para este paciente.
         </p>
       </section>
     );
   }
 
-  const totalConsultas = consultas.length;
-  const consultasConIA = consultas.filter((c) => {
+  const totalEstudios = estudios.length;
+  const estudiosConIA = estudios.filter((c) => {
     const secciones = Array.isArray(c.secciones_ai) ? c.secciones_ai : [];
     const tieneIASecciones = secciones.length > 0;
     const tieneIaLegacy = !!c.ia_cnn || !!c.ia_llm;
     return tieneIASecciones || tieneIaLegacy;
   }).length;
 
-  const consultasOrdenadas = [...consultas].sort((a, b) => {
+  const estudiosOrdenados = [...estudios].sort((a, b) => {
     const fechaA = a.fecha || a.fechaRegistro || "";
     const fechaB = b.fecha || b.fechaRegistro || "";
     return fechaA.localeCompare(fechaB);
   });
 
-  const chartData = consultasOrdenadas.map((consulta: any) => {
-    const fechaBase = consulta.fecha || consulta.fechaRegistro || null;
+  const chartData = estudiosOrdenados.map((estudio: any) => {
+    const fechaBase = estudio.fecha || estudio.fechaRegistro || null;
     const fechaLabel = fechaBase ? dayjs(fechaBase).format("DD/MM/YY") : "-";
 
     return {
-      id: consulta.id,
+      id: estudio.id,
       fechaLabel,
-      indiceRiesgo: consulta.indiceRiesgo ?? 0,
-      rawConsulta: consulta,
+      indiceRiesgo: estudio.indiceRiesgo ?? 0,
+      rawEstudio: estudio,
     };
   });
 
   const renderTooltip = ({ active, payload }: any) => {
     if (!active || !payload || !payload.length) return null;
     const data = payload[0].payload;
-    const consulta = data.rawConsulta as any;
+    const estudio = data.rawEstudio as any;
 
-    const secciones = Array.isArray(consulta.secciones_ai)
-      ? consulta.secciones_ai
+    const secciones = Array.isArray(estudio.secciones_ai)
+      ? estudio.secciones_ai
       : [];
     const lastSession = secciones.length
       ? secciones[secciones.length - 1]
       : null;
     const cnnSummary = lastSession?.ia_cnn?.summary;
-    const llm = lastSession?.ia_llm || consulta.ia_llm;
+    const llm = lastSession?.ia_llm || estudio.ia_llm;
 
-    const fechaBase = consulta.fecha || consulta.fechaRegistro || null;
+    const fechaBase = estudio.fecha || estudio.fechaRegistro || null;
     const fechaLabel = fechaBase
       ? dayjs(fechaBase).format("DD/MM/YYYY HH:mm")
       : "-";
@@ -143,17 +145,17 @@ const RegistrosMedicosPacienteDetalle: React.FC = () => {
     return (
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm px-3 py-2 text-xs text-gray-700 max-w-xs">
         <p className="font-semibold text-gray-900 mb-1">
-          {fechaLabel} · {consulta.tipo || "Sin tipo"}
+          {fechaLabel} · {estudio.tipo || "Sin tipo"}
         </p>
         <p className="mb-1">
           <span className="text-gray-500">Resultado: </span>
           <span className="font-semibold">
-            {consulta.resultado || "Sin resultado"}
+            {estudio.resultado || "Sin resultado"}
           </span>
         </p>
         <p className="mb-1">
           <span className="text-gray-500">Pólipo / lesión: </span>
-          <span className="font-semibold">{consulta.polipo || "-"}</span>
+          <span className="font-semibold">{estudio.polipo || "-"}</span>
         </p>
         {cnnSummary && (
           <p className="mb-1">
@@ -180,13 +182,13 @@ const RegistrosMedicosPacienteDetalle: React.FC = () => {
           </p>
         )}
         <p className="mt-1 text-[10px] text-gray-400">
-          Índice de riesgo: {consulta.indiceRiesgo ?? 0}/100
+          Índice de riesgo: {estudio.indiceRiesgo ?? 0}/100
         </p>
       </div>
     );
   };
 
-  const consultasConPoliposIA = consultas.filter((c) => {
+  const estudiosConPoliposIA = estudios.filter((c: any) => {
     const secciones = Array.isArray(c.secciones_ai) ? c.secciones_ai : [];
     if (secciones.length > 0) {
       const last = secciones[secciones.length - 1];
@@ -213,21 +215,21 @@ const RegistrosMedicosPacienteDetalle: React.FC = () => {
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full md:w-auto">
           <div className="bg-gray-50 rounded-lg px-4 py-3 border border-gray-200">
-            <p className="text-xs text-gray-500">Total de consultas</p>
+            <p className="text-xs text-gray-500">Total de estudios</p>
             <p className="text-xl font-semibold text-gray-900">
-              {totalConsultas}
+              {totalEstudios}
             </p>
           </div>
           <div className="bg-gray-50 rounded-lg px-4 py-3 border border-gray-200">
-            <p className="text-xs text-gray-500">Consultas con IA</p>
+            <p className="text-xs text-gray-500">Estudios con IA</p>
             <p className="text-xl font-semibold text-gray-900">
-              {consultasConIA}
+              {estudiosConIA}
             </p>
           </div>
           <div className="bg-gray-50 rounded-lg px-4 py-3 border border-gray-200">
             <p className="text-xs text-gray-500">Pólipo detectado por IA</p>
             <p className="text-xl font-semibold text-gray-900">
-              {consultasConPoliposIA}
+              {estudiosConPoliposIA}
             </p>
           </div>
         </div>
@@ -263,9 +265,9 @@ const RegistrosMedicosPacienteDetalle: React.FC = () => {
                 dot={{ r: 4 }}
                 activeDot={{ r: 6 }}
                 onClick={(data: any) => {
-                  const consulta = data?.payload?.rawConsulta;
-                  if (!consulta) return;
-                  setSelectedConsulta(consulta);
+                  const estudio = data?.payload?.rawEstudio;
+                  if (!estudio) return;
+                  setSelectedEstudio(estudio);
                   setIsModalOpen(true);
                 }}
               />
@@ -275,23 +277,23 @@ const RegistrosMedicosPacienteDetalle: React.FC = () => {
       </div>
 
       <div className="space-y-4">
-        {consultasOrdenadas.map((consulta: any) => {
-          const secciones = Array.isArray(consulta.secciones_ai)
-            ? consulta.secciones_ai
+        {estudiosOrdenados.map((estudio: any) => {
+          const secciones = Array.isArray(estudio.secciones_ai)
+            ? estudio.secciones_ai
             : [];
           const lastSession = secciones.length
             ? secciones[secciones.length - 1]
             : null;
           const cnnSummary = lastSession?.ia_cnn?.summary;
-          const llm = lastSession?.ia_llm || consulta.ia_llm;
+          const llm = lastSession?.ia_llm || estudio.ia_llm;
 
-          const fechaLabel = consulta.fecha
-            ? dayjs(consulta.fecha).format("DD/MM/YYYY")
-            : consulta.fechaRegistro
-            ? dayjs(consulta.fechaRegistro).format("DD/MM/YYYY HH:mm")
+          const fechaLabel = estudio.fecha
+            ? dayjs(estudio.fecha).format("DD/MM/YYYY")
+            : estudio.fechaRegistro
+            ? dayjs(estudio.fechaRegistro).format("DD/MM/YYYY HH:mm")
             : "-";
 
-          const estado = consulta.estado || "-";
+          const estado = estudio.estado || "-";
 
           let iaBadgeText = "Sin datos de IA";
           let iaBadgeColor: "default" | "success" | "error" | "warning" =
@@ -317,23 +319,23 @@ const RegistrosMedicosPacienteDetalle: React.FC = () => {
 
           return (
             <div
-              key={consulta.id}
+              key={estudio.id}
               className="bg-gray-50 p-5 rounded-lg border border-gray-200 hover:shadow-md transition-shadow cursor-pointer"
               onClick={() => {
-                setSelectedConsulta(consulta);
+                setSelectedEstudio(estudio);
                 setIsModalOpen(true);
               }}
             >
               <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3 mb-4 border-b border-gray-200 pb-3">
                 <div>
                   <p className="text-xs text-gray-500 font-medium">
-                    Fecha de consulta
+                    Fecha de estudio
                   </p>
                   <p className="text-lg font-semibold text-gray-900">
                     {fechaLabel}
                   </p>
                   <p className="text-xs text-gray-600 mt-1">
-                    {consulta.tipo || "Tipo no especificado"}
+                    {estudio.tipo || "Tipo no especificado"}
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-1">
@@ -341,7 +343,7 @@ const RegistrosMedicosPacienteDetalle: React.FC = () => {
                     <span className="text-xs text-gray-500">Estado</span>
                     <Tag
                       color={
-                        estado === "finalizada"
+                        estado === "finalizado"
                           ? "green"
                           : estado === "en_progreso"
                           ? "blue"
@@ -357,7 +359,7 @@ const RegistrosMedicosPacienteDetalle: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-gray-500">Resultado</span>
                     <span className="text-sm font-semibold text-gray-800">
-                      {consulta.resultado || "Sin resultado"}
+                      {estudio.resultado || "Sin resultado"}
                     </span>
                   </div>
                   <Tag color={iaBadgeColor} className="mt-1">
@@ -369,17 +371,17 @@ const RegistrosMedicosPacienteDetalle: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-gray-700">
                 <div>
                   <p className="text-gray-500">Pólipo / lesión</p>
-                  <p className="font-semibold">{consulta.polipo || "-"}</p>
+                  <p className="font-semibold">{estudio.polipo || "-"}</p>
                 </div>
                 <div>
                   <p className="text-gray-500">Tamaño</p>
                   <p className="font-semibold">
-                    {consulta.tamano || consulta.tamaño || "-"}
+                    {estudio.tamano || estudio.tamaño || "-"}
                   </p>
                 </div>
                 <div>
                   <p className="text-gray-500">Ubicación</p>
-                  <p className="font-semibold">{consulta.ubicacion || "-"}</p>
+                  <p className="font-semibold">{estudio.ubicacion || "-"}</p>
                 </div>
               </div>
             </div>
@@ -387,7 +389,7 @@ const RegistrosMedicosPacienteDetalle: React.FC = () => {
         })}
       </div>
 
-      {selectedConsulta && (
+      {selectedEstudio && (
         <Modal
           open={isModalOpen}
           onCancel={() => setIsModalOpen(false)}
@@ -397,13 +399,13 @@ const RegistrosMedicosPacienteDetalle: React.FC = () => {
           title={
             <div className="flex flex-col gap-1">
               <span className="text-sm font-semibold text-gray-800">
-                Resumen de consulta
+                Resumen de estudio
               </span>
               <span className="text-xs text-gray-500">
-                {selectedConsulta.fecha
-                  ? dayjs(selectedConsulta.fecha).format("DD/MM/YYYY HH:mm")
-                  : selectedConsulta.fechaRegistro
-                  ? dayjs(selectedConsulta.fechaRegistro).format(
+                {selectedEstudio.fecha
+                  ? dayjs(selectedEstudio.fecha).format("DD/MM/YYYY HH:mm")
+                  : selectedEstudio.fechaRegistro
+                  ? dayjs(selectedEstudio.fechaRegistro).format(
                       "DD/MM/YYYY HH:mm"
                     )
                   : "Sin fecha"}
@@ -412,15 +414,15 @@ const RegistrosMedicosPacienteDetalle: React.FC = () => {
           }
         >
           {(() => {
-            const consulta = selectedConsulta as any;
-            const secciones = Array.isArray(consulta.secciones_ai)
-              ? consulta.secciones_ai
+            const estudioModal = selectedEstudio as any;
+            const secciones = Array.isArray(estudioModal.secciones_ai)
+              ? estudioModal.secciones_ai
               : [];
             const lastSession = secciones.length
               ? secciones[secciones.length - 1]
               : null;
             const cnnSummary = lastSession?.ia_cnn?.summary;
-            const llm = lastSession?.ia_llm || consulta.ia_llm;
+            const llm = lastSession?.ia_llm || estudioModal.ia_llm;
 
             return (
               <div className="space-y-4 text-sm text-gray-700">
@@ -432,31 +434,31 @@ const RegistrosMedicosPacienteDetalle: React.FC = () => {
                     <p>
                       <span className="text-gray-500">Tipo: </span>
                       <span className="font-semibold">
-                        {consulta.tipo || "Sin tipo"}
+                        {estudioModal.tipo || "Sin tipo"}
                       </span>
                     </p>
                     <p>
                       <span className="text-gray-500">Resultado: </span>
                       <span className="font-semibold">
-                        {consulta.resultado || "Sin resultado"}
+                        {estudioModal.resultado || "Sin resultado"}
                       </span>
                     </p>
                     <p>
                       <span className="text-gray-500">Pólipo / lesión: </span>
                       <span className="font-semibold">
-                        {consulta.polipo || "-"}
+                        {estudioModal.polipo || "-"}
                       </span>
                     </p>
                     <p>
                       <span className="text-gray-500">Tamaño: </span>
                       <span className="font-semibold">
-                        {consulta.tamano || consulta.tamaño || "-"} mm
+                        {estudioModal.tamano || estudioModal.tamaño || "-"} mm
                       </span>
                     </p>
                     <p>
                       <span className="text-gray-500">Ubicación: </span>
                       <span className="font-semibold">
-                        {consulta.ubicacion || "-"}
+                        {estudioModal.ubicacion || "-"}
                       </span>
                     </p>
                   </div>
@@ -506,29 +508,29 @@ const RegistrosMedicosPacienteDetalle: React.FC = () => {
                       </p>
                     )}
                     <p className="mt-2 text-xs text-gray-500">
-                      Índice de riesgo: {consulta.indiceRiesgo ?? 0}/100
+                      Índice de riesgo: {estudioModal.indiceRiesgo ?? 0}/100
                     </p>
                   </div>
                 </div>
 
-                {consulta.hallazgos && (
+                {estudioModal.hallazgos && (
                   <div>
                     <p className="text-xs font-semibold text-gray-500 uppercase mb-1">
                       Hallazgos
                     </p>
                     <p className="text-sm text-gray-700 whitespace-pre-line">
-                      {consulta.hallazgos}
+                      {estudioModal.hallazgos}
                     </p>
                   </div>
                 )}
 
-                {consulta.observaciones && (
+                {estudioModal.observaciones && (
                   <div>
                     <p className="text-xs font-semibold text-gray-500 uppercase mb-1">
                       Observaciones del médico
                     </p>
                     <p className="text-sm text-gray-700 whitespace-pre-line">
-                      {consulta.observaciones}
+                      {estudioModal.observaciones}
                     </p>
                   </div>
                 )}

@@ -4,10 +4,11 @@ import { Button, message } from "antd";
 import { ArrowLeftOutlined, VideoCameraOutlined } from "@ant-design/icons";
 import Webcam from "react-webcam";
 import io, { Socket } from "socket.io-client";
-import FirebaseConsultas from "../features/FirebaseConsultas";
+import FirebaseEstudios from "../features/FirebaseEstudios";
 import FirebasePacientes from "../features/FirebasePacientes";
 import FirebaseMedia from "../features/FirebaseMedia";
 import SectionTitle from "../components/common/SectionTitle";
+import { useElectronStore } from "../hooks/useElectronStore";
 
 const SERVER_URL =
   process.env.NEXT_PUBLIC_API_SERVER_URL || "http://localhost:8000";
@@ -218,14 +219,15 @@ const buildPolypSegments = (events: CnnPolypEvent[]): CnnPolypSegment[] => {
 };
 
 const Detection: React.FC = () => {
-  const { id: pacienteId, consultaId } = useParams<{
+  const { id: pacienteId, estudioId } = useParams<{
     id: string;
-    consultaId: string;
+    estudioId: string;
   }>();
   const navigate = useNavigate();
   // TODO: Obtener empresaId y doctorId del contexto de autenticación
-  const empresaId = "GoFayqIW9MR718FzNpyzGUgaK283";
-  const doctorId = "doctor-demo";
+  const { user } = useElectronStore();
+  const empresaId = user?.empresa?.id;
+  const doctorId = user?.id;
 
   const webcamRef = useRef<Webcam>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -254,16 +256,16 @@ const Detection: React.FC = () => {
   const [llmAnalysis, setLlmAnalysis] = useState<LLMAnalysis | null>(null);
   const [isLlmExpanded, setIsLlmExpanded] = useState(false);
   const [paciente, setPaciente] = useState<any | null>(null);
-  const [consulta, setConsulta] = useState<any | null>(null);
+  const [estudio, setEstudio] = useState<any | null>(null);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
   const [showDeviceSelector, setShowDeviceSelector] = useState(false);
 
-  const subtitle = consulta
+  const subtitle = estudio
     ? [
-        consulta.tipo,
-        consulta.fecha,
-        consulta.estado && `Estado: ${consulta.estado}`,
+        estudio.tipo,
+        estudio.fecha,
+        estudio.estado && `Estado: ${estudio.estado}`,
       ]
         .filter(Boolean)
         .join(" • ")
@@ -300,41 +302,38 @@ const Detection: React.FC = () => {
     };
   }, []);
 
-  // Cargar información de consulta y paciente para el header
+  // Cargar información de estudio y paciente para el header
   useEffect(() => {
     const fetchInfo = async () => {
-      if (!pacienteId || !consultaId) return;
+      if (!pacienteId || !estudioId) return;
       try {
-        const consultaData: any = await FirebaseConsultas.obtenerConsultaPorId(
+        const estudioData: any = await FirebaseEstudios.obtenerEstudioPorId(
           empresaId,
           pacienteId,
-          consultaId
+          estudioId
         );
-        setConsulta(consultaData);
-        if (consultaData?.estado === "finalizada") {
+        setEstudio(estudioData);
+        if (estudioData?.estado === "finalizado") {
           message.info(
-            "Esta consulta ya está finalizada. El módulo de detección solo está disponible para consultas en progreso."
+            "Este estudio ya está finalizado. El módulo de detección solo está disponible para estudios en progreso."
           );
-          navigate(`/paciente-detalle/${pacienteId}/consultas/${consultaId}`);
+          navigate(`/paciente-detalle/${pacienteId}/estudios/${estudioId}`);
           return;
         }
-        if (consultaData?.paciente_id) {
+        if (estudioData?.paciente_id) {
           const pacienteData = await FirebasePacientes.obtenerPacientePorId(
             empresaId,
-            consultaData.paciente_id
+            estudioData.paciente_id
           );
           setPaciente(pacienteData);
         }
       } catch (error) {
-        console.error(
-          "Error cargando información de consulta/paciente:",
-          error
-        );
+        console.error("Error cargando información de estudio/paciente:", error);
       }
     };
 
     fetchInfo();
-  }, [empresaId, pacienteId, consultaId]);
+  }, [empresaId, pacienteId, estudioId]);
 
   // Función para dibujar bboxes en el canvas overlay
   const drawDetections = (detections: any[]) => {
@@ -509,15 +508,15 @@ const Detection: React.FC = () => {
 
         if (isNewSegment && canCaptureMore) {
           const screenshot = webcamRef.current?.getScreenshot();
-          if (screenshot && pacienteId && consultaId) {
+          if (screenshot && pacienteId && estudioId) {
             const sessionKey = sessionId || "default";
 
             drawDetectionsOnImage(screenshot, data.detections || [])
               .then((blob) =>
-                FirebaseMedia.subirFrameDeConsulta(
+                FirebaseMedia.subirFrameDeEstudio(
                   empresaId,
                   pacienteId,
-                  consultaId,
+                  estudioId,
                   sessionKey,
                   data.frame_index,
                   blob
@@ -586,8 +585,8 @@ const Detection: React.FC = () => {
       return;
     }
 
-    if (!pacienteId || !consultaId) {
-      message.error("Falta el contexto de paciente/consulta");
+    if (!pacienteId || !estudioId) {
+      message.error("Falta el contexto de paciente/estudio");
       return;
     }
 
@@ -595,15 +594,15 @@ const Detection: React.FC = () => {
       empresa_id: empresaId,
       doctor_id: doctorId,
       paciente_id: pacienteId,
-      consulta_id: consultaId,
+      estudio_id: estudioId,
     });
 
-    // Marcar consulta como en progreso
+    // Marcar estudio como en progreso
     try {
-      await FirebaseConsultas.actualizarConsulta(
+      await FirebaseEstudios.actualizarEstudio(
         empresaId,
         pacienteId,
-        consultaId,
+        estudioId,
         { estado: "en_progreso" }
       );
     } catch (error) {
@@ -641,7 +640,7 @@ const Detection: React.FC = () => {
         console.error("No se pudo iniciar la grabación de video:", error);
       }
     }
-  }, [isConnected, empresaId, pacienteId, consultaId, doctorId]);
+  }, [isConnected, empresaId, pacienteId, estudioId, doctorId]);
 
   // Capturar y enviar frames
   useEffect(() => {
@@ -755,7 +754,7 @@ const Detection: React.FC = () => {
       });
     }
 
-    if (pacienteId && consultaId) {
+    if (pacienteId && estudioId) {
       const allEvents = polypEventsRef.current;
       const allSegments = buildPolypSegments(allEvents);
 
@@ -788,7 +787,7 @@ const Detection: React.FC = () => {
       };
 
       //Obtener las sesiones actuales
-      const newSecciones = consulta?.secciones_ai || [];
+      const newSecciones = estudio?.secciones_ai || [];
 
       // Subir video completo de la sesión si existe
       let videoUrl: string | null = null;
@@ -798,10 +797,10 @@ const Detection: React.FC = () => {
             type: "video/webm",
           });
           const sessionKey = sessionId || "general";
-          videoUrl = await FirebaseMedia.subirVideoDeConsulta(
+          videoUrl = await FirebaseMedia.subirVideoDeEstudio(
             empresaId,
             pacienteId,
-            consultaId,
+            estudioId,
             sessionKey,
             videoBlob
           );
@@ -819,18 +818,18 @@ const Detection: React.FC = () => {
       });
 
       try {
-        await FirebaseConsultas.actualizarConsulta(
+        await FirebaseEstudios.actualizarEstudio(
           empresaId,
           pacienteId,
-          consultaId,
+          estudioId,
           { secciones_ai: newSecciones }
         );
-        message.success("Resultados de IA guardados en la consulta");
+        message.success("Resultados de IA guardados en el estudio");
       } catch (error) {
         message.error("No se pudieron guardar los resultados de IA");
       }
 
-      navigate(`/paciente-detalle/${pacienteId}/consultas/${consultaId}`);
+      navigate(`/paciente-detalle/${pacienteId}/estudios/${estudioId}`);
     }
   };
 
@@ -842,9 +841,9 @@ const Detection: React.FC = () => {
           type="text"
           icon={<ArrowLeftOutlined />}
           onClick={() =>
-            pacienteId && consultaId
+            pacienteId && estudioId
               ? navigate(
-                  `/paciente-detalle/${pacienteId}/consultas/${consultaId}`
+                  `/paciente-detalle/${pacienteId}/estudios/${estudioId}`
                 )
               : navigate(-1)
           }
@@ -871,22 +870,22 @@ const Detection: React.FC = () => {
 
           <div className="flex items-center gap-4 text-xs text-gray-500">
             <div className="flex items-center gap-2">
-              {consulta?.tipo && (
+              {estudio?.tipo && (
                 <span className="px-2 py-0.5 rounded-full border border-blue-100 bg-blue-50 text-blue-700 text-[11px] font-medium">
-                  {consulta.tipo}
+                  {estudio.tipo}
                 </span>
               )}
-              {consulta?.estado && (
+              {estudio?.estado && (
                 <span
                   className={`px-2 py-0.5 rounded-full border text-[11px] font-medium ${
-                    consulta.estado === "pendiente"
+                    estudio.estado === "pendiente"
                       ? "bg-orange-50 text-orange-700 border-orange-100"
-                      : consulta.estado === "finalizada"
+                      : estudio.estado === "finalizado"
                       ? "bg-green-50 text-green-700 border-green-100"
                       : "bg-blue-50 text-blue-700 border-blue-100"
                   }`}
                 >
-                  {consulta.estado[0].toUpperCase() + consulta.estado.slice(1)}
+                  {estudio.estado[0].toUpperCase() + estudio.estado.slice(1)}
                 </span>
               )}
             </div>
@@ -914,16 +913,16 @@ const Detection: React.FC = () => {
       {/* Contenido */}
       <div className="max-w-7xl mx-auto w-full px-6 py-4 flex flex-col gap-4 flex-1">
         {/* Resumen de última detección */}
-        {(consulta?.ia_cnn || consulta?.ia_llm) && (
+        {(estudio?.ia_cnn || estudio?.ia_llm) && (
           <div className="bg-white p-4 rounded-xl shadow-sm border border-indigo-50 flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide">
                 Última detección registrada
               </p>
               <p className="text-sm text-gray-700 mt-1">
-                {`Pólipos detectados: ${consulta?.ia_cnn?.lastPolypCount ?? 0}`}
-                {consulta?.ia_llm?.severity &&
-                  ` • Severidad: ${consulta.ia_llm.severity}`}
+                {`Pólipos detectados: ${estudio?.ia_cnn?.lastPolypCount ?? 0}`}
+                {estudio?.ia_llm?.severity &&
+                  ` • Severidad: ${estudio.ia_llm.severity}`}
               </p>
             </div>
           </div>

@@ -5,6 +5,7 @@ interface PacientesState {
   loading: boolean;
   openDrawer: boolean;
   openModalConsultas: boolean;
+  openModalEstudios: boolean;
   openModal: boolean;
   mode: "view" | "create" | "edit";
   listaDePacientes: Paciente[];
@@ -17,6 +18,7 @@ const initialState: PacientesState = {
   loading: false,
   openDrawer: false,
   openModalConsultas: false,
+  openModalEstudios: false,
   openModal: false,
   mode: "view",
   listaDePacientes: [],
@@ -40,6 +42,9 @@ export const pacientesSlice = createSlice({
     },
     setOpenModalConsultas: (state, action: PayloadAction<boolean>) => {
       state.openModalConsultas = action.payload;
+    },
+    setOpenModalEstudios: (state, action: PayloadAction<boolean>) => {
+      state.openModalEstudios = action.payload;
     },
     setListaDePacientes: (state, action: PayloadAction<Paciente[]>) => {
       state.listaDePacientes = action.payload;
@@ -81,6 +86,7 @@ export const {
   setOpenDrawer,
   setOpenModal,
   setOpenModalConsultas,
+  setOpenModalEstudios,
   setListaDePacientes,
   setDetalleDePaciente,
   agregarPaciente,

@@ -13,6 +13,7 @@ import {
   setLoading,
   setMode,
   setOpenDrawer,
+  setOpenModalEstudios,
   setOpenModalConsultas,
   setRefresh,
 } from "../../store/pacientesSlice";
@@ -24,11 +25,12 @@ import dayjs from "dayjs";
 import { cleanUndefinedValues } from "../../helpers/cleanUndefinedValues";
 import { message } from "antd";
 import FirebasePacientes from "../../features/FirebasePacientes";
+import { useElectronStore } from "../../hooks/useElectronStore";
 
 const HeaderPacienteDetalle = () => {
   const dispatch = useDispatch();
-  // TODO: Obtener empresaId del contexto de autenticación
-  const empresaId = "GoFayqIW9MR718FzNpyzGUgaK283";
+  const { user } = useElectronStore();
+  const empresaId = user?.empresa?.id;
 
   const detalleDePaciente = useSelector(
     (state: any) => state.pacientes.detalleDePaciente
@@ -142,7 +144,14 @@ const HeaderPacienteDetalle = () => {
           icon={<PlusOutlined />}
           onClick={() => dispatch(setOpenModalConsultas(true))}
         >
-          Crear consulta
+          Nueva consulta
+        </Button>
+        <Button
+          type="default"
+          icon={<PlusOutlined />}
+          onClick={() => dispatch(setOpenModalEstudios(true))}
+        >
+          Nuevo estudio
         </Button>
         {/* Abrir menú de opciones */}
         <Dropdown
