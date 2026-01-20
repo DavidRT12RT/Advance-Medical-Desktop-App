@@ -9,6 +9,9 @@ module.exports = {
     appCopyright: 'Copyright © 2026 ScaleFlow',
     darwinDarkModeSupport: true,
     icon: 'assets/icon',
+    extraResource: [
+      'assets'
+    ],
   },
   rebuildConfig: {},
   makers: [

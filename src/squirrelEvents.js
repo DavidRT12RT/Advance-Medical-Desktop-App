@@ -57,9 +57,30 @@ function createInstallWindow(title, message, isUninstall = false) {
   installWindow.focus();
 
   // Leer el logo desde assets
-  const logoPath = path.join(__dirname, '../assets/logo.png');
   const fs = require('fs');
-  const logoBase64 = fs.readFileSync(logoPath).toString('base64');
+  let logoBase64 = '';
+
+  try {
+    // En producción, __dirname apunta a resources/app.asar/dist
+    // Necesitamos ir a resources/assets
+    const logoPath = path.join(process.resourcesPath, 'assets', 'logo.png');
+    console.log('[Squirrel] Intentando cargar logo desde:', logoPath);
+
+    if (fs.existsSync(logoPath)) {
+      logoBase64 = fs.readFileSync(logoPath).toString('base64');
+      console.log('[Squirrel] Logo cargado exitosamente');
+    } else {
+      console.log('[Squirrel] Logo no encontrado en:', logoPath);
+      // Fallback: intentar desde __dirname
+      const fallbackPath = path.join(__dirname, '../assets/logo.png');
+      if (fs.existsSync(fallbackPath)) {
+        logoBase64 = fs.readFileSync(fallbackPath).toString('base64');
+        console.log('[Squirrel] Logo cargado desde fallback');
+      }
+    }
+  } catch (error) {
+    console.error('[Squirrel] Error cargando logo:', error);
+  }
 
   // HTML compacto con logo de Advance
   const html = `
@@ -95,11 +116,21 @@ function createInstallWindow(title, message, isUninstall = false) {
           margin: 0 auto 20px;
           border-radius: 12px;
           overflow: hidden;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
         .logo img {
           width: 100%;
           height: 100%;
           object-fit: contain;
+        }
+        .logo-fallback {
+          width: 50px;
+          height: 50px;
+          background: white;
+          border-radius: 8px;
         }
         .message {
           font-size: 16px;
@@ -133,7 +164,7 @@ function createInstallWindow(title, message, isUninstall = false) {
     <body>
       <div class="container">
         <div class="logo">
-          <img src="data:image/png;base64,${logoBase64}" alt="Advance Logo">
+          ${logoBase64 ? `<img src="data:image/png;base64,${logoBase64}" alt="Advance Logo">` : '<div class="logo-fallback"></div>'}
         </div>
         <div class="message">
           ${isUninstall ? 'Software de asistencia médica avanzada desinstalado' : 'Software de asistencia médica avanzada instalado'}
