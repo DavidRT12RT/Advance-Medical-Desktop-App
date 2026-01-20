@@ -3,12 +3,12 @@
  * Maneja las actualizaciones automáticas de la aplicación usando archivos binarios desde Firebase Storage
  */
 
-const { app, BrowserWindow } = require('electron');
-const https = require('https');
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
-const { spawn } = require('child_process');
+import { app } from 'electron';
+import https from 'https';
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
+import { spawn, exec } from 'child_process';
 
 class AutoUpdater {
   constructor() {
@@ -276,7 +276,6 @@ class AutoUpdater {
    */
   async installMacOSUpdate() {
     return new Promise((resolve, reject) => {
-      const { exec } = require('child_process');
 
       console.log('[AutoUpdater] Iniciando instalación automática en macOS...');
 
@@ -342,7 +341,6 @@ class AutoUpdater {
    * Copia la aplicación a la carpeta Applications
    */
   copyAppToApplications(sourcePath, destPath, resolve, reject) {
-    const { exec } = require('child_process');
 
     console.log(`[AutoUpdater] Copiando aplicación de ${sourcePath} a ${destPath}...`);
 
@@ -408,4 +406,4 @@ class AutoUpdater {
 
 // Exportar instancia singleton
 const autoUpdater = new AutoUpdater();
-module.exports = autoUpdater;
+export default autoUpdater;
