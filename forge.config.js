@@ -4,17 +4,24 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 module.exports = {
   packagerConfig: {
     asar: true,
+    appBundleId: 'com.scaleflow.aim-desktop',
+    appCategoryType: 'public.app-category.medical',
+    appCopyright: 'Copyright © 2026 ScaleFlow',
+    darwinDarkModeSupport: true,
+    icon: 'assets/icon',
   },
   rebuildConfig: {},
   makers: [
-    //Windows - Instalador automático con wizard
+    //Windows - Instalador automático
     {
       name: '@electron-forge/maker-squirrel',
       config: {
-        // setupIcon:"assets/icon.ico",
-        // iconUrl: 'file://' + require('path').resolve(__dirname, 'assets/icon.ico'),
-        // loadingGif: 'assets/loading.gif', // Opcional: GIF durante instalación
-        // Comentados hasta que existan los archivos de assets
+        authors: 'ScaleFlow',
+        description: 'AIM Desktop - Sistema de Gestión Médica',
+        setupExe: 'AIM-Desktop-Setup.exe',
+        setupIcon: 'assets/icon.ico',
+        iconUrl: 'https://raw.githubusercontent.com/scaleflow/aim-desktop/main/assets/icon.ico',
+        noMsi: true,
       },
     },
     // macOS - ZIP para desarrollo (mantener para compatibilidad)
@@ -27,9 +34,7 @@ module.exports = {
       name: '@electron-forge/maker-dmg',
       config: {
         format: 'ULFO',
-        // No especificar icon ni background si no existen
-        // icon: 'assets/icon.icns',
-        // background: 'assets/dmg-background.png',
+        icon: 'assets/icon.icns',
       },
     },
     // Linux - DEB (Ubuntu/Debian)
@@ -37,8 +42,9 @@ module.exports = {
       name: '@electron-forge/maker-deb',
       config: {
         options: {
-          maintainer: 'David Melgarejo',
-          homepage: 'https://advance-intelligence.com'
+          maintainer: 'ScaleFlow',
+          homepage: 'https://scaleflow.com',
+          icon: 'assets/icon.png'
         }
       },
     },

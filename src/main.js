@@ -22,8 +22,36 @@ try {
   console.log('[Main] Running in production mode, dotenv not loaded');
 }
 
+// Manejar eventos de Squirrel (instalación, actualización, desinstalación)
 if (started) {
   app.quit();
+}
+
+// Crear acceso directo en escritorio después de la instalación (solo Windows)
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.scaleflow.aim-desktop');
+
+  // En la primera ejecución después de instalar, crear acceso directo
+  app.whenReady().then(() => {
+    const desktopPath = path.join(app.getPath('home'), 'Desktop');
+    const shortcutPath = path.join(desktopPath, 'AIM Desktop.lnk');
+
+    // Crear acceso directo si no existe
+    if (!require('fs').existsSync(shortcutPath)) {
+      try {
+        const success = require('electron').shell.writeShortcutLink(shortcutPath, {
+          target: process.execPath,
+          description: 'AIM Desktop - Sistema de Gestión Médica',
+          appUserModelId: 'com.scaleflow.aim-desktop'
+        });
+        if (success) {
+          console.log('[Main] Acceso directo creado en escritorio');
+        }
+      } catch (error) {
+        console.error('[Main] Error creando acceso directo:', error);
+      }
+    }
+  });
 }
 
 const createWindow = () => {

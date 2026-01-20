@@ -1,8 +1,8 @@
 {
   "name": "advance-desktop-app",
-  "productName": "advance-desktop-app",
+  "productName": "AdvanceInteligentSystem",
   "version": "1.0.0",
-  "description": "My Electron application description",
+  "description": "AIM Desktop - Sistema de Gestión Médica Inteligente",
   "main": ".vite/build/main.js",
   "scripts": {
     "start": "electron-forge start",
@@ -13,8 +13,8 @@
   },
   "keywords": [],
   "author": {
-    "name": "David Melgarejo",
-    "email": "davidarcosm@hotmail.com"
+    "name": "ScaleFlow",
+    "email": "contact@scaleflow.com"
   },
   "license": "MIT",
   "devDependencies": {
