@@ -17,17 +17,19 @@ module.exports = {
   rebuildConfig: {},
   //Configuracion de los instaladores (Windows, MAC y LINUX)
   makers: [
-    //Windows - Instalador automático
+    //Windows - Instalador automático con Squirrel
     {
       name: '@electron-forge/maker-squirrel',
       config: {
         authors: 'ScaleFlow',
         description: 'AIM Desktop - Sistema de Gestión Médica',
+        name: 'AdvanceInteligentSystem',
         setupExe: 'AIM-Desktop-Setup.exe',
         setupIcon: 'assets/icon.ico',
         iconUrl: 'https://raw.githubusercontent.com/scaleflow/aim-desktop/main/assets/icon.ico',
-        noMsi: true,
         loadingGif: 'assets/transparent.gif',
+        noMsi: true,
+        remoteReleases: false,
       },
     },
     // macOS - ZIP para desarrollo (mantener para compatibilidad)
@@ -39,7 +41,7 @@ module.exports = {
     {
       name: '@electron-forge/maker-dmg',
       config: {
-        format: 'ULFO',
+        format: 'UDZO',
         icon: 'assets/icon.icns',
       },
     },

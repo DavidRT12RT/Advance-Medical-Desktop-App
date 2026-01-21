@@ -16,6 +16,8 @@ import { Outlet, useNavigate, useLocation } from "react-router-dom";
 // @ts-ignore
 import logoEmpresa from "../../assets/logo.png";
 import { useElectronStore } from "../hooks/useElectronStore";
+// @ts-ignore
+import AppVersion from "./AppVersion";
 
 const { Header, Content } = Layout;
 
@@ -136,9 +138,20 @@ const LayoutMain = () => {
           backgroundColor: "#fff",
           borderRadius: 8,
           minHeight: 360,
+          position: "relative",
         }}
       >
         <Outlet />
+        <div
+          style={{
+            position: "fixed",
+            bottom: 8,
+            right: 16,
+            zIndex: 1000,
+          }}
+        >
+          <AppVersion />
+        </div>
       </Content>
     </Layout>
   );

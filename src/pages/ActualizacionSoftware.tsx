@@ -67,7 +67,13 @@ interface UpdateInfo {
   obligatoria: boolean;
   changelog: ChangelogItem;
   descargas: {
-    [key: string]: {
+    windows?: {
+      url: string;
+      checksum: string;
+      tamano: number;
+      arquitectura: string;
+    };
+    mac?: {
       url: string;
       checksum: string;
       tamano: number;
@@ -108,14 +114,14 @@ const ActualizacionSoftware: React.FC = () => {
     const getVersion = async () => {
       try {
         // @ts-ignore
-        const version = await window.electron.ipcRenderer.invoke(
-          "update:getCurrentVersion",
-        );
-        setCurrentVersion(version);
+        const version = await window.updater?.getCurrentVersion();
+        if (version) {
+          setCurrentVersion(version);
+        }
       } catch (error) {
         console.error("Error getting version:", error);
-        // Fallback a versión hardcodeada
-        setCurrentVersion("1.5.1");
+        // Fallback a versión desde package.json
+        setCurrentVersion("1.0.0");
       }
     };
     getVersion();

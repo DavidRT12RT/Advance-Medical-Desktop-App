@@ -4,6 +4,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { Button, Tooltip } from 'antd';
 import logo from "../assets/logo.png";
 import FirebaseLicense from '../features/FirebaseLicense';
+import AppVersion from './AppVersion';
 
 export default function LicenseGate({ machineId, onLicensed }) {
   const [loading, setLoading] = useState(false);
@@ -193,6 +194,8 @@ export default function LicenseGate({ machineId, onLicensed }) {
           </Tooltip>
         </div>
       </div>
+
+      <AppVersion style={{ marginTop: '16px' }} />
     </div>
   );
 }

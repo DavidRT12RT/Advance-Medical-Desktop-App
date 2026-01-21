@@ -7,6 +7,7 @@ import logo from "../assets/logo.png";
 import FirebaseLicense from '../features/FirebaseLicense';
 import { useElectronStore } from '../hooks/useElectronStore';
 import { useNavigate } from 'react-router-dom';
+import AppVersion from './AppVersion';
 
 export default function Login() {
   const auth = getAuth(app);
@@ -135,6 +136,8 @@ export default function Login() {
           </div>
         </form>
       </div>
+
+      <AppVersion style={{ marginTop: '16px' }} />
     </div>
   );
 }
