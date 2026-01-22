@@ -39,6 +39,13 @@ import {
   getDocs,
 } from "firebase/firestore";
 import { useElectronStore } from "../hooks/useElectronStore";
+import {
+  incrementarDescargas,
+  incrementarInstalaciones,
+  incrementarErrores,
+  registrarInstalacion,
+  registrarDescarga,
+} from "../features/FirebaseUpdates";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import "dayjs/locale/es";
@@ -93,6 +100,7 @@ interface DownloadProgress {
 }
 
 const ActualizacionSoftware: React.FC = () => {
+  const [messageApi, contextHolder] = message.useMessage();
   const { user } = useElectronStore();
   const [currentVersion, setCurrentVersion] = useState<string>("1.5.1");
   const [checking, setChecking] = useState(false);
@@ -213,6 +221,7 @@ const ActualizacionSoftware: React.FC = () => {
     }
   };
 
+  console.log("User", user);
   // Listener para eventos de progreso de descarga
   useEffect(() => {
     // @ts-ignore
@@ -222,10 +231,59 @@ const ActualizacionSoftware: React.FC = () => {
       setDownloadProgress(progress);
     };
 
-    const handleDownloadComplete = (data: any) => {
+    const handleDownloadComplete = async (data: any) => {
       setDownloading(false);
       setUpdateDownloaded(true);
-      message.success("Actualización descargada correctamente");
+      messageApi.open({
+        type: "success",
+        content: "Actualización descargada correctamente",
+      });
+
+      console.log("Antes de entrar al if", { updateInfo, user });
+      console.log("El update info tiene id", updateInfo?.id);
+      console.log("La empresa tiene id", user?.empresa?.id);
+
+      // Registrar descarga en Firebase
+      if (updateInfo && user?.empresa?.id) {
+        try {
+          console.log("Dentro del if");
+          // Incrementar contador de descargas
+          await incrementarDescargas(
+            user?.empresa?.id,
+            updateInfo.version,
+            updateInfo.id,
+          );
+          console.log("Incrementado descargas");
+
+          // Obtener información del dispositivo
+          // @ts-ignore
+          const deviceInfo = await window.device?.getAllDeviceInfo();
+
+          // Registrar descarga en subcolección
+          if (deviceInfo) {
+            await registrarDescarga(
+              user?.empresa?.id,
+              updateInfo.version,
+              updateInfo.id,
+              {
+                machineId: deviceInfo.machineId || "unknown",
+                macAddresses: deviceInfo.macAddresses || [],
+                ipAddresses: deviceInfo.ipAddresses || [],
+                systemInfo: deviceInfo.system || {},
+              },
+            );
+          }
+
+          console.log(
+            "[ActualizacionSoftware] Descarga registrada en Firebase",
+          );
+        } catch (error) {
+          console.error(
+            "[ActualizacionSoftware] Error al registrar descarga:",
+            error,
+          );
+        }
+      }
     };
 
     // @ts-ignore
@@ -237,7 +295,9 @@ const ActualizacionSoftware: React.FC = () => {
       // @ts-ignore
       window.updater.removeAllListeners();
     };
-  }, []);
+  }, [updateInfo, user]);
+
+  console.log("El update info es", updateInfo);
 
   const handleDownloadUpdate = async () => {
     if (!updateInfo) return;
@@ -261,34 +321,121 @@ const ActualizacionSoftware: React.FC = () => {
       if (!result.success) {
         setDownloading(false);
         setError(result.error || "Error al descargar la actualización");
-        message.error("Error al descargar la actualización");
+        messageApi.open({
+          type: "error",
+          content: "Error al descargar la actualización",
+        });
       }
       // El éxito se maneja en el listener 'update-downloaded'
     } catch (error) {
       console.error("Error downloading update:", error);
       setDownloading(false);
       setError("Error al descargar la actualización");
-      message.error("Error al descargar la actualización");
+      messageApi.open({
+        type: "error",
+        content: "Error al descargar la actualización",
+      });
     }
   };
 
   const handleInstallUpdate = async () => {
     try {
+      // Registrar instalación en Firebase ANTES de instalar
+      if (updateInfo && user?.empresa?.id) {
+        try {
+          // Obtener información del dispositivo
+          // @ts-ignore
+          const deviceInfo = await window.device?.getAllDeviceInfo();
+
+          // Incrementar contador de instalaciones
+          await incrementarInstalaciones(
+            user?.empresa?.id,
+            updateInfo.version,
+            updateInfo.id,
+          );
+
+          // Registrar instalación en subcolección
+          if (deviceInfo) {
+            await registrarInstalacion(
+              user?.empresa?.id,
+              updateInfo.version,
+              updateInfo.id,
+              {
+                machineId: deviceInfo.machineId || "unknown",
+                macAddresses: deviceInfo.macAddresses || [],
+                ipAddresses: deviceInfo.ipAddresses || [],
+                systemInfo: deviceInfo.system || {},
+                versionAnterior: currentVersion,
+              },
+            );
+          }
+
+          console.log(
+            "[ActualizacionSoftware] Instalación registrada en Firebase",
+          );
+        } catch (error) {
+          console.error(
+            "[ActualizacionSoftware] Error al registrar instalación:",
+            error,
+          );
+          // Continuar con la instalación aunque falle el registro
+        }
+      }
+
       // @ts-ignore
       const result = await window.updater.installUpdate();
 
       if (result.success) {
-        message.success(
-          "Instalando actualización... La aplicación se reiniciará.",
-        );
+        messageApi.open({
+          type: "success",
+          content: "Instalando actualización... La aplicación se reiniciará.",
+        });
       } else {
         setError(result.error || "Error al instalar la actualización");
-        message.error("Error al instalar la actualización");
+        messageApi.open({
+          type: "error",
+          content: "Error al instalar la actualización",
+        });
+
+        // Registrar error en Firebase
+        if (updateInfo && user?.empresa?.id) {
+          try {
+            await incrementarErrores(
+              user?.empresa?.id,
+              updateInfo.version,
+              updateInfo.id,
+            );
+          } catch (err) {
+            console.error(
+              "[ActualizacionSoftware] Error al registrar error:",
+              err,
+            );
+          }
+        }
       }
     } catch (error) {
       console.error("Error installing update:", error);
       setError("Error al instalar la actualización");
-      message.error("Error al instalar la actualización");
+
+      // Registrar error en Firebase
+      if (updateInfo && user?.empresa?.id) {
+        try {
+          await incrementarErrores(
+            user?.empresa?.id,
+            updateInfo.version,
+            updateInfo.id,
+          );
+        } catch (err) {
+          console.error(
+            "[ActualizacionSoftware] Error al registrar error:",
+            err,
+          );
+        }
+      }
+      messageApi.open({
+        type: "error",
+        content: "Error al instalar la actualización",
+      });
     }
   };
 
@@ -332,6 +479,7 @@ const ActualizacionSoftware: React.FC = () => {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
+      {contextHolder}
       <div className="mb-6">
         <Title level={2}>Actualización de Software</Title>
         <Text type="secondary">
