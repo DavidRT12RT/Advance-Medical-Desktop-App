@@ -13,6 +13,7 @@ const Estudios = () => {
   const navigate = useNavigate();
   const { user } = useElectronStore();
   const empresaId = user?.empresa?.id;
+  const userId = user?.usuarioDetail?.id;
 
   const [loading, setLoading] = useState(true);
   const [estudios, setEstudios] = useState<any[]>([]);
@@ -35,7 +36,10 @@ const Estudios = () => {
     }
     try {
       setLoading(true);
-      const data = await FirebaseEstudios.obtenerTodosLosEstudios(empresaId);
+      const data = await FirebaseEstudios.obtenerTodosLosEstudios(
+        empresaId,
+        userId,
+      );
       const sorted = data.sort((a: any, b: any) => {
         const dateA = new Date(a.fecha || a.fechaRegistro || 0).getTime();
         const dateB = new Date(b.fecha || b.fechaRegistro || 0).getTime();

@@ -54,6 +54,8 @@ const LayoutMain = () => {
     selectedKey = "6";
   } else if (location.pathname.startsWith("/estudios")) {
     selectedKey = "4";
+  } else if (location.pathname.startsWith("/consultas")) {
+    selectedKey = "3";
   } else if (location.pathname.startsWith("/")) {
     selectedKey = "2";
   }
@@ -97,7 +99,7 @@ const LayoutMain = () => {
               icon: <ScheduleOutlined />,
               label: "Consultas",
               onClick: () => {
-                navigate("/");
+                navigate("/consultas");
               },
             },
             {

@@ -111,7 +111,8 @@ class FirebaseEstudios {
   async crearEstudioBasico(
     empresa_id: string,
     paciente_id: string,
-    estudioInfo: any
+    estudioInfo: any,
+    userId?: string,
   ) {
     const estudiosRef = collection(
       firestore,
@@ -119,13 +120,14 @@ class FirebaseEstudios {
       empresa_id,
       "pacientes",
       paciente_id,
-      "estudios"
+      "estudios",
     );
 
     const estudioBody = {
       ...estudioInfo,
       empresa_id,
       paciente_id,
+      doctorId: userId || estudioInfo.doctorId,
       fechaRegistro: new Date().toISOString(),
     };
 
@@ -136,7 +138,8 @@ class FirebaseEstudios {
   async obtenerEstudiosPorEstado(
     empresa_id: string,
     paciente_id: string,
-    estado: string
+    estado: string,
+    userId?: string,
   ) {
     const estudiosRef = collection(
       firestore,
@@ -144,26 +147,46 @@ class FirebaseEstudios {
       empresa_id,
       "pacientes",
       paciente_id,
-      "estudios"
+      "estudios",
     );
 
-    const q = query(estudiosRef, where("estado", "==", estado));
+    let q;
+    if (userId) {
+      q = query(
+        estudiosRef,
+        where("estado", "==", estado),
+        where("doctorId", "==", userId),
+      );
+    } else {
+      q = query(estudiosRef, where("estado", "==", estado));
+    }
     const snapshot = await getDocs(q);
 
     return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
   }
 
-  async obtenerEstudiosDePaciente(empresa_id: string, paciente_id: string) {
+  async obtenerEstudiosDePaciente(
+    empresa_id: string,
+    paciente_id: string,
+    userId?: string,
+  ) {
     const estudiosRef = collection(
       firestore,
       "empresas",
       empresa_id,
       "pacientes",
       paciente_id,
-      "estudios"
+      "estudios",
     );
 
-    const snapshot = await getDocs(estudiosRef);
+    let estudiosQuery;
+    if (userId) {
+      estudiosQuery = query(estudiosRef, where("doctorId", "==", userId));
+    } else {
+      estudiosQuery = estudiosRef;
+    }
+
+    const snapshot = await getDocs(estudiosQuery);
     return snapshot.docs.map((docSnap) => {
       const data: any = { id: docSnap.id, ...docSnap.data() };
       const indiceRiesgo = calcularIndiceRiesgo(data);
@@ -174,7 +197,7 @@ class FirebaseEstudios {
   async obtenerEstudioPorId(
     empresa_id: string,
     paciente_id: string,
-    estudio_id: string
+    estudio_id: string,
   ) {
     const estudioDocRef = doc(
       firestore,
@@ -183,7 +206,7 @@ class FirebaseEstudios {
       "pacientes",
       paciente_id,
       "estudios",
-      estudio_id
+      estudio_id,
     );
 
     const snapshot = await getDoc(estudioDocRef);
@@ -198,7 +221,7 @@ class FirebaseEstudios {
     empresa_id: string,
     paciente_id: string,
     estudio_id: string,
-    data: any
+    data: any,
   ) {
     const estudioDocRef = doc(
       firestore,
@@ -207,21 +230,30 @@ class FirebaseEstudios {
       "pacientes",
       paciente_id,
       "estudios",
-      estudio_id
+      estudio_id,
     );
 
     await updateDoc(estudioDocRef, data);
   }
 
-  async obtenerTodosLosEstudios(empresa_id: string) {
+  async obtenerTodosLosEstudios(empresa_id: string, userId?: string) {
     try {
       const pacientesRef = collection(
         firestore,
         "empresas",
         empresa_id,
-        "pacientes"
+        "pacientes",
       );
-      const pacientesSnapshot = await getDocs(pacientesRef);
+
+      // Filtrar pacientes por doctorId si se proporciona userId
+      let pacientesQuery;
+      if (userId) {
+        pacientesQuery = query(pacientesRef, where("doctorId", "==", userId));
+      } else {
+        pacientesQuery = pacientesRef;
+      }
+
+      const pacientesSnapshot = await getDocs(pacientesQuery);
 
       const todosLosEstudios: any[] = [];
 
@@ -235,10 +267,18 @@ class FirebaseEstudios {
           empresa_id,
           "pacientes",
           pacienteId,
-          "estudios"
+          "estudios",
         );
 
-        const estudiosSnapshot = await getDocs(estudiosRef);
+        // Filtrar estudios por doctorId si se proporciona userId
+        let estudiosQuery;
+        if (userId) {
+          estudiosQuery = query(estudiosRef, where("doctorId", "==", userId));
+        } else {
+          estudiosQuery = estudiosRef;
+        }
+
+        const estudiosSnapshot = await getDocs(estudiosQuery);
 
         estudiosSnapshot.docs.forEach((estudioDoc) => {
           const estudioData: any = { id: estudioDoc.id, ...estudioDoc.data() };

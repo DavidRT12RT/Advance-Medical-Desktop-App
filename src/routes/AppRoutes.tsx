@@ -15,6 +15,7 @@ import PacienteDetalle from "../pages/PacienteDetalle";
 import EstudioDetalle from "../pages/EstudioDetalle";
 import ConsultaDetalle from "../pages/ConsultaDetalle";
 import Estudios from "../pages/Estudios";
+import Consultas from "../pages/Consultas";
 import ActualizacionSoftware from "../pages/ActualizacionSoftware";
 
 //Single Page Application SPA
@@ -28,6 +29,7 @@ const AppRoutes = () => {
         <Route path="/configuracion" element={<Configuracion />} />
         <Route path="/paciente-detalle/:id" element={<PacienteDetalle />} />
         <Route path="/estudios" element={<Estudios />} />
+        <Route path="/consultas" element={<Consultas />} />
         <Route
           path="/paciente-detalle/:id/estudios/:estudioId"
           element={<EstudioDetalle />}

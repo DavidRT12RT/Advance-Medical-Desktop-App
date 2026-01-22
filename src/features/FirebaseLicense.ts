@@ -32,7 +32,7 @@ class FirebaseLicense {
       const licenciaCollection = collection(firestore, "licencias");
       const licenciaQuery = query(
         licenciaCollection,
-        where("claveLicencia", "==", license.claveLicencia)
+        where("claveLicencia", "==", license.claveLicencia),
       );
       const licenciaSnapshot = await getDocs(licenciaQuery);
 
@@ -75,18 +75,22 @@ class FirebaseLicense {
   async vincularComputadoraConLicencia(
     license: string,
     machineId: string,
-    machineInformation: Record<string, any>
+    machineInformation: Record<string, any>,
   ): Promise<any> {
     // Buscar licencia en Firestore
     const licenciaCollection = collection(firestore, "licencias");
     const licenciaQuery = query(
       licenciaCollection,
-      where("claveLicencia", "==", license)
+      where("claveLicencia", "==", license),
     );
     const licenciaSnapshot = await getDocs(licenciaQuery);
     if (licenciaSnapshot.empty) throw new Error("La licencia no existe");
     const firstDoc = licenciaSnapshot.docs[0];
     const licencia = { id: firstDoc.id, ...firstDoc.data() } as any;
+
+    // Verificar que la licencia no tenga machineId
+    if (licencia.machineId)
+      throw new Error("La licencia ya está vinculada a otra computadora");
 
     const today = new Date().toISOString().slice(0, 10);
     if (licencia.fechaExpiracion < today)
@@ -153,13 +157,13 @@ class FirebaseLicense {
   async obtenerPerfilDelUsuarioPorUID(
     firebaseUID: string,
     idEmpresa: string,
-    idOrganizacion: string
+    idOrganizacion: string,
   ) {
     try {
       // Ruta: empresas/{idEmpresa}/organizaciones/{idOrganizacion}/perfiles
       const perfilesRef = collection(
         firestore,
-        `empresas/${idEmpresa}/organizaciones/${idOrganizacion}/perfiles`
+        `empresas/${idEmpresa}/organizaciones/${idOrganizacion}/perfiles`,
       );
 
       // Buscar el perfil que coincida con el firebaseUID
@@ -194,7 +198,7 @@ class FirebaseLicense {
     try {
       const organizacionRef = doc(
         firestore,
-        `empresas/${idEmpresa}/organizaciones/${idOrganizacion}`
+        `empresas/${idEmpresa}/organizaciones/${idOrganizacion}`,
       );
       const organizacionSnap = await getDoc(organizacionRef);
 

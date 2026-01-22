@@ -23,6 +23,7 @@ import { useElectronStore } from "../hooks/useElectronStore";
 const Pacientes = () => {
   const { user } = useElectronStore();
   const empresaId = user?.empresa?.id;
+  const userId = user?.usuarioDetail?.id;
 
   const [formDatosGenerales] = Form.useForm();
   const [formAntecedentes] = Form.useForm();
@@ -48,7 +49,8 @@ const Pacientes = () => {
     const obtenerPacientes = async () => {
       try {
         const pacientesData = await FirebasePacientes.obtenerPacientes(
-          empresaId
+          empresaId,
+          userId,
         );
         dispatch(setListaDePacientes(pacientesData));
       } catch (error) {
@@ -57,7 +59,7 @@ const Pacientes = () => {
       }
     };
     obtenerPacientes();
-  }, [empresaId, dispatch]);
+  }, [empresaId, userId, dispatch]);
 
   const handleSelectPaciente = (paciente: Paciente) => {
     // Crear una copia del paciente para evitar modificar el objeto original (read-only)
@@ -90,7 +92,7 @@ const Pacientes = () => {
 
       // Formatear valores necesarios
       const fechaNacimiento = dayjs(datosGenerales.fechaNacimiento).format(
-        "YYYY-MM-DD"
+        "YYYY-MM-DD",
       );
       const values = { ...datosGenerales, ...antecedentes, fechaNacimiento };
       dispatch(setLoading(true));
@@ -101,10 +103,12 @@ const Pacientes = () => {
         };
         const pacienteCreado = await FirebasePacientes.crearActualizarPaciente(
           empresaId,
-          newPaciente
+          newPaciente,
+          userId,
         );
         const pacientesActualizados = await FirebasePacientes.obtenerPacientes(
-          empresaId
+          empresaId,
+          userId,
         );
         dispatch(setListaDePacientes(pacientesActualizados));
         dispatch(setDetalleDePaciente(pacienteCreado));
@@ -112,9 +116,14 @@ const Pacientes = () => {
       } else {
         values.id = detalleDePaciente?.id || "";
         const pacienteActualizado =
-          await FirebasePacientes.crearActualizarPaciente(empresaId, values);
+          await FirebasePacientes.crearActualizarPaciente(
+            empresaId,
+            values,
+            userId,
+          );
         const pacientesActualizados = await FirebasePacientes.obtenerPacientes(
-          empresaId
+          empresaId,
+          userId,
         );
         dispatch(setListaDePacientes(pacientesActualizados));
         message.success("Paciente actualizado exitosamente");
@@ -145,17 +154,17 @@ const Pacientes = () => {
         try {
           await FirebasePacientes.eliminarPaciente(
             empresaId,
-            detalleDePaciente?.id || ""
+            detalleDePaciente?.id || "",
           );
           const pacientesActualizados =
-            await FirebasePacientes.obtenerPacientes(empresaId);
+            await FirebasePacientes.obtenerPacientes(empresaId, userId);
           dispatch(setListaDePacientes(pacientesActualizados));
           dispatch(setMode("view"));
           formDatosGenerales.resetFields();
           formAntecedentes.resetFields();
 
           message.success(
-            `${detalleDePaciente?.nombres} ${detalleDePaciente?.apellidoPaterno} ${detalleDePaciente?.apellidoMaterno} eliminado exitosamente`
+            `${detalleDePaciente?.nombres} ${detalleDePaciente?.apellidoPaterno} ${detalleDePaciente?.apellidoMaterno} eliminado exitosamente`,
           );
         } catch (error) {
           console.error("Error eliminando paciente:", error);

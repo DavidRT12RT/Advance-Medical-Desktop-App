@@ -29,6 +29,7 @@ const ModalNuevoEstudio: React.FC<ModalNuevoEstudioProps> = ({
   const navigate = useNavigate();
   const { user } = useElectronStore();
   const empresaId = user?.empresa?.id;
+  const userId = user?.usuarioDetail?.id;
 
   const [pacientes, setPacientes] = useState<any[]>([]);
   const [loadingPacientes, setLoadingPacientes] = useState(false);
@@ -45,7 +46,7 @@ const ModalNuevoEstudio: React.FC<ModalNuevoEstudioProps> = ({
     if (!empresaId) return;
     try {
       setLoadingPacientes(true);
-      const data = await FirebasePacientes.obtenerPacientes(empresaId);
+      const data = await FirebasePacientes.obtenerPacientes(empresaId, userId);
       setPacientes(data);
     } catch (error) {
       console.error("Error obteniendo pacientes:", error);
@@ -85,7 +86,7 @@ const ModalNuevoEstudio: React.FC<ModalNuevoEstudioProps> = ({
       const nuevoEstudio = await FirebaseEstudios.crearEstudioBasico(
         empresaId,
         selectedPaciente.id,
-        estudioBasico
+        estudioBasico,
       );
 
       message.success("Estudio creado exitosamente");
@@ -93,7 +94,7 @@ const ModalNuevoEstudio: React.FC<ModalNuevoEstudioProps> = ({
 
       // Navegar al detalle del estudio recién creado
       navigate(
-        `/paciente-detalle/${selectedPaciente.id}/estudios/${nuevoEstudio.id}`
+        `/paciente-detalle/${selectedPaciente.id}/estudios/${nuevoEstudio.id}`,
       );
     } catch (error) {
       console.error("Error al guardar estudio básico:", error);

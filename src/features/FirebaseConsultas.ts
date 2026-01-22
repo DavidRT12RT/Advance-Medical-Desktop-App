@@ -111,7 +111,8 @@ class FirebaseConsultas {
   async crearConsultaBasica(
     empresa_id: string,
     paciente_id: string,
-    consultaInfo: any
+    consultaInfo: any,
+    userId?: string,
   ) {
     const consultasRef = collection(
       firestore,
@@ -119,13 +120,14 @@ class FirebaseConsultas {
       empresa_id,
       "pacientes",
       paciente_id,
-      "consultas"
+      "consultas",
     );
 
     const consultaBody = {
       ...consultaInfo,
       empresa_id,
       paciente_id,
+      doctorId: userId || consultaInfo.doctorId,
       fechaRegistro: new Date().toISOString(),
     };
 
@@ -136,7 +138,8 @@ class FirebaseConsultas {
   async obtenerConsultasPorEstado(
     empresa_id: string,
     paciente_id: string,
-    estado: string
+    estado: string,
+    userId?: string,
   ) {
     const consultasRef = collection(
       firestore,
@@ -144,26 +147,46 @@ class FirebaseConsultas {
       empresa_id,
       "pacientes",
       paciente_id,
-      "consultas"
+      "consultas",
     );
 
-    const q = query(consultasRef, where("estado", "==", estado));
+    let q;
+    if (userId) {
+      q = query(
+        consultasRef,
+        where("estado", "==", estado),
+        where("doctorId", "==", userId),
+      );
+    } else {
+      q = query(consultasRef, where("estado", "==", estado));
+    }
     const snapshot = await getDocs(q);
 
     return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
   }
 
-  async obtenerConsultasDePaciente(empresa_id: string, paciente_id: string) {
+  async obtenerConsultasDePaciente(
+    empresa_id: string,
+    paciente_id: string,
+    userId?: string,
+  ) {
     const consultasRef = collection(
       firestore,
       "empresas",
       empresa_id,
       "pacientes",
       paciente_id,
-      "consultas"
+      "consultas",
     );
 
-    const snapshot = await getDocs(consultasRef);
+    let consultasQuery;
+    if (userId) {
+      consultasQuery = query(consultasRef, where("doctorId", "==", userId));
+    } else {
+      consultasQuery = consultasRef;
+    }
+
+    const snapshot = await getDocs(consultasQuery);
     return snapshot.docs.map((docSnap) => {
       const data: any = { id: docSnap.id, ...docSnap.data() };
       const indiceRiesgo = calcularIndiceRiesgo(data);
@@ -174,7 +197,7 @@ class FirebaseConsultas {
   async obtenerConsultaPorId(
     empresa_id: string,
     paciente_id: string,
-    consulta_id: string
+    consulta_id: string,
   ) {
     const consultaDocRef = doc(
       firestore,
@@ -183,7 +206,7 @@ class FirebaseConsultas {
       "pacientes",
       paciente_id,
       "consultas",
-      consulta_id
+      consulta_id,
     );
 
     const snapshot = await getDoc(consultaDocRef);
@@ -198,7 +221,7 @@ class FirebaseConsultas {
     empresa_id: string,
     paciente_id: string,
     consulta_id: string,
-    data: any
+    data: any,
   ) {
     const consultaDocRef = doc(
       firestore,
@@ -207,7 +230,7 @@ class FirebaseConsultas {
       "pacientes",
       paciente_id,
       "consultas",
-      consulta_id
+      consulta_id,
     );
 
     await updateDoc(consultaDocRef, data);
