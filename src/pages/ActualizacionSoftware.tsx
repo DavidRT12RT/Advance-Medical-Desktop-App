@@ -216,39 +216,26 @@ const ActualizacionSoftware: React.FC = () => {
   // Listener para eventos de progreso de descarga
   useEffect(() => {
     // @ts-ignore
-    if (!window.electron?.ipcRenderer) return;
+    if (!window.updater) return;
 
-    // @ts-ignore
-    const handleDownloadProgress = (event, progress) => {
+    const handleDownloadProgress = (progress: any) => {
       setDownloadProgress(progress);
     };
 
-    // @ts-ignore
-    const handleDownloadComplete = (event, data) => {
+    const handleDownloadComplete = (data: any) => {
       setDownloading(false);
       setUpdateDownloaded(true);
       message.success("Actualización descargada correctamente");
     };
 
     // @ts-ignore
-    window.electron.ipcRenderer.on(
-      "update-download-progress",
-      handleDownloadProgress,
-    );
+    window.updater.onDownloadProgress(handleDownloadProgress);
     // @ts-ignore
-    window.electron.ipcRenderer.on("update-downloaded", handleDownloadComplete);
+    window.updater.onUpdateDownloaded(handleDownloadComplete);
 
     return () => {
       // @ts-ignore
-      window.electron.ipcRenderer.removeListener(
-        "update-download-progress",
-        handleDownloadProgress,
-      );
-      // @ts-ignore
-      window.electron.ipcRenderer.removeListener(
-        "update-downloaded",
-        handleDownloadComplete,
-      );
+      window.updater.removeAllListeners();
     };
   }, []);
 
@@ -266,9 +253,10 @@ const ActualizacionSoftware: React.FC = () => {
 
     try {
       // @ts-ignore
-      const result = await window.electron.ipcRenderer.invoke(
-        "update:downloadUpdate",
-      );
+      const result = await window.updater.downloadUpdate(updateInfo);
+
+      console.log("El resultado es: ", result);
+      console.log("El update info que mande es", updateInfo);
 
       if (!result.success) {
         setDownloading(false);
@@ -287,9 +275,7 @@ const ActualizacionSoftware: React.FC = () => {
   const handleInstallUpdate = async () => {
     try {
       // @ts-ignore
-      const result = await window.electron.ipcRenderer.invoke(
-        "update:installUpdate",
-      );
+      const result = await window.updater.installUpdate();
 
       if (result.success) {
         message.success(
@@ -347,10 +333,7 @@ const ActualizacionSoftware: React.FC = () => {
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-6">
-        <Title level={2}>
-          <RocketOutlined className="text-purple-600 mr-2" />
-          Actualización de Software
-        </Title>
+        <Title level={2}>Actualización de Software</Title>
         <Text type="secondary">
           Mantén tu aplicación actualizada con las últimas funciones y mejoras
           de seguridad
@@ -425,7 +408,7 @@ const ActualizacionSoftware: React.FC = () => {
           {/* Nueva actualización disponible */}
           {updateAvailable && updateInfo && (
             <Card
-              className="mb-4"
+              className="mb-4 mt-4!"
               title={
                 <Space>
                   <Badge status="processing" />
@@ -484,7 +467,9 @@ const ActualizacionSoftware: React.FC = () => {
 
                 {/* Changelog */}
                 <div>
-                  <Title level={5}>Novedades</Title>
+                  <Title level={5} className="mb-5!">
+                    Novedades
+                  </Title>
                   <Timeline
                     items={[
                       ...(updateInfo.changelog.nuevas.length > 0

@@ -122,9 +122,14 @@ class AutoUpdater {
   /**
    * Descarga el archivo de actualización
    */
-  async downloadUpdate() {
+  async downloadUpdate(updateInfo) {
     if (this.isDownloading) {
       throw new Error('Ya hay una descarga en progreso');
+    }
+
+    // Si se proporciona updateInfo, actualizarlo
+    if (updateInfo) {
+      this.updateInfo = updateInfo;
     }
 
     const downloadInfo = this.getDownloadUrl();

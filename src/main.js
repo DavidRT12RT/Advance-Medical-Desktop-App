@@ -373,9 +373,10 @@ ipcMain.handle('update:checkForUpdate', async (event, updateInfo) => {
   }
 });
 
-ipcMain.handle('update:downloadUpdate', async () => {
+ipcMain.handle('update:downloadUpdate', async (event, updateInfo) => {
   try {
-    const downloadPath = await autoUpdater.downloadUpdate();
+    console.log("[IPC] Downloading update:", updateInfo);
+    const downloadPath = await autoUpdater.downloadUpdate(updateInfo);
     return { success: true, path: downloadPath };
   } catch (error) {
     console.error('[IPC] Error downloading update:', error);

@@ -72,18 +72,18 @@ window.electronStore = {
 window.updater = {
   getCurrentVersion: () => ipcRenderer.invoke('update:getCurrentVersion'),
   checkForUpdates: () => ipcRenderer.invoke('update:checkForUpdates'),
-  downloadUpdate: () => ipcRenderer.invoke('update:downloadUpdate'),
+  downloadUpdate: (updateInfo) => ipcRenderer.invoke('update:downloadUpdate', updateInfo),
   installUpdate: () => ipcRenderer.invoke('update:installUpdate'),
   onUpdateAvailable: (callback) => ipcRenderer.on('update:available', (_, data) => callback(data)),
   onUpdateNotAvailable: (callback) => ipcRenderer.on('update:not-available', () => callback()),
-  onDownloadProgress: (callback) => ipcRenderer.on('update:download-progress', (_, data) => callback(data)),
-  onUpdateDownloaded: (callback) => ipcRenderer.on('update:downloaded', (_, data) => callback(data)),
+  onDownloadProgress: (callback) => ipcRenderer.on('update-download-progress', (_, data) => callback(data)),
+  onUpdateDownloaded: (callback) => ipcRenderer.on('update-downloaded', (_, data) => callback(data)),
   onUpdateError: (callback) => ipcRenderer.on('update:error', (_, error) => callback(error)),
   removeAllListeners: () => {
     ipcRenderer.removeAllListeners('update:available');
     ipcRenderer.removeAllListeners('update:not-available');
-    ipcRenderer.removeAllListeners('update:download-progress');
-    ipcRenderer.removeAllListeners('update:downloaded');
+    ipcRenderer.removeAllListeners('update-download-progress');
+    ipcRenderer.removeAllListeners('update-downloaded');
     ipcRenderer.removeAllListeners('update:error');
   },
 };
