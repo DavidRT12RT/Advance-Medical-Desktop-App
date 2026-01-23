@@ -32,7 +32,7 @@ const ModalInfoSeccionAI = ({
           <span className="text-xs text-gray-500">
             {aiSessions[selectedSessionIndex].timestamp
               ? dayjs(aiSessions[selectedSessionIndex].timestamp).format(
-                  "DD/MM/YYYY HH:mm:ss"
+                  "DD/MM/YYYY HH:mm:ss",
                 )
               : "Sin fecha registrada"}
           </span>
@@ -48,12 +48,33 @@ const ModalInfoSeccionAI = ({
         const polypImages: string[] = Array.isArray(session?.polypImages)
           ? session.polypImages
           : [];
+        const manualScreenshots: string[] = Array.isArray(
+          session?.manualScreenshots,
+        )
+          ? session.manualScreenshots
+          : [];
         const videoUrl: string | undefined = session?.videoUrl;
+        const sessionMode = session?.mode || "unknown";
 
         return (
           <div className="space-y-5">
-            {(videoUrl || polypImages.length > 0) && (
+            {(videoUrl ||
+              polypImages.length > 0 ||
+              manualScreenshots.length > 0) && (
               <div className="bg-gray-900 rounded-lg p-4 border border-gray-800 space-y-4">
+                {/* Indicador de modo de sesión */}
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`px-2 py-1 rounded text-[10px] font-semibold ${
+                      sessionMode === "with_ai"
+                        ? "bg-green-600 text-white"
+                        : "bg-blue-600 text-white"
+                    }`}
+                  >
+                    {sessionMode === "with_ai" ? "Con IA" : "Solo Video"}
+                  </span>
+                </div>
+
                 {videoUrl && (
                   <div className="space-y-2">
                     <p className="text-xs font-semibold text-gray-300 uppercase tracking-wide">
@@ -72,8 +93,8 @@ const ModalInfoSeccionAI = ({
                 {polypImages.length > 0 && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs font-semibold text-gray-300 uppercase tracking-wide">
-                        Imágenes capturadas
+                      <p className="text-xs font-semibold text-green-300 uppercase tracking-wide">
+                        Detecciones IA (Pólipos)
                       </p>
                       <span className="text-[11px] text-gray-400">
                         {polypImages.length === 1
@@ -87,14 +108,48 @@ const ModalInfoSeccionAI = ({
                           key={idx}
                           type="button"
                           onClick={() => setPreviewImage(url)}
-                          className="relative group rounded-md overflow-hidden border border-gray-700 hover:border-indigo-400 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                          className="relative group rounded-md overflow-hidden border-2 border-green-700 hover:border-green-400 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500"
                         >
                           <img
                             src={url}
-                            alt={`Polipo ${idx + 1}`}
+                            alt={`Pólipo detectado ${idx + 1}`}
                             className="w-full h-20 object-cover transform group-hover:scale-105 transition"
                           />
-                          <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded-full bg-black/70 text-[10px] text-gray-100">
+                          <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded-full bg-green-600 text-[10px] text-white font-semibold">
+                            IA #{idx + 1}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {manualScreenshots.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-semibold text-blue-300 uppercase tracking-wide">
+                        Capturas Manuales
+                      </p>
+                      <span className="text-[11px] text-gray-400">
+                        {manualScreenshots.length === 1
+                          ? "1 captura"
+                          : `${manualScreenshots.length} capturas`}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-40 overflow-auto pr-1">
+                      {manualScreenshots.map((url, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setPreviewImage(url)}
+                          className="relative group rounded-md overflow-hidden border-2 border-blue-700 hover:border-blue-400 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                        >
+                          <img
+                            src={url}
+                            alt={`Captura manual ${idx + 1}`}
+                            className="w-full h-20 object-cover transform group-hover:scale-105 transition"
+                          />
+                          <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded-full bg-blue-600 text-[10px] text-white font-semibold">
                             #{idx + 1}
                           </span>
                         </button>
@@ -163,7 +218,7 @@ const ModalInfoSeccionAI = ({
                             {llm.recommendations.map(
                               (rec: string, idx: number) => (
                                 <li key={idx}>{rec}</li>
-                              )
+                              ),
                             )}
                           </ul>
                         </div>

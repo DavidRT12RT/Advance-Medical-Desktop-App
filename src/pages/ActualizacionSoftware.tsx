@@ -150,12 +150,30 @@ const ActualizacionSoftware: React.FC = () => {
 
     const unsubscribe = onSnapshot(
       latestUpdateRef,
-      (snapshot) => {
+      async (snapshot) => {
         if (snapshot.exists()) {
           const data = snapshot.data() as UpdateInfo;
 
           // Verificar si está activa y no retirada
           if (data.activa && !data.retirada) {
+            // Obtener plataforma actual
+            // @ts-ignore
+            const platform = await window.device?.getPlatform();
+            const currentPlatform = platform === "darwin" ? "mac" : "windows";
+
+            // Verificar que exista el binario para la plataforma actual
+            const hasBinaryForPlatform =
+              data.descargas && data.descargas[currentPlatform];
+
+            if (!hasBinaryForPlatform) {
+              console.log(
+                `No hay actualización disponible para ${currentPlatform}`,
+              );
+              setUpdateAvailable(false);
+              setUpdateInfo(null);
+              return;
+            }
+
             // Comparar versiones (simple comparación numérica)
             const currentVersionCode = parseInt(
               currentVersion.replace(/\./g, ""),

@@ -4,6 +4,7 @@ import {
   FilePdfOutlined,
   DownloadOutlined,
   EditOutlined,
+  BgColorsOutlined,
 } from "@ant-design/icons";
 import { pdf } from "@react-pdf/renderer";
 import ReportePDFDocument, {
@@ -12,6 +13,7 @@ import ReportePDFDocument, {
 } from "./ReportePDFDocument";
 import FirebaseConfiguraciones from "../../features/FirebaseConfiguraciones";
 import { useElectronStore } from "../../hooks/useElectronStore";
+import ImageEditorModal from "./ImageEditorModal";
 
 interface ModalGenerarReporteProps {
   isOpen: boolean;
@@ -40,6 +42,10 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
 
   const [generando, setGenerando] = useState(false);
   const [cargandoConfig, setCargandoConfig] = useState(false);
+  const [editingImageUrl, setEditingImageUrl] = useState<string | null>(null);
+  const [editedImages, setEditedImages] = useState<Map<string, string>>(
+    new Map(),
+  );
 
   // Config state con valores por defecto
   const [config, setConfig] = useState<ReportConfig>({
@@ -108,8 +114,22 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
     }
   };
 
-  // Obtener imágenes de todas las sesiones AI
-  const todasLasImagenes = useMemo(() => {
+  // Obtener capturas manuales de todas las sesiones
+  const capturasManualesTodas = useMemo(() => {
+    const aiSessions = Array.isArray(estudio?.secciones_ai)
+      ? estudio.secciones_ai
+      : [];
+    const images: string[] = [];
+    aiSessions.forEach((session: any) => {
+      if (Array.isArray(session?.manualScreenshots)) {
+        images.push(...session.manualScreenshots);
+      }
+    });
+    return images;
+  }, [estudio]);
+
+  // Obtener imágenes automáticas de pólipos detectados por IA
+  const imagenesAutomaticasIA = useMemo(() => {
     const aiSessions = Array.isArray(estudio?.secciones_ai)
       ? estudio.secciones_ai
       : [];
@@ -122,9 +142,14 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
     return images;
   }, [estudio]);
 
+  // Todas las imágenes combinadas para el contador total
+  const todasLasImagenes = useMemo(() => {
+    return [...capturasManualesTodas, ...imagenesAutomaticasIA];
+  }, [capturasManualesTodas, imagenesAutomaticasIA]);
+
   const handleConfigChange = async (
     key: keyof ReportConfig,
-    value: boolean
+    value: boolean,
   ) => {
     // Actualizar estado local
     setConfig((prev) => ({ ...prev, [key]: value }));
@@ -146,7 +171,7 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
           empresaId,
           idOrganizacion,
           idUsuario,
-          configParaGuardar
+          configParaGuardar,
         );
       } catch (error) {
         console.error("Error guardando configuración:", error);
@@ -159,12 +184,12 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
   const handleImageToggle = (url: string) => {
     setConfig((prev) => {
       const existingImage = prev.imagenesSeleccionadas.find(
-        (img) => img.url === url
+        (img) => img.url === url,
       );
       // If trying to add and already at max, show warning
       if (!existingImage && prev.imagenesSeleccionadas.length >= MAX_IMAGES) {
         message.warning(
-          `Máximo ${MAX_IMAGES} imágenes permitidas en el reporte`
+          `Máximo ${MAX_IMAGES} imágenes permitidas en el reporte`,
         );
         return prev;
       }
@@ -181,7 +206,7 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
     setConfig((prev) => ({
       ...prev,
       imagenesSeleccionadas: prev.imagenesSeleccionadas.map((img) =>
-        img.url === url ? { ...img, titulo } : img
+        img.url === url ? { ...img, titulo } : img,
       ),
     }));
   };
@@ -193,7 +218,7 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
       .map((url) => ({ url, titulo: "" }));
     if (todasLasImagenes.length > MAX_IMAGES) {
       message.info(
-        `Se seleccionaron las primeras ${MAX_IMAGES} imágenes (máximo permitido)`
+        `Se seleccionaron las primeras ${MAX_IMAGES} imágenes (máximo permitido)`,
       );
     }
     setConfig((prev) => ({
@@ -209,15 +234,42 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
     }));
   };
 
+  const handleEditImage = (url: string) => {
+    setEditingImageUrl(url);
+  };
+
+  const handleSaveEditedImage = (originalUrl: string, editedUrl: string) => {
+    setEditedImages((prev) => {
+      const newMap = new Map(prev);
+      newMap.set(originalUrl, editedUrl);
+      return newMap;
+    });
+    setEditingImageUrl(null);
+    message.success("Imagen editada correctamente");
+  };
+
+  const getDisplayUrl = (originalUrl: string) => {
+    return editedImages.get(originalUrl) || originalUrl;
+  };
+
   const handleGenerarPDF = async () => {
     try {
       setGenerando(true);
+
+      // Actualizar las URLs de las imágenes seleccionadas con las versiones editadas
+      const configConImagenesEditadas = {
+        ...config,
+        imagenesSeleccionadas: config.imagenesSeleccionadas.map((img) => ({
+          ...img,
+          url: getDisplayUrl(img.url), // Usar imagen editada si existe
+        })),
+      };
 
       const doc = (
         <ReportePDFDocument
           estudio={estudio}
           paciente={paciente}
-          config={config}
+          config={configConImagenesEditadas}
           organizacion={organizacion}
           configuracionMedica={configuracionDatosMedicos}
           nombreDoctor={user?.usuarioDetail?.nombre}
@@ -319,7 +371,7 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
                 onChange={(e) =>
                   handleConfigChange(
                     "incluirDatosAnestesiologo",
-                    e.target.checked
+                    e.target.checked,
                   )
                 }
               >
@@ -480,69 +532,199 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
               </p>
             </div>
           ) : (
-            <div className="bg-gray-900 p-4 rounded-lg border border-gray-800">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs text-gray-400">
-                  {config.imagenesSeleccionadas.length} de{" "}
-                  {Math.min(todasLasImagenes.length, MAX_IMAGES)} imágenes
-                  seleccionadas
-                  <span className="text-yellow-400 ml-2">
+            <div className="space-y-4">
+              {/* Capturas Manuales */}
+              {capturasManualesTodas.length > 0 && (
+                <div className="bg-blue-900/20 p-4 rounded-lg border-2 border-blue-700">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-xs font-semibold text-blue-300 uppercase tracking-wide">
+                      Capturas Manuales
+                    </h4>
+                    <span className="text-xs text-blue-400">
+                      {capturasManualesTodas.length}{" "}
+                      {capturasManualesTodas.length === 1
+                        ? "imagen"
+                        : "imágenes"}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-2 max-h-48 overflow-auto pr-1">
+                    {capturasManualesTodas.map((url, idx) => {
+                      const displayUrl = getDisplayUrl(url);
+                      const isSelected = config.imagenesSeleccionadas.some(
+                        (img) => img.url === url,
+                      );
+                      const isEdited = editedImages.has(url);
+                      return (
+                        <div key={idx} className="relative group">
+                          <button
+                            type="button"
+                            onClick={() => handleImageToggle(url)}
+                            className={`relative rounded-md overflow-hidden border-2 transition focus:outline-none w-full ${
+                              isSelected
+                                ? "border-blue-400 ring-2 ring-blue-300"
+                                : "border-blue-700 hover:border-blue-500"
+                            }`}
+                          >
+                            <img
+                              src={displayUrl}
+                              alt={`Captura manual ${idx + 1}`}
+                              className={`w-full h-16 object-cover transition ${
+                                isSelected
+                                  ? "opacity-100"
+                                  : "opacity-60 group-hover:opacity-100"
+                              }`}
+                            />
+                            {isSelected && (
+                              <div className="absolute inset-0 bg-blue-500/20 flex items-center justify-center pointer-events-none">
+                                <span className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                                  <svg
+                                    className="w-3 h-3 text-white"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={3}
+                                      d="M5 13l4 4L19 7"
+                                    />
+                                  </svg>
+                                </span>
+                              </div>
+                            )}
+                            <span className="absolute bottom-0.5 right-0.5 px-1 py-0.5 rounded bg-blue-600 text-[9px] text-white font-semibold pointer-events-none">
+                              #{idx + 1}
+                            </span>
+                            {isEdited && (
+                              <span className="absolute top-0.5 right-0.5 px-1 py-0.5 rounded bg-green-600 text-[8px] text-white font-semibold pointer-events-none">
+                                Editada
+                              </span>
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditImage(url);
+                            }}
+                            className="absolute top-1 left-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/95 hover:bg-white rounded-full p-2 shadow-xl z-20 border border-blue-300"
+                            title="Editar imagen"
+                          >
+                            <BgColorsOutlined className="text-blue-600 text-base" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Detecciones Automáticas IA */}
+              {imagenesAutomaticasIA.length > 0 && (
+                <div className="bg-green-900/20 p-4 rounded-lg border-2 border-green-700">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-xs font-semibold text-green-300 uppercase tracking-wide">
+                      Detecciones Automáticas IA
+                    </h4>
+                    <span className="text-xs text-green-400">
+                      {imagenesAutomaticasIA.length}{" "}
+                      {imagenesAutomaticasIA.length === 1
+                        ? "imagen"
+                        : "imágenes"}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-2 max-h-48 overflow-auto pr-1">
+                    {imagenesAutomaticasIA.map((url, idx) => {
+                      const displayUrl = getDisplayUrl(url);
+                      const isSelected = config.imagenesSeleccionadas.some(
+                        (img) => img.url === url,
+                      );
+                      const isEdited = editedImages.has(url);
+                      return (
+                        <div key={idx} className="relative group">
+                          <button
+                            type="button"
+                            onClick={() => handleImageToggle(url)}
+                            className={`relative rounded-md overflow-hidden border-2 transition focus:outline-none w-full ${
+                              isSelected
+                                ? "border-green-400 ring-2 ring-green-300"
+                                : "border-green-700 hover:border-green-500"
+                            }`}
+                          >
+                            <img
+                              src={displayUrl}
+                              alt={`Detección IA ${idx + 1}`}
+                              className={`w-full h-16 object-cover transition ${
+                                isSelected
+                                  ? "opacity-100"
+                                  : "opacity-60 group-hover:opacity-100"
+                              }`}
+                            />
+                            {isSelected && (
+                              <div className="absolute inset-0 bg-green-500/20 flex items-center justify-center pointer-events-none">
+                                <span className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
+                                  <svg
+                                    className="w-3 h-3 text-white"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={3}
+                                      d="M5 13l4 4L19 7"
+                                    />
+                                  </svg>
+                                </span>
+                              </div>
+                            )}
+                            <span className="absolute bottom-0.5 right-0.5 px-1 py-0.5 rounded bg-green-600 text-[9px] text-white font-semibold pointer-events-none">
+                              IA #{idx + 1}
+                            </span>
+                            {isEdited && (
+                              <span className="absolute top-0.5 right-0.5 px-1 py-0.5 rounded bg-green-600 text-[8px] text-white font-semibold pointer-events-none">
+                                Editada
+                              </span>
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditImage(url);
+                            }}
+                            className="absolute top-1 left-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/95 hover:bg-white rounded-full p-2 shadow-xl z-20 border border-green-300"
+                            title="Editar imagen"
+                          >
+                            <BgColorsOutlined className="text-green-600 text-base" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Contador total */}
+              <div className="bg-gray-900 p-3 rounded-lg border border-gray-800">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-400">
+                    {config.imagenesSeleccionadas.length} de{" "}
+                    {Math.min(todasLasImagenes.length, MAX_IMAGES)} imágenes
+                    seleccionadas
+                  </span>
+                  <span className="text-xs text-yellow-400">
                     (máx. {MAX_IMAGES})
                   </span>
-                </span>
+                </div>
               </div>
-              <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-2 max-h-48 overflow-auto pr-1">
-                {todasLasImagenes.map((url, idx) => {
-                  const isSelected = config.imagenesSeleccionadas.some(
-                    (img) => img.url === url
-                  );
-                  return (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => handleImageToggle(url)}
-                      className={`relative group rounded-md overflow-hidden border-2 transition focus:outline-none ${
-                        isSelected
-                          ? "border-indigo-500 ring-2 ring-indigo-400"
-                          : "border-gray-700 hover:border-gray-500"
-                      }`}
-                    >
-                      <img
-                        src={url}
-                        alt={`Imagen ${idx + 1}`}
-                        className={`w-full h-16 object-cover transition ${
-                          isSelected
-                            ? "opacity-100"
-                            : "opacity-60 group-hover:opacity-100"
-                        }`}
-                      />
-                      {isSelected && (
-                        <div className="absolute inset-0 bg-indigo-500/20 flex items-center justify-center">
-                          <span className="w-5 h-5 bg-indigo-500 rounded-full flex items-center justify-center">
-                            <svg
-                              className="w-3 h-3 text-white"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={3}
-                                d="M5 13l4 4L19 7"
-                              />
-                            </svg>
-                          </span>
-                        </div>
-                      )}
-                      <span className="absolute bottom-0.5 right-0.5 px-1 py-0.5 rounded bg-black/70 text-[9px] text-gray-100">
-                        #{idx + 1}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+            </div>
+          )}
 
+          {todasLasImagenes.length > 0 && (
+            <div className="bg-gray-900 p-4 rounded-lg border border-gray-800 mt-4">
               {/* Títulos para imágenes seleccionadas */}
               {config.imagenesSeleccionadas.length > 0 && (
                 <div className="mt-4 space-y-2">
@@ -597,6 +779,18 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
           </Button>
         </div>
       </div>
+
+      {/* Modal de edición de imagen */}
+      {editingImageUrl && (
+        <ImageEditorModal
+          isOpen={!!editingImageUrl}
+          imageUrl={editingImageUrl}
+          onClose={() => setEditingImageUrl(null)}
+          onSave={(editedUrl) =>
+            handleSaveEditedImage(editingImageUrl, editedUrl)
+          }
+        />
+      )}
     </Modal>
   );
 };

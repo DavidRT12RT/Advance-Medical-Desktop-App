@@ -72,12 +72,14 @@ const MIN_SEGMENT_CONFIDENCE = 0.8;
 
 // Frames que mantenemos encendido el indicador de pólipos en la UI
 // después de la última detección > 0, para evitar parpadeos rápidos.
-const POLYP_UI_HOLD_FRAMES = TARGET_FPS / 4; // ~250ms
+const POLYP_UI_HOLD_FRAMES = TARGET_FPS / 10; // ~250ms
 
 // Imágenes representativas por sesión para no saturar Storage
-const MAX_POLYP_IMAGES_PER_SESSION = 6;
-// Definimos un gap máximo entre frames con pólipo para considerar un nuevo segmento visual
-const MAX_POLYP_IMAGE_FRAME_GAP = TARGET_FPS; // ~1 segundo a 60 FPS
+const MAX_POLYP_IMAGES_PER_SESSION = 20; // Máximo 20 capturas por TODA la sesión
+// Intervalo mínimo entre capturas automáticas (30 segundos)
+const MIN_SECONDS_BETWEEN_AUTO_CAPTURES = 30;
+const MIN_FRAMES_BETWEEN_AUTO_CAPTURES =
+  TARGET_FPS * MIN_SECONDS_BETWEEN_AUTO_CAPTURES;
 
 const dataUrlToBlob = (dataUrl: string): Blob => {
   const parts = dataUrl.split(",");
@@ -95,7 +97,7 @@ const dataUrlToBlob = (dataUrl: string): Blob => {
 
 const drawDetectionsOnImage = (
   base64Image: string,
-  detections: any[]
+  detections: any[],
 ): Promise<Blob> => {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -149,7 +151,7 @@ const drawDetectionsOnImage = (
           }
         },
         "image/jpeg",
-        0.9
+        0.9,
       );
     };
     img.onerror = (err) => reject(err);
@@ -224,7 +226,7 @@ const Detection: React.FC = () => {
     estudioId: string;
   }>();
   const navigate = useNavigate();
-  // TODO: Obtener empresaId y doctorId del contexto de autenticación
+  const [messageApi, contextHolder] = message.useMessage();
   const { user } = useElectronStore();
   const empresaId = user?.empresa?.id;
   const doctorId = user?.id;
@@ -238,6 +240,7 @@ const Detection: React.FC = () => {
   const isCapturingRef = useRef(false);
   const polypEventsRef = useRef<CnnPolypEvent[]>([]);
   const polypImageUrlsRef = useRef<string[]>([]);
+  const manualScreenshotsRef = useRef<string[]>([]);
   const lastPolypFrameWithImageRef = useRef<number | null>(null);
   const lastDetectionsRef = useRef<any[]>([]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -260,6 +263,11 @@ const Detection: React.FC = () => {
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
   const [showDeviceSelector, setShowDeviceSelector] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [screenshotFeedback, setScreenshotFeedback] = useState<string | null>(
+    null,
+  );
+  const [showScreenshotAnimation, setShowScreenshotAnimation] = useState(false);
 
   const subtitle = estudio
     ? [
@@ -275,9 +283,34 @@ const Detection: React.FC = () => {
   useEffect(() => {
     const getVideoDevices = async () => {
       try {
+        // Primero intentamos pedir permisos explícitamente accediendo al stream
+        // Esto es necesario en macOS para disparar el prompt de permisos del sistema
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+          });
+          // Importante: detener los tracks inmediatamente para liberar la cámara
+          // y permitir que el componente Webcam la use después
+          stream.getTracks().forEach((track) => track.stop());
+        } catch (err: any) {
+          console.warn(
+            "No se pudo obtener acceso inicial a la cámara (posible falta de permisos):",
+            err,
+          );
+          if (
+            err.name === "NotAllowedError" ||
+            err.name === "PermissionDeniedError"
+          ) {
+            messageApi.error(
+              "Acceso a cámara denegado. Por favor verifique los permisos del sistema.",
+            );
+            return;
+          }
+        }
+
         const allDevices = await navigator.mediaDevices.enumerateDevices();
         const videoDevices = allDevices.filter(
-          (device) => device.kind === "videoinput"
+          (device) => device.kind === "videoinput",
         );
         setDevices(videoDevices);
 
@@ -287,6 +320,7 @@ const Detection: React.FC = () => {
         }
       } catch (error) {
         console.error("Error obteniendo dispositivos de video:", error);
+        messageApi.error("Error al listar dispositivos de video");
       }
     };
 
@@ -297,7 +331,7 @@ const Detection: React.FC = () => {
     return () => {
       navigator.mediaDevices.removeEventListener(
         "devicechange",
-        getVideoDevices
+        getVideoDevices,
       );
     };
   }, []);
@@ -310,12 +344,12 @@ const Detection: React.FC = () => {
         const estudioData: any = await FirebaseEstudios.obtenerEstudioPorId(
           empresaId,
           pacienteId,
-          estudioId
+          estudioId,
         );
         setEstudio(estudioData);
         if (estudioData?.estado === "finalizado") {
-          message.info(
-            "Este estudio ya está finalizado. El módulo de detección solo está disponible para estudios en progreso."
+          messageApi.info(
+            "Este estudio ya está finalizado. El módulo de detección solo está disponible para estudios en progreso.",
           );
           navigate(`/paciente-detalle/${pacienteId}/estudios/${estudioId}`);
           return;
@@ -323,7 +357,7 @@ const Detection: React.FC = () => {
         if (estudioData?.paciente_id) {
           const pacienteData = await FirebasePacientes.obtenerPacientePorId(
             empresaId,
-            estudioData.paciente_id
+            estudioData.paciente_id,
           );
           setPaciente(pacienteData);
         }
@@ -334,6 +368,57 @@ const Detection: React.FC = () => {
 
     fetchInfo();
   }, [empresaId, pacienteId, estudioId]);
+
+  // Captura manual con tecla Espacio
+  useEffect(() => {
+    const handleKeyPress = async (event: KeyboardEvent) => {
+      // Solo capturar si es la tecla Espacio y estamos capturando
+      if (event.code === "Space" && isCapturing && !isPaused) {
+        event.preventDefault();
+
+        const screenshot = webcamRef.current?.getScreenshot();
+        if (!screenshot || !pacienteId || !estudioId) return;
+
+        try {
+          // Mostrar animación de feedback
+          setShowScreenshotAnimation(true);
+          setScreenshotFeedback(screenshot);
+
+          // Ocultar animación después de 800ms
+          setTimeout(() => {
+            setShowScreenshotAnimation(false);
+          }, 800);
+
+          // Subir screenshot a Firebase
+          const blob = dataUrlToBlob(screenshot);
+          const sessionKey = sessionId || "manual";
+          const timestamp = Date.now();
+
+          const url = await FirebaseMedia.subirFrameDeEstudio(
+            empresaId,
+            pacienteId,
+            estudioId,
+            `${sessionKey}_manual`,
+            timestamp,
+            blob,
+          );
+
+          manualScreenshotsRef.current.push(url);
+          messageApi.success(
+            `Captura guardada (${manualScreenshotsRef.current.length})`,
+          );
+        } catch (error) {
+          console.error("Error capturando screenshot manual:", error);
+          messageApi.error("Error al guardar la captura");
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyPress);
+    return () => {
+      window.removeEventListener("keydown", handleKeyPress);
+    };
+  }, [isCapturing, isPaused, pacienteId, estudioId, empresaId, sessionId]);
 
   // Función para dibujar bboxes en el canvas overlay
   const drawDetections = (detections: any[]) => {
@@ -353,7 +438,7 @@ const Detection: React.FC = () => {
 
     const scale = Math.min(
       canvas.width / FRAME_WIDTH,
-      canvas.height / FRAME_HEIGHT
+      canvas.height / FRAME_HEIGHT,
     );
     const offsetX = (canvas.width - FRAME_WIDTH * scale) / 2;
     const offsetY = (canvas.height - FRAME_HEIGHT * scale) / 2;
@@ -373,7 +458,7 @@ const Detection: React.FC = () => {
         offsetX + x1 * scale,
         offsetY + y1 * scale,
         width * scale,
-        height * scale
+        height * scale,
       );
 
       // Fondo para el texto
@@ -389,7 +474,7 @@ const Detection: React.FC = () => {
         offsetX + x1 * scale,
         offsetY + y2 * scale + 2,
         textMetrics.width + 4,
-        textHeight
+        textHeight,
       );
 
       // Dibujar texto
@@ -426,176 +511,214 @@ const Detection: React.FC = () => {
     };
   }, []);
 
-  // Inicializar Socket.IO
+  // Inicializar Socket.IO (opcional - permite funcionar sin servidor)
   useEffect(() => {
-    const socket = io(SERVER_URL, {
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      reconnectionAttempts: 5,
-      transports: ["websocket", "polling"],
-    });
+    let socket: Socket | null = null;
 
-    // Eventos de conexión
-    socket.on("connect", () => {
-      console.log("Conectado al servidor");
-      setIsConnected(true);
-    });
-
-    socket.on("disconnect", () => {
-      console.log("Desconectado del servidor");
-      setIsConnected(false);
-      setIsCapturing(false);
-    });
-
-    // Sesión iniciada
-    socket.on(
-      "session_started",
-      (data: { session_id: string; timestamp: string }) => {
-        console.log("Sesión iniciada:", data.session_id);
-        setSessionId(data.session_id);
-      }
-    );
-
-    // Detección
-    socket.on("detection", (data: DetectionResult) => {
-      console.log("Detection que nos envia:", data);
-      setStats({
-        frame: data.frame_index,
-        polyps: data.num_polyps,
-        time: data.processing_time_ms,
+    try {
+      socket = io(SERVER_URL, {
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        reconnectionAttempts: 3,
+        timeout: 5000,
+        transports: ["websocket", "polling"],
       });
 
-      // Suavizar indicador de pólipos en UI para evitar parpadeos 0 ↔ 1
-      if (data.num_polyps > 0) {
-        polypHoldCounterRef.current = POLYP_UI_HOLD_FRAMES;
-        setDisplayPolyps(data.num_polyps);
-      } else {
-        if (polypHoldCounterRef.current > 0) {
-          polypHoldCounterRef.current -= 1;
-          // mantenemos el displayPolyps actual
-        } else {
-          setDisplayPolyps(0);
+      // Eventos de conexión
+      socket.on("connect", () => {
+        console.log("Conectado al servidor de IA");
+        setIsConnected(true);
+        messageApi.success("Servidor de IA conectado - Detección habilitada");
+      });
+
+      socket.on("disconnect", () => {
+        console.log("Desconectado del servidor de IA");
+        setIsConnected(false);
+        // NO detenemos la captura - permitimos grabar sin IA
+      });
+
+      socket.on("connect_error", (error) => {
+        console.log("Error de conexión al servidor de IA:", error.message);
+        setIsConnected(false);
+        // Mostrar mensaje solo una vez
+        if (!socketRef.current) {
+          messageApi.warning(
+            "Servidor de IA no disponible - Grabación sin análisis IA",
+          );
         }
-      }
+      });
 
-      // Guardar últimas detecciones para poder pintarlas en el canvas de video
-      lastDetectionsRef.current = data.detections || [];
+      // Sesión iniciada
+      socket.on(
+        "session_started",
+        (data: { session_id: string; timestamp: string }) => {
+          console.log("Sesión iniciada:", data.session_id);
+          setSessionId(data.session_id);
+        },
+      );
 
-      // Registrar eventos de pólipos (solo cuando hay al menos un pólipo)
-      if (data.num_polyps > 0) {
-        polypEventsRef.current.push({
-          frame_index: data.frame_index,
-          num_polyps: data.num_polyps,
-          processing_time_ms: data.processing_time_ms,
-          timestamp: data.timestamp,
-          detections: (data.detections || []).map((d: any) => ({
-            bbox: d.bbox,
-            className: d.class,
-            confidence: d.confidence,
-          })),
+      // Detección
+      socket.on("detection", (data: DetectionResult) => {
+        console.log("Detection que nos envia:", data);
+        setStats({
+          frame: data.frame_index,
+          polyps: data.num_polyps,
+          time: data.processing_time_ms,
         });
 
-        // Capturar una imagen representativa por "segmento" de pólipo
-        // definido por un gap máximo de frames entre detecciones.
-        const lastFrame = lastPolypFrameWithImageRef.current;
-        const isNewSegment =
-          lastFrame === null ||
-          data.frame_index - lastFrame > MAX_POLYP_IMAGE_FRAME_GAP;
-
-        const canCaptureMore =
-          polypImageUrlsRef.current.length < MAX_POLYP_IMAGES_PER_SESSION;
-
-        if (isNewSegment && canCaptureMore) {
-          const screenshot = webcamRef.current?.getScreenshot();
-          if (screenshot && pacienteId && estudioId) {
-            const sessionKey = sessionId || "default";
-
-            drawDetectionsOnImage(screenshot, data.detections || [])
-              .then((blob) =>
-                FirebaseMedia.subirFrameDeEstudio(
-                  empresaId,
-                  pacienteId,
-                  estudioId,
-                  sessionKey,
-                  data.frame_index,
-                  blob
-                )
-              )
-              .then((url) => {
-                polypImageUrlsRef.current.push(url);
-                lastPolypFrameWithImageRef.current = data.frame_index;
-              })
-              .catch((error) => {
-                console.error("Error subiendo imagen de pólipo:", error);
-              });
+        // Suavizar indicador de pólipos en UI para evitar parpadeos 0 ↔ 1
+        if (data.num_polyps > 0) {
+          polypHoldCounterRef.current = POLYP_UI_HOLD_FRAMES;
+          setDisplayPolyps(data.num_polyps);
+        } else {
+          if (polypHoldCounterRef.current > 0) {
+            polypHoldCounterRef.current -= 1;
+            // mantenemos el displayPolyps actual
+          } else {
+            setDisplayPolyps(0);
           }
         }
-      }
 
-      // Dibujar detecciones en el canvas overlay
-      drawDetections(data.detections || []);
-    });
+        // Guardar últimas detecciones para poder pintarlas en el canvas de video
+        lastDetectionsRef.current = data.detections || [];
 
-    // Análisis LLM
-    socket.on("llm_analysis", (data: LLMAnalysisFromBackend) => {
-      const description = data?.llm_analysis?.description;
-      const recommendations = data?.llm_analysis?.recommendations;
-      const severity = data?.llm_analysis?.severity;
-      const confidence_level = data?.llm_analysis?.confidence_level;
-      const timestamp = data?.timestamp;
-      const has_polyp = data?.llm_analysis?.has_polyp;
+        // Registrar eventos de pólipos (solo cuando hay al menos un pólipo)
+        if (data.num_polyps > 0) {
+          polypEventsRef.current.push({
+            frame_index: data.frame_index,
+            num_polyps: data.num_polyps,
+            processing_time_ms: data.processing_time_ms,
+            timestamp: data.timestamp,
+            detections: (data.detections || []).map((d: any) => ({
+              bbox: d.bbox,
+              className: d.class,
+              confidence: d.confidence,
+            })),
+          });
 
-      setLlmAnalysis({
-        has_polyp: has_polyp,
-        confidence_level: confidence_level,
-        description: description,
-        recommendations: recommendations,
-        severity: severity,
-        timestamp: timestamp,
+          // Capturar imagen automática solo si:
+          // 1. No hemos alcanzado el límite máximo de capturas por sesión (20)
+          // 2. Han pasado al menos 30 segundos desde la última captura
+          const lastFrame = lastPolypFrameWithImageRef.current;
+          const hasWaitedEnough =
+            lastFrame === null ||
+            data.frame_index - lastFrame >= MIN_FRAMES_BETWEEN_AUTO_CAPTURES;
+
+          const canCaptureMore =
+            polypImageUrlsRef.current.length < MAX_POLYP_IMAGES_PER_SESSION;
+
+          if (hasWaitedEnough && canCaptureMore) {
+            const screenshot = webcamRef.current?.getScreenshot();
+            if (screenshot && pacienteId && estudioId) {
+              const sessionKey = sessionId || "default";
+
+              // Marcar inmediatamente que estamos procesando esta captura
+              lastPolypFrameWithImageRef.current = data.frame_index;
+
+              drawDetectionsOnImage(screenshot, data.detections || [])
+                .then((blob) =>
+                  FirebaseMedia.subirFrameDeEstudio(
+                    empresaId,
+                    pacienteId,
+                    estudioId,
+                    sessionKey,
+                    data.frame_index,
+                    blob,
+                  ),
+                )
+                .then((url) => {
+                  // Verificar nuevamente el límite antes de agregar (por si acaso)
+                  if (
+                    polypImageUrlsRef.current.length <
+                    MAX_POLYP_IMAGES_PER_SESSION
+                  ) {
+                    polypImageUrlsRef.current.push(url);
+                    console.log(
+                      `Captura automática ${polypImageUrlsRef.current.length}/${MAX_POLYP_IMAGES_PER_SESSION}`,
+                    );
+                  }
+                })
+                .catch((error) => {
+                  console.error("Error subiendo imagen de pólipo:", error);
+                  // Revertir el marcador si falló
+                  lastPolypFrameWithImageRef.current = null;
+                });
+            }
+          }
+        }
+
+        // Dibujar detecciones en el canvas overlay
+        drawDetections(data.detections || []);
       });
-      setIsLlmExpanded(false);
-    });
 
-    // Estados
-    socket.on("paused", () => {
-      console.log("Sesión pausada");
-    });
+      // Análisis LLM
+      socket.on("llm_analysis", (data: LLMAnalysisFromBackend) => {
+        const description = data?.llm_analysis?.description;
+        const recommendations = data?.llm_analysis?.recommendations;
+        const severity = data?.llm_analysis?.severity;
+        const confidence_level = data?.llm_analysis?.confidence_level;
+        const timestamp = data?.timestamp;
+        const has_polyp = data?.llm_analysis?.has_polyp;
 
-    socket.on("resumed", () => {
-      console.log("Sesión reanudada");
-    });
+        setLlmAnalysis({
+          has_polyp: has_polyp,
+          confidence_level: confidence_level,
+          description: description,
+          recommendations: recommendations,
+          severity: severity,
+          timestamp: timestamp,
+        });
+        setIsLlmExpanded(false);
+      });
 
-    // Errores
-    socket.on("error", (data: { message: string }) => {
-      console.error("Error del servidor:", data.message);
-    });
+      // Estados
+      socket.on("paused", () => {
+        console.log("Sesión pausada");
+      });
 
-    socketRef.current = socket;
+      socket.on("resumed", () => {
+        console.log("Sesión reanudada");
+      });
+
+      // Errores
+      socket.on("error", (data: { message: string }) => {
+        console.error("Error del servidor:", data.message);
+      });
+
+      socketRef.current = socket;
+    } catch (error) {
+      console.error("Error inicializando conexión al servidor de IA:", error);
+      setIsConnected(false);
+      messageApi.info("Modo sin servidor - Solo grabación de video");
+    }
 
     return () => {
-      socket.disconnect();
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+      }
     };
   }, []);
 
-  // Iniciar sesión
+  // Iniciar sesión (funciona con o sin servidor)
   const startSession = useCallback(async () => {
-    if (!socketRef.current || !isConnected) {
-      message.error("No conectado al servidor de IA");
-      return;
-    }
-
     if (!pacienteId || !estudioId) {
-      message.error("Falta el contexto de paciente/estudio");
+      messageApi.error("Falta el contexto de paciente/estudio");
       return;
     }
 
-    socketRef.current.emit("start_session", {
-      empresa_id: empresaId,
-      doctor_id: doctorId,
-      paciente_id: pacienteId,
-      estudio_id: estudioId,
-    });
+    // Si hay servidor conectado, iniciar sesión de IA
+    if (socketRef.current?.connected) {
+      socketRef.current.emit("start_session", {
+        empresa_id: empresaId,
+        doctor_id: doctorId,
+        paciente_id: pacienteId,
+        estudio_id: estudioId,
+      });
+      messageApi.success("Sesión de IA iniciada");
+    } else {
+      messageApi.info("Iniciando grabación sin análisis de IA");
+    }
 
     // Marcar estudio como en progreso
     try {
@@ -603,7 +726,7 @@ const Detection: React.FC = () => {
         empresaId,
         pacienteId,
         estudioId,
-        { estado: "en_progreso" }
+        { estado: "en_progreso" },
       );
     } catch (error) {
       console.error("Error actualizando estado de consulta:", error);
@@ -642,14 +765,14 @@ const Detection: React.FC = () => {
     }
   }, [isConnected, empresaId, pacienteId, estudioId, doctorId]);
 
-  // Capturar y enviar frames
+  // Capturar y enviar frames (funciona con o sin servidor)
   useEffect(() => {
     if (!isCapturing || !webcamRef.current) return;
 
     const captureFrames = async () => {
       isCapturingRef.current = true;
 
-      while (isCapturingRef.current && socketRef.current?.connected) {
+      while (isCapturingRef.current) {
         try {
           const imageSrc = webcamRef.current?.getScreenshot();
           if (!imageSrc) continue;
@@ -706,17 +829,22 @@ const Detection: React.FC = () => {
               rgbBuffer[j + 2] = data[i + 2];
             }
 
-            // Enviar frame
-            socketRef.current?.emit("frame", {
-              frame_index: frameIndexRef.current++,
-              data: rgbBuffer,
-            });
+            // Enviar frame solo si hay servidor conectado
+            if (socketRef.current?.connected) {
+              socketRef.current.emit("frame", {
+                frame_index: frameIndexRef.current++,
+                data: rgbBuffer,
+              });
+            } else {
+              // Sin servidor, solo incrementar frame index para grabación
+              frameIndexRef.current++;
+            }
           };
           img.src = imageSrc;
 
           // Esperar para 60 FPS
           await new Promise((resolve) =>
-            setTimeout(resolve, 1000 / TARGET_FPS)
+            setTimeout(resolve, 1000 / TARGET_FPS),
           );
         } catch (error) {
           console.error("Error capturando frame:", error);
@@ -731,19 +859,40 @@ const Detection: React.FC = () => {
     };
   }, [isCapturing]);
 
-  // Controles
+  // Controles (funcionan con o sin servidor)
   const handlePause = () => {
-    socketRef.current?.emit("pause");
+    setIsPaused(true);
+    isCapturingRef.current = false;
+
+    // Si hay servidor, notificar
+    if (socketRef.current?.connected) {
+      socketRef.current.emit("pause");
+    }
+
+    messageApi.info("Captura pausada");
   };
 
   const handleResume = () => {
-    socketRef.current?.emit("resume");
+    setIsPaused(false);
+    setIsCapturing(true);
+
+    // Si hay servidor, notificar
+    if (socketRef.current?.connected) {
+      socketRef.current.emit("resume");
+    }
+
+    messageApi.info("Captura reanudada");
   };
 
   const handleFinish = async () => {
     isCapturingRef.current = false;
-    socketRef.current?.emit("finish");
     setIsCapturing(false);
+    setIsPaused(false);
+
+    // Si hay servidor, notificar
+    if (socketRef.current?.connected) {
+      socketRef.current.emit("finish");
+    }
 
     // Detener la grabación de video si está activa
     const recorder = mediaRecorderRef.current;
@@ -760,7 +909,7 @@ const Detection: React.FC = () => {
 
       // Filtrar solo segmentos clínicamente relevantes (confianza mínima)
       const importantSegments = allSegments.filter(
-        (seg) => (seg.maxConfidence || 0) >= MIN_SEGMENT_CONFIDENCE
+        (seg) => (seg.maxConfidence || 0) >= MIN_SEGMENT_CONFIDENCE,
       );
 
       // Ordenar segmentos importantes por duración (frames) * confianza máxima
@@ -775,16 +924,20 @@ const Detection: React.FC = () => {
 
       const topSegments = scoredSegments.slice(0, MAX_SEGMENTS_SAVED);
 
-      const cnnData = {
-        summary: {
-          lastFrame: stats.frame,
-          lastPolypCount: stats.polyps,
-          lastProcessingTimeMs: stats.time,
-          totalPolypEvents: allEvents.length,
-          totalSegments: importantSegments.length,
-        },
-        segments: topSegments,
-      };
+      // Solo crear datos CNN si hubo eventos de pólipos (servidor conectado)
+      const cnnData =
+        allEvents.length > 0
+          ? {
+              summary: {
+                lastFrame: stats.frame,
+                lastPolypCount: stats.polyps,
+                lastProcessingTimeMs: stats.time,
+                totalPolypEvents: allEvents.length,
+                totalSegments: importantSegments.length,
+              },
+              segments: topSegments,
+            }
+          : null;
 
       //Obtener las sesiones actuales
       const newSecciones = estudio?.secciones_ai || [];
@@ -802,31 +955,48 @@ const Detection: React.FC = () => {
             pacienteId,
             estudioId,
             sessionKey,
-            videoBlob
+            videoBlob,
           );
         } catch (error) {
           console.error("Error subiendo video de consulta:", error);
         }
       }
 
-      newSecciones.push({
-        ia_cnn: cnnData,
-        ia_llm: llmAnalysis,
-        timestamp: new Date().toISOString(),
-        polypImages: polypImageUrlsRef.current,
-        videoUrl,
-      });
+      // Solo agregar sección si hay datos de IA, video o capturas manuales
+      if (
+        cnnData ||
+        llmAnalysis ||
+        videoUrl ||
+        manualScreenshotsRef.current.length > 0
+      ) {
+        newSecciones.push({
+          ia_cnn: cnnData,
+          ia_llm: llmAnalysis,
+          timestamp: new Date().toISOString(),
+          polypImages: polypImageUrlsRef.current,
+          manualScreenshots: manualScreenshotsRef.current,
+          videoUrl,
+          mode: socketRef.current?.connected ? "with_ai" : "video_only",
+        });
+      }
 
       try {
         await FirebaseEstudios.actualizarEstudio(
           empresaId,
           pacienteId,
           estudioId,
-          { secciones_ai: newSecciones }
+          { secciones_ai: newSecciones },
         );
-        message.success("Resultados de IA guardados en el estudio");
+
+        if (socketRef.current?.connected) {
+          messageApi.success(
+            "Resultados de IA y video guardados en el estudio",
+          );
+        } else {
+          messageApi.success("Video guardado en el estudio");
+        }
       } catch (error) {
-        message.error("No se pudieron guardar los resultados de IA");
+        messageApi.error("No se pudieron guardar los resultados");
       }
 
       navigate(`/paciente-detalle/${pacienteId}/estudios/${estudioId}`);
@@ -835,6 +1005,7 @@ const Detection: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
+      {contextHolder}
       {/* Header */}
       <div className="bg-white w-full">
         <Button
@@ -843,7 +1014,7 @@ const Detection: React.FC = () => {
           onClick={() =>
             pacienteId && estudioId
               ? navigate(
-                  `/paciente-detalle/${pacienteId}/estudios/${estudioId}`
+                  `/paciente-detalle/${pacienteId}/estudios/${estudioId}`,
                 )
               : navigate(-1)
           }
@@ -881,8 +1052,8 @@ const Detection: React.FC = () => {
                     estudio.estado === "pendiente"
                       ? "bg-orange-50 text-orange-700 border-orange-100"
                       : estudio.estado === "finalizado"
-                      ? "bg-green-50 text-green-700 border-green-100"
-                      : "bg-blue-50 text-blue-700 border-blue-100"
+                        ? "bg-green-50 text-green-700 border-green-100"
+                        : "bg-blue-50 text-blue-700 border-blue-100"
                   }`}
                 >
                   {estudio.estado[0].toUpperCase() + estudio.estado.slice(1)}
@@ -956,6 +1127,41 @@ const Detection: React.FC = () => {
               style={{ cursor: "crosshair" }}
             />
 
+            {/* Mensaje informativo - Captura con Espacio */}
+            {isCapturing && (
+              <div className="absolute top-4 right-4 z-20">
+                <div className="bg-black/40 px-4 py-2 rounded-lg text-white text-xs">
+                  <div className="flex items-center gap-2">
+                    <kbd className="px-2 py-1 bg-white/20 rounded text-[10px] font-mono">
+                      ESPACIO
+                    </kbd>
+                    <span className="text-[11px] text-gray-200">
+                      para capturar imagen
+                    </span>
+                  </div>
+                  {manualScreenshotsRef.current.length > 0 && (
+                    <div className="mt-1 text-[10px] text-green-300">
+                      {manualScreenshotsRef.current.length} captura(s)
+                      guardada(s)
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Animación de feedback de screenshot (estilo iPhone) */}
+            {showScreenshotAnimation && screenshotFeedback && (
+              <div className="absolute top-4 left-4 z-30 animate-screenshot-feedback">
+                <div className="bg-white rounded-lg shadow-2xl overflow-hidden border-4 border-white">
+                  <img
+                    src={screenshotFeedback}
+                    alt="Screenshot preview"
+                    className="w-24 h-24 object-cover"
+                  />
+                </div>
+              </div>
+            )}
+
             {/* Estadísticas */}
             <div className="absolute bottom-4 right-4 z-20">
               <div className="bg-black/40 px-4 py-3 rounded-lg text-white text-xs space-y-2">
@@ -1001,8 +1207,8 @@ const Detection: React.FC = () => {
                       llmAnalysis.severity === "benign"
                         ? "bg-green-600"
                         : llmAnalysis.severity === "malignant"
-                        ? "bg-red-600"
-                        : "bg-yellow-600"
+                          ? "bg-red-600"
+                          : "bg-yellow-600"
                     }`}
                   >
                     {llmAnalysis.severity || "N/A"}
@@ -1060,8 +1266,8 @@ const Detection: React.FC = () => {
                         ? `${llmAnalysis.description.slice(0, 80)}...`
                         : llmAnalysis.description
                       : llmAnalysis.has_polyp
-                      ? "Pólipo detectado, pulsa para ver detalles."
-                      : "Sin hallazgos relevantes. Pulsa para ver más."}
+                        ? "Pólipo detectado, pulsa para ver detalles."
+                        : "Sin hallazgos relevantes. Pulsa para ver más."}
                   </div>
                 )}
               </div>
@@ -1114,14 +1320,19 @@ const Detection: React.FC = () => {
             <Button
               type="primary"
               onClick={startSession}
-              disabled={!isConnected || isCapturing}
+              disabled={isCapturing}
+              title={
+                !isConnected
+                  ? "Modo sin IA - Solo grabación"
+                  : "Iniciar con análisis IA"
+              }
             >
-              Iniciar
+              {isConnected ? "Iniciar con IA" : "Iniciar (sin IA)"}
             </Button>
-            <Button onClick={handlePause} disabled={!isCapturing}>
+            <Button onClick={handlePause} disabled={!isCapturing || isPaused}>
               Pausar
             </Button>
-            <Button onClick={handleResume} disabled={!isCapturing}>
+            <Button onClick={handleResume} disabled={!isCapturing || !isPaused}>
               Reanudar
             </Button>
             <Button danger onClick={handleFinish} disabled={!isCapturing}>

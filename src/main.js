@@ -75,6 +75,18 @@ const createWindow = () => {
   //Ocultar barra de menu
   mainWindow.setMenuBarVisibility(false);
 
+  // Configurar manejo de permisos (Cámara y Micrófono)
+  // Esto es crucial para que funcione en la versión empaquetada
+  mainWindow.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
+    const allowedPermissions = ['media', 'camera', 'microphone', 'display-capture'];
+    if (allowedPermissions.includes(permission)) {
+      // Aprobar permisos de medios automáticamente (el OS aún pedirá confirmación al usuario)
+      callback(true);
+    } else {
+      callback(false);
+    }
+  });
+
   // and load the index.html of the app.
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
