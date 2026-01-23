@@ -223,6 +223,7 @@ class FirebaseConsultas {
     consulta_id: string,
     data: any,
   ) {
+    console.log("data", data);
     const consultaDocRef = doc(
       firestore,
       "empresas",
@@ -233,7 +234,9 @@ class FirebaseConsultas {
       consulta_id,
     );
 
-    await updateDoc(consultaDocRef, data);
+    const response = await updateDoc(consultaDocRef, data);
+    console.log("response", response);
+    return response;
   }
 }
 

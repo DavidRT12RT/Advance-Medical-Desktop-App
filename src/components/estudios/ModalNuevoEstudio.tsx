@@ -87,6 +87,7 @@ const ModalNuevoEstudio: React.FC<ModalNuevoEstudioProps> = ({
         empresaId,
         selectedPaciente.id,
         estudioBasico,
+        userId,
       );
 
       message.success("Estudio creado exitosamente");

@@ -1,5 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { Modal, Form, Select, DatePicker, Input, message } from "antd";
+import {
+  Modal,
+  Form,
+  Select,
+  DatePicker,
+  Input,
+  message,
+  AutoComplete,
+} from "antd";
 import { useElectronStore } from "../../hooks/useElectronStore";
 import FirebasePacientes from "../../features/FirebasePacientes";
 import FirebaseConsultas from "../../features/FirebaseConsultas";
@@ -28,6 +36,8 @@ const ModalNuevaConsulta: React.FC<ModalNuevaConsultaProps> = ({
   const [pacientes, setPacientes] = useState<any[]>([]);
   const [loadingPacientes, setLoadingPacientes] = useState(false);
 
+  console.log("pacientes", pacientes);
+
   useEffect(() => {
     if (visible && empresaId) {
       fetchPacientes();
@@ -49,6 +59,11 @@ const ModalNuevaConsulta: React.FC<ModalNuevaConsultaProps> = ({
   };
 
   const handleSubmit = async () => {
+    if (!selectedPaciente) {
+      message.error("Debes seleccionar un paciente");
+      return;
+    }
+
     try {
       const values = await form.validateFields();
       setLoading(true);
@@ -66,8 +81,9 @@ const ModalNuevaConsulta: React.FC<ModalNuevaConsultaProps> = ({
         pacienteId: values.pacienteId,
         paciente: {
           id: pacienteSeleccionado?.id,
-          nombre: pacienteSeleccionado?.nombre,
-          apellido: pacienteSeleccionado?.apellido,
+          nombres: pacienteSeleccionado?.nombres,
+          apellidoPaterno: pacienteSeleccionado?.apellidoPaterno,
+          apellidoMaterno: pacienteSeleccionado?.apellidoMaterno,
           sexo: pacienteSeleccionado?.sexo,
           fechaNacimiento: pacienteSeleccionado?.fechaNacimiento,
         },
@@ -78,8 +94,8 @@ const ModalNuevaConsulta: React.FC<ModalNuevaConsultaProps> = ({
         observaciones: values.observaciones || "",
         diagnostico: "",
         medico: {
-          id: user?.id,
-          nombre: user?.nombre || "Sin nombre",
+          id: user?.usuarioDetail?.id,
+          nombre: user?.usuarioDetail?.nombre || "Sin nombre",
         },
         fechaRegistro: new Date().toISOString(),
         empresaId,
@@ -93,6 +109,8 @@ const ModalNuevaConsulta: React.FC<ModalNuevaConsultaProps> = ({
       );
       message.success("Consulta creada exitosamente");
       form.resetFields();
+      setSearchValue("");
+      setSelectedPaciente(null);
       onCancel();
       if (onSuccess) onSuccess();
     } catch (error) {
@@ -105,8 +123,38 @@ const ModalNuevaConsulta: React.FC<ModalNuevaConsultaProps> = ({
 
   const handleCancel = () => {
     form.resetFields();
+    setSearchValue("");
+    setSelectedPaciente(null);
     onCancel();
   };
+
+  const [searchValue, setSearchValue] = useState("");
+  const [selectedPaciente, setSelectedPaciente] = useState<any>(null);
+
+  const handleSelectPaciente = (value: string, option: any) => {
+    setSelectedPaciente(option.paciente);
+    setSearchValue(option.label);
+    form.setFieldsValue({ pacienteId: value });
+  };
+
+  const pacientesOptions = pacientes
+    .filter((p) => {
+      const searchLower = searchValue.toLowerCase();
+      const nombreCompleto =
+        `${p.nombres} ${p.apellidoPaterno} ${p.apellidoMaterno}`.toLowerCase();
+      return (
+        nombreCompleto.includes(searchLower) ||
+        p.cedula?.toLowerCase().includes(searchLower) ||
+        p.email?.toLowerCase().includes(searchLower)
+      );
+    })
+    .map((p) => ({
+      value: p.id,
+      label: `${p.nombres} ${p.apellidoPaterno} ${p.apellidoMaterno} - ${
+        p.cedula || "Sin cédula"
+      }`,
+      paciente: p,
+    }));
 
   return (
     <Modal
@@ -120,23 +168,23 @@ const ModalNuevaConsulta: React.FC<ModalNuevaConsultaProps> = ({
       width={600}
     >
       <Form form={form} layout="vertical" className="mt-4">
-        <Form.Item
-          name="pacienteId"
-          label="Paciente"
-          rules={[{ required: true, message: "Seleccione un paciente" }]}
-        >
-          <Select
-            placeholder="Seleccione un paciente"
-            loading={loadingPacientes}
-            showSearch
-            optionFilterProp="children"
-          >
-            {pacientes.map((paciente) => (
-              <Option key={paciente.id} value={paciente.id}>
-                {paciente.nombre} {paciente.apellido}
-              </Option>
-            ))}
-          </Select>
+        <Form.Item label="Seleccionar Paciente">
+          <AutoComplete
+            value={searchValue}
+            onChange={setSearchValue}
+            onSelect={handleSelectPaciente}
+            options={pacientesOptions}
+            placeholder="Buscar paciente por nombre, cédula o email..."
+            filterOption={false}
+            notFoundContent={
+              loadingPacientes ? "Cargando..." : "No se encontraron pacientes"
+            }
+            style={{ width: "100%" }}
+          />
+        </Form.Item>
+
+        <Form.Item name="pacienteId" hidden>
+          <Input />
         </Form.Item>
 
         <Form.Item

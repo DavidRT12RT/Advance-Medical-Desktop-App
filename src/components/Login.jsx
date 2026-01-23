@@ -35,7 +35,6 @@ export default function Login() {
       const idOrganizacion = decodedToken.idOrganizacion;
 
 
-
       // Obtener el perfil desde la estructura de organizaciones
       // El usuario DEBE estar en el perfil de la organización para poder iniciar sesión
       if (!idEmpresa || !idOrganizacion) {

@@ -32,6 +32,7 @@ const ConsultaDetalle: React.FC = () => {
     id: string;
     consultaId: string;
   }>();
+  const [messageApi, contextHolder] = message.useMessage();
   const navigate = useNavigate();
   const { user } = useElectronStore();
   const empresaId = user?.empresa?.id;
@@ -56,7 +57,7 @@ const ConsultaDetalle: React.FC = () => {
         const consultaData: any = await FirebaseConsultas.obtenerConsultaPorId(
           empresaId,
           pacienteId,
-          consultaId
+          consultaId,
         );
 
         if (!consultaData) {
@@ -69,14 +70,14 @@ const ConsultaDetalle: React.FC = () => {
         // Obtener paciente
         const pacienteData = await FirebasePacientes.obtenerPacientePorId(
           empresaId,
-          pacienteId
+          pacienteId,
         );
         setPaciente(pacienteData);
 
         // Obtener estudios del paciente
         const estudiosData = await FirebaseEstudios.obtenerEstudiosDePaciente(
           empresaId,
-          pacienteId
+          pacienteId,
         );
         setEstudios(estudiosData || []);
 
@@ -96,7 +97,7 @@ const ConsultaDetalle: React.FC = () => {
     fetchData();
   }, [empresaId, pacienteId, consultaId, form]);
 
-  const handleSave = async () => {
+  const handleSave = async (isFinalizing: boolean) => {
     if (!pacienteId || !consultaId) return;
 
     try {
@@ -108,8 +109,7 @@ const ConsultaDetalle: React.FC = () => {
         hallazgos_generales: values.hallazgos_generales ?? "",
         notas: values.notas ?? "",
       };
-
-      if (finalizeOnSave) {
+      if (isFinalizing) {
         payload.estado = "finalizada";
       }
 
@@ -117,20 +117,20 @@ const ConsultaDetalle: React.FC = () => {
         empresaId,
         pacienteId,
         consultaId,
-        payload
+        payload,
       );
 
       setConsulta((prev: any) => (prev ? { ...prev, ...payload } : prev));
 
-      if (finalizeOnSave) {
-        message.success("Consulta finalizada correctamente");
+      if (isFinalizing) {
+        messageApi.success("Consulta finalizada correctamente");
         navigate(`/paciente-detalle/${pacienteId}`);
       } else {
-        message.success("Consulta guardada exitosamente");
+        messageApi.success("Consulta guardada exitosamente");
       }
     } catch (error) {
       console.error("Error guardando consulta:", error);
-      message.error("Error al guardar la consulta");
+      messageApi.error("Error al guardar la consulta");
     } finally {
       setSaving(false);
       setFinalizeOnSave(false);
@@ -153,6 +153,7 @@ const ConsultaDetalle: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50/50 pb-10">
+      {contextHolder}
       <div className="max-w-7xl mx-auto p-6">
         <Button
           type="default"
@@ -182,8 +183,8 @@ const ConsultaDetalle: React.FC = () => {
                   consulta.estado === "finalizada"
                     ? "green"
                     : consulta.estado === "en_progreso"
-                    ? "blue"
-                    : "orange"
+                      ? "blue"
+                      : "orange"
                 }
               >
                 {consulta.estado[0].toUpperCase() + consulta.estado.slice(1)}
@@ -198,7 +199,7 @@ const ConsultaDetalle: React.FC = () => {
                 loading={saving}
                 onClick={() => {
                   setFinalizeOnSave(false);
-                  handleSave();
+                  handleSave(false);
                 }}
               >
                 Guardar cambios
@@ -209,7 +210,7 @@ const ConsultaDetalle: React.FC = () => {
                 loading={saving}
                 onClick={() => {
                   setFinalizeOnSave(true);
-                  handleSave();
+                  handleSave(true);
                 }}
               >
                 Finalizar consulta
@@ -307,7 +308,7 @@ const ConsultaDetalle: React.FC = () => {
                         className="cursor-pointer hover:bg-gray-50 rounded px-2"
                         onClick={() =>
                           navigate(
-                            `/paciente-detalle/${pacienteId}/estudios/${estudio.id}`
+                            `/paciente-detalle/${pacienteId}/estudios/${estudio.id}`,
                           )
                         }
                       >
@@ -325,8 +326,8 @@ const ConsultaDetalle: React.FC = () => {
                               estudio.estado === "finalizado"
                                 ? "green"
                                 : estudio.estado === "en_progreso"
-                                ? "blue"
-                                : "orange"
+                                  ? "blue"
+                                  : "orange"
                             }
                           >
                             {estudio.estado || "Pendiente"}
