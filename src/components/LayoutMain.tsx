@@ -47,18 +47,22 @@ const LayoutMain = () => {
     }
   };
 
-  let selectedKey = "2";
-  if (location.pathname.startsWith("/configuracion")) {
-    selectedKey = "5";
-  } else if (location.pathname.startsWith("/actualizacion")) {
-    selectedKey = "6";
-  } else if (location.pathname.startsWith("/estudios")) {
-    selectedKey = "4";
-  } else if (location.pathname.startsWith("/consultas")) {
-    selectedKey = "3";
-  } else if (location.pathname.startsWith("/")) {
-    selectedKey = "2";
-  }
+  const getSelectedKey = () => {
+    const path = location.pathname;
+
+    if (path.includes("/actualizacion")) return "6";
+    if (path.includes("/configuracion")) return "5";
+
+    if (path.includes("/estudios")) return "4";
+
+    if (path.includes("/consultas")) return "3";
+
+    if (path.startsWith("/paciente-detalle") || path === "/") return "2";
+
+    return "2"; // Default
+  };
+
+  const selectedKey = getSelectedKey();
 
   return (
     <Layout style={{ minHeight: "100vh", backgroundColor: "#fff" }}>

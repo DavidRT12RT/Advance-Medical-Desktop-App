@@ -13,6 +13,20 @@ module.exports = {
     extraResource: [
       'assets'
     ],
+    // Permisos para macOS - Acceso a cámara y micrófono
+    osxSign: {
+      identity: null, // Para desarrollo sin firma
+      hardenedRuntime: true,
+      entitlements: 'entitlements.plist',
+      'entitlements-inherit': 'entitlements.plist',
+    },
+    osxNotarize: false,
+    // Información adicional para macOS
+    extendInfo: {
+      NSCameraUsageDescription: 'AIM Desktop necesita acceso a la cámara para realizar detecciones asistidas por IA durante procedimientos médicos (colonoscopías y endoscopías).',
+      NSMicrophoneUsageDescription: 'AIM Desktop puede necesitar acceso al micrófono para grabar notas de voz durante los procedimientos.',
+      NSAppleEventsUsageDescription: 'AIM Desktop necesita este permiso para funcionar correctamente.',
+    },
   },
   rebuildConfig: {},
   //Configuracion de los instaladores (Windows, MAC y LINUX)
