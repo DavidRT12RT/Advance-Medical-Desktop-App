@@ -122,7 +122,9 @@ export default function LicenseGate({ machineId, onLicensed }) {
       onLicensed?.(enriched);
     } catch (e) {
       console.error(e);
-      setError('Error al registrar la licencia');
+      // Mostrar la causa real (ej. "La licencia no existe", "ya está vinculada",
+      // o errores de conexión/permisos de Firebase) para poder diagnosticar
+      setError(e?.message || 'Error al registrar la licencia');
     } finally {
       setLoading(false);
     }
