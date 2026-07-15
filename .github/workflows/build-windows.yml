@@ -24,6 +24,11 @@ jobs:
 
       - name: Build installer
         run: npm run make
+        env:
+          # URL del servidor de IA central; se embebe en el build.
+          # Definir en Settings > Secrets and variables > Actions > Variables.
+          # Si no está definida, la app usa http://localhost:8000.
+          VITE_API_SERVER_URL: ${{ vars.VITE_API_SERVER_URL }}
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4

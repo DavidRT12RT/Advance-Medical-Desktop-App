@@ -10,8 +10,11 @@ import FirebaseMedia from "../features/FirebaseMedia";
 import SectionTitle from "../components/common/SectionTitle";
 import { useElectronStore } from "../hooks/useElectronStore";
 
+// URL del servidor de IA (API Python con YOLO/Ollama).
+// Se define en build con VITE_API_SERVER_URL (archivo .env en la raíz del
+// proyecto o variable de entorno en CI); sin ella usa la API local.
 const SERVER_URL =
-  process.env.NEXT_PUBLIC_API_SERVER_URL || "http://localhost:8000";
+  import.meta.env.VITE_API_SERVER_URL || "http://localhost:8000";
 const FRAME_WIDTH = Number(process.env.NEXT_PUBLIC_API_WIDTH) || 640;
 const FRAME_HEIGHT = Number(process.env.NEXT_PUBLIC_API_HEIGHT) || 480;
 const TARGET_FPS = Number(process.env.NEXT_PUBLIC_API_FPS) || 60;
