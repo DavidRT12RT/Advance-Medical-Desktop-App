@@ -90,3 +90,6 @@ typings/
 
 # Electron-Forge
 out/
+
+# Credenciales de Firebase (usar firebase.json.example como plantilla)
+src/config/firebase.json
