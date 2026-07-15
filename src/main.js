@@ -22,15 +22,14 @@ try {
   console.log('[Main] Running in production mode, dotenv not loaded');
 }
 
-// Manejar eventos de Squirrel (instalación, actualización, desinstalación)
-// Si es un evento de Squirrel, la app se cierra automáticamente
-if (handleSquirrelEvent()) {
-  // La función handleSquirrelEvent() ya maneja el quit
-  // Este código no se ejecutará porque la app ya se cerró
-}
+// Manejar eventos de Squirrel (instalación, actualización, desinstalación).
+// Durante estos eventos squirrelEvents.js muestra su propia ventana; no debe
+// ejecutarse el arranque normal (ventana principal, accesos directos, etc.).
+// El quit ocurre vía 'window-all-closed' al cerrar la ventana de instalación.
+const isSquirrelEvent = handleSquirrelEvent();
 
 // Crear acceso directo en escritorio después de la instalación (solo Windows)
-if (process.platform === 'win32') {
+if (!isSquirrelEvent && process.platform === 'win32') {
   app.setAppUserModelId('com.scaleflow.aim-desktop');
 
   // En la primera ejecución después de instalar, crear acceso directo
@@ -105,15 +104,17 @@ const createWindow = () => {
   return mainWindow;
 };
 
-app.whenReady().then(() => {
-  createWindow();
+if (!isSquirrelEvent) {
+  app.whenReady().then(() => {
+    createWindow();
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow();
+      }
+    });
   });
-});
+}
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {

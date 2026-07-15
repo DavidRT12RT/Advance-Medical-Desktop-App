@@ -48,15 +48,44 @@ class AutoUpdater {
   }
 
   /**
-   * Compara dos versiones (formato semver simple)
+   * Compara dos versiones (semver, incluyendo prereleases como 1.0.0-beta.1)
    */
   compareVersions(v1, v2) {
-    const parts1 = v1.split('.').map(Number);
-    const parts2 = v2.split('.').map(Number);
+    const parse = (version) => {
+      const [core, ...preParts] = String(version).split('-');
+      const nums = core.split('.').map((n) => parseInt(n, 10) || 0);
+      while (nums.length < 3) nums.push(0);
+      return { nums, pre: preParts.join('-') || null };
+    };
+
+    const a = parse(v1);
+    const b = parse(v2);
 
     for (let i = 0; i < 3; i++) {
-      if (parts1[i] > parts2[i]) return 1;
-      if (parts1[i] < parts2[i]) return -1;
+      if (a.nums[i] > b.nums[i]) return 1;
+      if (a.nums[i] < b.nums[i]) return -1;
+    }
+
+    // Misma versión base: la versión sin prerelease es mayor (1.0.0 > 1.0.0-beta.1)
+    if (!a.pre && !b.pre) return 0;
+    if (!a.pre) return 1;
+    if (!b.pre) return -1;
+
+    // Comparar identificadores de prerelease segmento por segmento (beta.2 > beta.1)
+    const aSegs = a.pre.split('.');
+    const bSegs = b.pre.split('.');
+    for (let i = 0; i < Math.max(aSegs.length, bSegs.length); i++) {
+      const x = aSegs[i];
+      const y = bSegs[i];
+      if (x === undefined) return -1;
+      if (y === undefined) return 1;
+      const xn = parseInt(x, 10);
+      const yn = parseInt(y, 10);
+      if (!isNaN(xn) && !isNaN(yn)) {
+        if (xn !== yn) return xn > yn ? 1 : -1;
+      } else if (x !== y) {
+        return x > y ? 1 : -1;
+      }
     }
     return 0;
   }

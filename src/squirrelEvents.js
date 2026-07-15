@@ -172,7 +172,12 @@ export function handleSquirrelEvent() {
       executeSquirrelCommand(['--createShortcut', path.basename(process.execPath)], () => {
         // 2. Mostrar la ventana solo después de que Squirrel termine su trabajo
         app.whenReady().then(() => {
-          createInstallWindow('', '', false);
+          const window = createInstallWindow('', '', false);
+
+          // Cerrar la app cuando el usuario cierre la ventana de instalación
+          window.on('closed', () => {
+            app.quit();
+          });
         });
       });
       return true;

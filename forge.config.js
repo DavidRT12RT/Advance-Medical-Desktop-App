@@ -33,7 +33,9 @@ module.exports = {
         name: 'AdvanceInteligentSystem',
         setupExe: 'AIM-Desktop-Setup.exe',
         setupIcon: 'assets/icon.ico',
-        iconUrl: 'https://raw.githubusercontent.com/scaleflow/aim-desktop/main/assets/icon.ico',
+        // iconUrl debe ser una URL pública a un .ico (aparece en "Agregar o quitar
+        // programas"). El repo es privado, así que raw.githubusercontent no sirve;
+        // agregar aquí una URL pública cuando exista hosting para el icono.
         loadingGif: 'assets/transparent.gif',
         noMsi: true,
         remoteReleases: false,
