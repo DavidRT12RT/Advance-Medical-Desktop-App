@@ -15,13 +15,6 @@ const __dirname = path.dirname(__filename);
 // Para importar módulos CommonJS en ES modules
 const require = createRequire(import.meta.url);
 
-// Cargar dotenv solo en desarrollo
-try {
-  require('dotenv').config({ path: path.join(__dirname, '../.env') });
-} catch (error) {
-  console.log('[Main] Running in production mode, dotenv not loaded');
-}
-
 // Manejar eventos de Squirrel (instalación, actualización, desinstalación).
 // Durante estos eventos squirrelEvents.js muestra su propia ventana; no debe
 // ejecutarse el arranque normal (ventana principal, accesos directos, etc.).

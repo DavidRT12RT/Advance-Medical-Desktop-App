@@ -6,8 +6,6 @@ const initialState: any = {
   refresh: Math.random(),
   listaDocumentosRag: [],
   listaTemplatesReportes: [],
-  chatSelected: null,
-  chatSelectedInfo: null,
 };
 
 export const ai = createSlice({
@@ -29,13 +27,6 @@ export const ai = createSlice({
     setListaTemplatesReportes: (state, action) => {
       state.listaTemplatesReportes = action.payload;
     },
-    setChatSelected: (state, action) => {
-      console.log("Mando a llamar la funcion!");
-      state.chatSelected = action.payload;
-    },
-    setChatSelectedInfo: (state, action) => {
-      state.chatSelectedInfo = action.payload;
-    },
   },
 });
 
@@ -46,8 +37,6 @@ export const {
   setRefresh,
   setListaDocumentosRag,
   setListaTemplatesReportes,
-  setChatSelected,
-  setChatSelectedInfo,
 } = ai.actions;
 
 export default ai.reducer;

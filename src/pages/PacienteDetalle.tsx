@@ -17,7 +17,6 @@ import {
   setLoading,
   setRefresh,
 } from "../store/pacientesSlice";
-import ScalyMedicoChat from "../components/pacientes-detalle/ScalyMedicoChat";
 import { useElectronStore } from "../hooks/useElectronStore";
 
 const PacienteDetalle = () => {
@@ -34,7 +33,6 @@ const PacienteDetalle = () => {
     { id: "historial", label: "Historial de Estudios" },
     { id: "proximos", label: "Próximos Estudios" },
     { id: "registros", label: "Registros Médicos" },
-    // { id: "scaly", label: "Scaly Asistente Médico" },
   ];
 
   const dispatch = useDispatch();
@@ -108,7 +106,6 @@ const PacienteDetalle = () => {
         {activeTab === "historial" && <EstudiosPacienteDetalle />}
         {activeTab === "proximos" && <EstudiosPendientesPacienteDetalle />}
         {activeTab === "registros" && <RegistrosMedicosPacienteDetalle />}
-        {/* {activeTab === "scaly" && <ScalyMedicoChat />} */}
       </div>
 
       {/* Modal estudio*/}
