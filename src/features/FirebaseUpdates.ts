@@ -4,7 +4,6 @@
  */
 
 import {
-  getFirestore,
   doc,
   updateDoc,
   increment,
@@ -15,8 +14,7 @@ import {
   where,
   getDocs,
 } from "firebase/firestore";
-
-const db = getFirestore();
+import { firestore as db } from "../firebaseConfig";
 
 /**
  * Incrementa el contador de descargas para una versión

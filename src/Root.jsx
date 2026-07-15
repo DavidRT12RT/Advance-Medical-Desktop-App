@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
-import { app } from './firebaseConfig';
+import { app, firestore } from './firebaseConfig';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { useElectronStore } from './hooks/useElectronStore';
 import LicenseGate from './components/LicenseGate';
 import Login from './components/Login';
@@ -13,7 +13,6 @@ import { jwtDecode } from 'jwt-decode';
 
 export default function Root() {
   const auth = getAuth(app); // <- Aqui inicializamos Firebase!!!!
-  const firestore = getFirestore(app);
   const navigate = useNavigate();
   const userListenerRef = useRef(null); // Ref para guardar el unsubscribe del listener
 

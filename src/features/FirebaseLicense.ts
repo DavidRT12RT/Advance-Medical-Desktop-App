@@ -2,6 +2,7 @@ import {
   doc,
   getDoc,
   updateDoc,
+  deleteField,
   query,
   where,
   collection,
@@ -106,6 +107,21 @@ class FirebaseLicense {
     });
 
     return licencia;
+  }
+
+  /**
+   * Desvincula la licencia de la computadora actual, eliminando el machineInfo
+   * en Firestore para que pueda vincularse de nuevo (en esta u otra máquina).
+   * @param licenseId ID del documento de la licencia en Firestore.
+   */
+  async desvincularLicencia(licenseId: string): Promise<void> {
+    if (!licenseId) throw new Error("No hay licencia para desvincular");
+
+    await updateDoc(doc(firestore, "licencias", licenseId), {
+      machineInfo: deleteField(),
+      machineId: deleteField(),
+      lastCheckAt: new Date().toISOString(),
+    });
   }
 
   async obtenerInformacionDelUsuarioPorUIDFirebase(firebaseUID: string) {

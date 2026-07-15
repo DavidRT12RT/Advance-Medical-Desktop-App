@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { jwtDecode } from 'jwt-decode';
 import { app } from '../firebaseConfig';
-import { Button } from 'antd';
+import { Button, Modal } from 'antd';
 import logo from "../assets/logo.png";
 import FirebaseLicense from '../features/FirebaseLicense';
 import { useElectronStore } from '../hooks/useElectronStore';
@@ -11,12 +11,41 @@ import AppVersion from './AppVersion';
 
 export default function Login() {
   const auth = getAuth(app);
-  const { setUser, licenseData } = useElectronStore();
+  const { setUser, licenseData, setLicenseData } = useElectronStore();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [unlinking, setUnlinking] = useState(false);
+
+  const handleDesvincularLicencia = () => {
+    Modal.confirm({
+      title: 'Desvincular licencia',
+      content: 'Se desvinculará la licencia de esta computadora y podrás vincular otra. ¿Deseas continuar?',
+      okText: 'Sí, desvincular',
+      cancelText: 'Cancelar',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        setUnlinking(true);
+        setError('');
+        try {
+          // Liberar la licencia en Firestore para que pueda vincularse de nuevo
+          if (licenseData?.id) {
+            await FirebaseLicense.desvincularLicencia(licenseData.id);
+          }
+        } catch (e) {
+          console.error('Error al desvincular la licencia en remoto:', e);
+          // Continuamos: aunque falle el remoto, liberamos esta máquina localmente
+        } finally {
+          // Limpiar licencia local: Root volverá a mostrar LicenseGate
+          try { localStorage.removeItem('licenseInfo'); } catch { }
+          await setLicenseData({});
+          setUnlinking(false);
+        }
+      },
+    });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -134,6 +163,15 @@ export default function Login() {
             </Button>
           </div>
         </form>
+
+        <div className="mt-4 pt-4 border-t border-gray-200 flex flex-col items-center gap-1">
+          <p className="text-xs text-gray-500">
+            Licencia vinculada: <span className="font-mono">{licenseData?.claveLicencia || '—'}</span>
+          </p>
+          <Button type="link" size="small" danger loading={unlinking} onClick={handleDesvincularLicencia}>
+            Desvincular licencia de esta computadora
+          </Button>
+        </div>
       </div>
 
       <AppVersion style={{ marginTop: '16px' }} />

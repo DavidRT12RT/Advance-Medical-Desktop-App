@@ -26,7 +26,6 @@ import {
   BarChartOutlined,
 } from "@ant-design/icons";
 import {
-  getFirestore,
   collection,
   query,
   orderBy,
@@ -35,6 +34,7 @@ import {
   updateDoc,
   getDocs,
 } from "firebase/firestore";
+import { firestore } from "../../firebaseConfig";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import "dayjs/locale/es";
@@ -90,7 +90,7 @@ const GestionVersionesAIM: React.FC<GestionVersionesAIMProps> = ({
   useEffect(() => {
     if (!empresaId) return;
 
-    const db = getFirestore();
+    const db = firestore;
     const versionesRef = collection(
       db,
       `empresas/${empresaId}/actualizaciones-software-aim`,
@@ -146,7 +146,7 @@ const GestionVersionesAIM: React.FC<GestionVersionesAIMProps> = ({
 
   const handleRetirarVersion = async (versionId: string) => {
     try {
-      const db = getFirestore();
+      const db = firestore;
       const versionRef = doc(
         db,
         `empresas/${empresaId}/actualizaciones-software-aim/${versionId}`,

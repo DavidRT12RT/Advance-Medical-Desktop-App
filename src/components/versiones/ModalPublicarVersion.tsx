@@ -33,7 +33,8 @@ import {
   uploadBytesResumable,
   getDownloadURL,
 } from "firebase/storage";
-import { getFirestore, doc, setDoc } from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore";
+import { firestore } from "../../firebaseConfig";
 import { v4 as uuidv4 } from "uuid";
 
 const { Step } = Steps;
@@ -291,7 +292,7 @@ const ModalPublicarVersion: React.FC<ModalPublicarVersionProps> = ({
       message.loading({ content: "Publicando versión...", key: "upload" });
 
       // Crear documento en Firestore
-      const db = getFirestore();
+      const db = firestore;
       const versionId = `v${values.version}`;
       const versionData = {
         id: uuidv4(),

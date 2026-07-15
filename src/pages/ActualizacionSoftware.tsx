@@ -29,7 +29,6 @@ import {
   ThunderboltOutlined,
 } from "@ant-design/icons";
 import {
-  getFirestore,
   doc,
   onSnapshot,
   collection,
@@ -38,6 +37,7 @@ import {
   limit,
   getDocs,
 } from "firebase/firestore";
+import { firestore } from "../firebaseConfig";
 import { useElectronStore } from "../hooks/useElectronStore";
 import {
   incrementarDescargas,
@@ -139,7 +139,7 @@ const ActualizacionSoftware: React.FC = () => {
   useEffect(() => {
     if (!user?.empresa?.id) return;
 
-    const db = getFirestore();
+    const db = firestore;
 
     // Escuchar la última actualización disponible
     const latestUpdateRef = doc(
