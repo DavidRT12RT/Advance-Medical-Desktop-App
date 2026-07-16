@@ -73,6 +73,13 @@ const setMachineId = (machineId) => {
 };
 
 const setLicenseData = (licenseData = {}) => {
+  // Objeto vacío/null = limpiar la licencia local por completo (logout de
+  // licencia, desvinculación o invalidación remota). Sin esto, el merge de
+  // abajo conservaba isValid/organizacion viejos en disco y la "limpieza"
+  // no limpiaba nada.
+  if (!licenseData || Object.keys(licenseData).length === 0) {
+    return setLicenseState({ ...DEFAULTS.license });
+  }
   const license = getLicenseData();
   return setLicenseState({
     ...license,
