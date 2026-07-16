@@ -4,7 +4,16 @@ import { getStorage } from "firebase/storage";
 
 import firebaseConfig from "../firebase.json";
 
-export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 // La suite de ScaleFlow administra los datos en la base de datos "suite" (no la "(default)")
-export const firestore = getFirestore(app, "suite");
+const FIRESTORE_DATABASE = "suite";
+
+export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+export const firestore = getFirestore(app, FIRESTORE_DATABASE);
 export const storage = getStorage(app);
+
+// Info de diagnóstico: a qué proyecto/base apunta este build (se muestra en
+// la pantalla de licencia para distinguir builds viejos de nuevos)
+export const FIREBASE_TARGET = {
+  projectId: firebaseConfig.projectId,
+  database: FIRESTORE_DATABASE,
+};

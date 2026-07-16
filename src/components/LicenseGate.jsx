@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { firestore } from '../firebaseConfig';
+import { firestore, FIREBASE_TARGET } from '../firebaseConfig';
 import { doc, getDoc } from 'firebase/firestore';
 import { Button, Tooltip } from 'antd';
 import logo from "../assets/logo.png";
@@ -193,6 +193,11 @@ export default function LicenseGate({ machineId, onLicensed }) {
           <p>Machine ID:</p>
           <Tooltip title={`Este es el codigo identificador de esta computadora: ${machineId}`}>
             <code className="text-gray-700">{machineId?.slice(0, 30) + '…'}</code>
+          </Tooltip>
+          <Tooltip title="Proyecto de Firebase y base de datos a la que apunta este build">
+            <code className="text-gray-400 mt-1">
+              {FIREBASE_TARGET.projectId} · db: {FIREBASE_TARGET.database}
+            </code>
           </Tooltip>
         </div>
       </div>
