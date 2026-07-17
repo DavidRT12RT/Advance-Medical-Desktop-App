@@ -91,6 +91,15 @@ const createWindow = () => {
     mainWindow.webContents.openDevTools();
   }
 
+  // TEMPORAL (beta): permitir abrir la consola con F12 también en el build
+  // empaquetado, para diagnosticar problemas de licencia/red en máquinas
+  // externas. Quitar cuando el despliegue esté estable.
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.type === 'keyDown' && input.key === 'F12') {
+      mainWindow.webContents.toggleDevTools();
+    }
+  });
+
   // Configurar autoUpdater con la ventana principal
   autoUpdater.setMainWindow(mainWindow);
 

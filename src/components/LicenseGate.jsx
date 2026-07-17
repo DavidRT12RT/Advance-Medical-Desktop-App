@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { firestore, FIREBASE_TARGET } from '../firebaseConfig';
+import { ejecutarDiagnostico } from '../utils/diagnosticoConexion';
 import { doc, getDoc } from 'firebase/firestore';
 import { Button, Tooltip } from 'antd';
 import logo from "../assets/logo.png";
@@ -10,6 +11,20 @@ export default function LicenseGate({ machineId, onLicensed }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [segments, setSegments] = useState(['', '', '']); // 3 grupos de 4
+  const [diagResultados, setDiagResultados] = useState(null);
+  const [diagLoading, setDiagLoading] = useState(false);
+
+  const handleDiagnostico = async () => {
+    setDiagLoading(true);
+    setDiagResultados(null);
+    try {
+      const resultados = await ejecutarDiagnostico();
+      setDiagResultados(resultados);
+      console.log('[Diagnóstico]', resultados);
+    } finally {
+      setDiagLoading(false);
+    }
+  };
   // No usamos el hook de electron store aquí para evitar instancias separadas del estado
 
   useEffect(() => {
@@ -105,9 +120,18 @@ export default function LicenseGate({ machineId, onLicensed }) {
         return;
       }
       setLoading(true);
+      console.log('[Licencia] Intentando vincular:', {
+        clave: licenseKey,
+        machineId,
+        proyecto: FIREBASE_TARGET.projectId,
+        db: FIREBASE_TARGET.database,
+        version: navigator?.userAgent,
+        timestamp: new Date().toISOString(),
+      });
       // Recopilar informacion detallada de la computadora desde el proceso principal
       const deviceInfo = await (window.device?.getAllDeviceInfo?.() || Promise.resolve({}));
       const licencia = await FirebaseLicense.vincularComputadoraConLicencia(licenseKey, machineId, deviceInfo);
+      console.log('[Licencia] Vinculación exitosa:', licencia?.claveLicencia, '→ doc', licencia?.id);
 
       try {
         if (licencia?.id) {
@@ -185,8 +209,20 @@ export default function LicenseGate({ machineId, onLicensed }) {
           <div className="mt-3 text-sm text-red-600">{error}</div>
         ) : null}
 
-        <div className="mt-5 flex gap-3">
-
+        <div className="mt-4 flex flex-col items-center gap-2">
+          <Button size="small" onClick={handleDiagnostico} loading={diagLoading}>
+            Diagnóstico de conexión
+          </Button>
+          {diagResultados ? (
+            <div className="w-full mt-1 text-xs bg-gray-50 border border-gray-200 rounded-md p-3 flex flex-col gap-1">
+              {diagResultados.map((r) => (
+                <div key={r.nombre} className={r.ok ? 'text-green-700' : 'text-red-600'}>
+                  {r.ok ? '✓' : '✗'} <span className="font-medium">{r.nombre}</span>
+                  {': '}{r.detalle} <span className="text-gray-400">({r.ms}ms)</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         <div className="mt-5 text-xs text-gray-500 flex flex-col items-center">

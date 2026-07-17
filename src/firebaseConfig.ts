@@ -12,8 +12,11 @@ export const firestore = getFirestore(app, FIRESTORE_DATABASE);
 export const storage = getStorage(app);
 
 // Info de diagnóstico: a qué proyecto/base apunta este build (se muestra en
-// la pantalla de licencia para distinguir builds viejos de nuevos)
+// la pantalla de licencia para distinguir builds viejos de nuevos).
+// La apiKey web es pública por diseño (viaja dentro de cualquier build);
+// se expone aquí para las pruebas de conectividad del diagnóstico.
 export const FIREBASE_TARGET = {
   projectId: firebaseConfig.projectId,
   database: FIRESTORE_DATABASE,
+  apiKey: firebaseConfig.apiKey,
 };
