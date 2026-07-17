@@ -399,6 +399,18 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
     </View>
   );
 
+  // La página 2 solo existe si hay contenido secundario que mostrar
+  const haySegundaPagina = Boolean(
+    imagesToShow.length > 0 ||
+      config.incluirMedicamentos ||
+      config.incluirComplicaciones ||
+      config.incluirSeguimiento ||
+      (config.incluirSedacion && estudio?.metodo_sedacion) ||
+      (config.incluirEquipo && estudio?.equipo_endoscopio) ||
+      (config.incluirDatosClinica && estudio?.clinica_nombre) ||
+      (config.incluirAnalisisIA && lastSession),
+  );
+
   return (
     <Document>
       <Page size="A4" style={styles.page} wrap>
@@ -472,23 +484,6 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
                 <Text style={styles.fieldLabel}>Procedimiento</Text>
                 <Text style={styles.fieldValue}>{tipoEstudio}</Text>
               </View>
-            </View>
-          </View>
-        )}
-
-        {/* IMAGES SECTION - Prominent placement */}
-        {imagesToShow.length > 0 && (
-          <View style={styles.sectionCard}>
-            <SectionTitle title="Imágenes del Estudio" />
-            <View style={styles.imagesGrid}>
-              {imagesToShow.map((img, idx) => (
-                <View key={idx} style={styles.imageWrapper}>
-                  <Image src={img.url} style={styles.studyImage} />
-                  {img.titulo && (
-                    <Text style={styles.imageTitle}>{img.titulo}</Text>
-                  )}
-                </View>
-              ))}
             </View>
           </View>
         )}
@@ -571,6 +566,145 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
               </View>
             </View>
           )}
+
+        {/* SIGNATURES - En la primera página, junto a la información clínica */}
+        <View style={styles.signaturesContainer} wrap={false}>
+          <View style={styles.signaturesRow}>
+            {/* Doctor signature */}
+            {config.incluirDatosMedico && (
+              <View style={styles.signatureBlock}>
+                <View style={styles.signatureLine} />
+                <Text style={styles.signatureName}>
+                  {(
+                    nombreDoctor ||
+                    estudio?.medico_nombre ||
+                    "MÉDICO TRATANTE"
+                  ).toUpperCase()}
+                </Text>
+                <Text style={styles.signatureRole}>Médico Tratante</Text>
+                {(configuracionMedica?.cedula || estudio?.medico_cedula) && (
+                  <Text style={styles.signatureCedula}>
+                    Céd. Prof.{" "}
+                    {configuracionMedica?.cedula || estudio.medico_cedula}
+                  </Text>
+                )}
+                {(configuracionMedica?.especialidad ||
+                  estudio?.medico_especialidad) && (
+                  <Text style={styles.signatureCedula}>
+                    {configuracionMedica?.especialidad ||
+                      estudio.medico_especialidad}
+                  </Text>
+                )}
+                {configuracionMedica?.numeroRegistro && (
+                  <Text style={styles.signatureCedula}>
+                    Reg. {configuracionMedica.numeroRegistro}
+                  </Text>
+                )}
+              </View>
+            )}
+
+            {/* Anesthesiologist signature */}
+            {config.incluirDatosAnestesiologo &&
+              estudio?.anestesiologo_nombre && (
+                <View style={styles.signatureBlock}>
+                  <View style={styles.signatureLine} />
+                  <Text style={styles.signatureName}>
+                    {(
+                      estudio?.anestesiologo_nombre || "ANESTESIÓLOGO"
+                    ).toUpperCase()}
+                  </Text>
+                  <Text style={styles.signatureRole}>Anestesiólogo</Text>
+                  {estudio?.anestesiologo_cedula && (
+                    <Text style={styles.signatureCedula}>
+                      Céd. Prof. {estudio.anestesiologo_cedula}
+                    </Text>
+                  )}
+                  {estudio?.anestesiologo_especialidad && (
+                    <Text style={styles.signatureCedula}>
+                      {estudio.anestesiologo_especialidad}
+                    </Text>
+                  )}
+                </View>
+              )}
+
+            {/* Assistant/Nurse signature */}
+            {config.incluirDatosAsistente && estudio?.asistente_nombre && (
+              <View style={styles.signatureBlock}>
+                <View style={styles.signatureLine} />
+                <Text style={styles.signatureName}>
+                  {estudio.asistente_nombre.toUpperCase()}
+                </Text>
+                <Text style={styles.signatureRole}>
+                  {estudio?.asistente_rol || "Asistente / Enfermero(a)"}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* Footer página 1 */}
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>
+            Generado el {new Date().toLocaleDateString("es-MX")}
+          </Text>
+          <Text
+            style={styles.footerText}
+            render={({ pageNumber, totalPages }) =>
+              `Página ${pageNumber} de ${totalPages}`
+            }
+          />
+          <Text style={styles.footerText}>
+            Advance Medical - Sistema de Gestión Médica
+          </Text>
+        </View>
+      </Page>
+
+      {/* PÁGINA 2: imágenes, plan, sedación, equipo, clínica y análisis IA */}
+      {haySegundaPagina && (
+      <Page size="A4" style={styles.page} wrap>
+        {/* Encabezado de continuación */}
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "flex-end",
+            borderBottomWidth: 2,
+            borderBottomColor: "#4F46E5",
+            paddingBottom: 6,
+            marginBottom: 14,
+          }}
+        >
+          <View>
+            <Text style={{ fontSize: 11, fontWeight: 700, color: "#111827" }}>
+              INFORME DEL ESTUDIO — CONTINUACIÓN
+            </Text>
+            <Text style={{ fontSize: 8, color: "#6B7280", marginTop: 2 }}>
+              {nombrePaciente} · {tipoEstudio} · {fechaEstudio}
+            </Text>
+          </View>
+          {organizacion?.nombreOrganizacion && (
+            <Text style={{ fontSize: 8, color: "#6B7280" }}>
+              {organizacion.nombreOrganizacion}
+            </Text>
+          )}
+        </View>
+
+        {/* Imágenes del estudio */}
+        {imagesToShow.length > 0 && (
+          <View style={styles.sectionCard}>
+            <SectionTitle title="Imágenes del Estudio" />
+            <View style={styles.imagesGrid}>
+              {imagesToShow.map((img, idx) => (
+                <View key={idx} style={styles.imageWrapper}>
+                  <Image src={img.url} style={styles.studyImage} />
+                  {img.titulo && (
+                    <Text style={styles.imageTitle}>{img.titulo}</Text>
+                  )}
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
 
         {/* Section 4: Plan and Follow-up */}
         {(config.incluirMedicamentos ||
@@ -764,91 +898,23 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
           </View>
         )}
 
-        {/* SIGNATURES - All involved personnel */}
-        <View style={styles.signaturesContainer} wrap={false}>
-          <View style={styles.signaturesRow}>
-            {/* Doctor signature */}
-            {config.incluirDatosMedico && (
-              <View style={styles.signatureBlock}>
-                <View style={styles.signatureLine} />
-                <Text style={styles.signatureName}>
-                  {(
-                    nombreDoctor ||
-                    estudio?.medico_nombre ||
-                    "MÉDICO TRATANTE"
-                  ).toUpperCase()}
-                </Text>
-                <Text style={styles.signatureRole}>Médico Tratante</Text>
-                {(configuracionMedica?.cedula || estudio?.medico_cedula) && (
-                  <Text style={styles.signatureCedula}>
-                    Céd. Prof.{" "}
-                    {configuracionMedica?.cedula || estudio.medico_cedula}
-                  </Text>
-                )}
-                {(configuracionMedica?.especialidad ||
-                  estudio?.medico_especialidad) && (
-                  <Text style={styles.signatureCedula}>
-                    {configuracionMedica?.especialidad ||
-                      estudio.medico_especialidad}
-                  </Text>
-                )}
-                {configuracionMedica?.numeroRegistro && (
-                  <Text style={styles.signatureCedula}>
-                    Reg. {configuracionMedica.numeroRegistro}
-                  </Text>
-                )}
-              </View>
-            )}
-
-            {/* Anesthesiologist signature */}
-            {config.incluirDatosAnestesiologo &&
-              estudio?.anestesiologo_nombre && (
-                <View style={styles.signatureBlock}>
-                  <View style={styles.signatureLine} />
-                  <Text style={styles.signatureName}>
-                    {(
-                      estudio?.anestesiologo_nombre || "ANESTESIÓLOGO"
-                    ).toUpperCase()}
-                  </Text>
-                  <Text style={styles.signatureRole}>Anestesiólogo</Text>
-                  {estudio?.anestesiologo_cedula && (
-                    <Text style={styles.signatureCedula}>
-                      Céd. Prof. {estudio.anestesiologo_cedula}
-                    </Text>
-                  )}
-                  {estudio?.anestesiologo_especialidad && (
-                    <Text style={styles.signatureCedula}>
-                      {estudio.anestesiologo_especialidad}
-                    </Text>
-                  )}
-                </View>
-              )}
-
-            {/* Assistant/Nurse signature */}
-            {config.incluirDatosAsistente && estudio?.asistente_nombre && (
-              <View style={styles.signatureBlock}>
-                <View style={styles.signatureLine} />
-                <Text style={styles.signatureName}>
-                  {estudio.asistente_nombre.toUpperCase()}
-                </Text>
-                <Text style={styles.signatureRole}>
-                  {estudio?.asistente_rol || "Asistente / Enfermero(a)"}
-                </Text>
-              </View>
-            )}
-          </View>
-        </View>
-
-        {/* Footer */}
+        {/* Footer página 2 */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>
             Generado el {new Date().toLocaleDateString("es-MX")}
           </Text>
+          <Text
+            style={styles.footerText}
+            render={({ pageNumber, totalPages }) =>
+              `Página ${pageNumber} de ${totalPages}`
+            }
+          />
           <Text style={styles.footerText}>
             Advance Medical - Sistema de Gestión Médica
           </Text>
         </View>
       </Page>
+      )}
     </Document>
   );
 };
