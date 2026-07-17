@@ -370,15 +370,16 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
         </div>
       }
     >
-      <div className="flex gap-5 py-2">
-      {/* Columna izquierda: configuración del reporte */}
-      <div className="w-[460px] shrink-0 max-h-[80vh] overflow-y-auto pr-2 space-y-6">
+      <div className="flex gap-5 pt-2" style={{ height: "82vh" }}>
+      {/* Columna izquierda: configuración (scroll propio) + acciones fijas */}
+      <div className="w-[440px] shrink-0 flex flex-col min-h-0">
+      <div className="flex-1 min-h-0 overflow-y-auto pr-3 space-y-5">
         {/* Sección: Datos Generales */}
         <div>
           <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">
             Datos Generales
           </h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 bg-gray-50 p-4 rounded-lg border border-gray-100">
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 bg-gray-50 p-3.5 rounded-lg border border-gray-100">
             <div className={sectionCheckboxStyle}>
               <Checkbox
                 checked={true}
@@ -444,7 +445,7 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
           <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">
             Información Clínica
           </h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 bg-gray-50 p-4 rounded-lg border border-gray-100">
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 bg-gray-50 p-3.5 rounded-lg border border-gray-100">
             <div className={sectionCheckboxStyle}>
               <Checkbox
                 checked={config.incluirResultado}
@@ -807,23 +808,23 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
           )}
         </div>
 
-        <Divider className="my-4" />
+      </div>
 
-        {/* Botones de acción */}
-        <div className="flex justify-end gap-3">
-          <Button onClick={onClose} disabled={generando}>
-            Cancelar
-          </Button>
-          <Button
-            type="primary"
-            icon={generando ? <Spin size="small" /> : <DownloadOutlined />}
-            onClick={handleGenerarPDF}
-            loading={generando}
-            className="bg-red-500 hover:bg-red-600 border-red-500"
-          >
-            {generando ? "Generando..." : "Generar y Descargar PDF"}
-          </Button>
-        </div>
+      {/* Botones de acción fijos al pie de la columna (fuera del scroll) */}
+      <div className="flex justify-end gap-3 pt-4 mt-1 border-t border-gray-200 bg-white">
+        <Button onClick={onClose} disabled={generando}>
+          Cancelar
+        </Button>
+        <Button
+          type="primary"
+          icon={generando ? <Spin size="small" /> : <DownloadOutlined />}
+          onClick={handleGenerarPDF}
+          loading={generando}
+          className="bg-red-500 hover:bg-red-600 border-red-500"
+        >
+          {generando ? "Generando..." : "Generar y Descargar PDF"}
+        </Button>
+      </div>
       </div>
 
       {/* Columna derecha: vista previa en vivo del reporte */}
@@ -844,10 +845,10 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
               src={previewUrl}
               title="Vista previa del reporte"
               className="w-full h-full"
-              style={{ minHeight: "74vh", border: 0 }}
+              style={{ border: 0 }}
             />
           ) : (
-            <div className="h-full min-h-[74vh] flex flex-col items-center justify-center gap-3 text-gray-400 text-sm">
+            <div className="h-full flex flex-col items-center justify-center gap-3 text-gray-400 text-sm">
               <Spin />
               Generando vista previa…
             </div>
