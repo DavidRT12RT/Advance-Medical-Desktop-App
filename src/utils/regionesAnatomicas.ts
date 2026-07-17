@@ -21,15 +21,27 @@ export interface RegionAnatomica {
 
 export function organoPorTipoEstudio(tipo: string): OrganoTipo {
   const t = (tipo || "").toLowerCase();
-  if (t.includes("colon") || t.includes("colonoscopia")) return "colon";
+  if (
+    t.includes("colon") ||
+    t.includes("colonoscopia") ||
+    t.includes("recto") ||
+    t.includes("sigmoid")
+  )
+    return "colon";
   if (t.includes("bronco") || t.includes("pulmon") || t.includes("pulmón"))
     return "pulmon";
   if (
     t.includes("gastro") ||
-    t.includes("endoscopia") ||
-    t.includes("endoscopía") ||
+    t.includes("endoscop") ||
+    t.includes("endoscóp") ||
+    t.includes("ultrasonido") ||
+    t.includes("ecoendo") ||
     t.includes("estomago") ||
-    t.includes("estómago")
+    t.includes("estómago") ||
+    t.includes("cpre") ||
+    t.includes("colangio") ||
+    t.includes("duoden") ||
+    t.includes("entero")
   )
     return "estomago";
   return "colon";

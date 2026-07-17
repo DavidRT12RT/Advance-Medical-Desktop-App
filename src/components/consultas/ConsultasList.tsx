@@ -2,6 +2,10 @@ import React from "react";
 import { Table, Tag, Badge } from "antd";
 import { useNavigate } from "react-router-dom";
 import type { ColumnsType } from "antd/es/table";
+import {
+  TIPOS_ESTUDIO_FILTERS,
+  colorPorTipo,
+} from "../../utils/tiposEstudio";
 
 interface ConsultasListProps {
   consultas: any[];
@@ -49,15 +53,10 @@ const ConsultasList: React.FC<ConsultasListProps> = ({
       dataIndex: "tipo",
       key: "tipo",
       width: 130,
-      filters: [
-        { text: "Colonoscopia", value: "Colonoscopia" },
-        { text: "Endoscopia", value: "Endoscopia" },
-      ],
+      filters: TIPOS_ESTUDIO_FILTERS,
       onFilter: (value, record) => record.tipo === value,
       render: (tipo) => (
-        <Tag color={tipo === "Colonoscopia" ? "blue" : "green"}>
-          {tipo || "Sin tipo"}
-        </Tag>
+        <Tag color={colorPorTipo(tipo)}>{tipo || "Sin tipo"}</Tag>
       ),
     },
     {

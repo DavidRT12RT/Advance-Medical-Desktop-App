@@ -14,6 +14,7 @@ import { useParams } from "react-router-dom";
 import { setOpenModalEstudios } from "../../store/pacientesSlice";
 import FirebaseEstudios from "../../features/FirebaseEstudios";
 import { useElectronStore } from "../../hooks/useElectronStore";
+import { TIPOS_ESTUDIO_OPTIONS } from "../../utils/tiposEstudio";
 
 const ModalEstudioPacienteDetalle = () => {
   const isOpenModal = useAppSelector(
@@ -103,12 +104,7 @@ const ModalEstudioPacienteDetalle = () => {
                 },
               ]}
             >
-              <Select
-                options={[
-                  { label: "Colonoscopia", value: "Colonoscopia" },
-                  { label: "Endoscopia", value: "Endoscopia" },
-                ]}
-              />
+              <Select options={TIPOS_ESTUDIO_OPTIONS} />
             </Form.Item>
           </Col>
           <Col span={12}>

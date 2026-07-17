@@ -2,6 +2,7 @@ import React from "react";
 import { Input, Select, DatePicker } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
+import { TIPOS_ESTUDIO } from "../../utils/tiposEstudio";
 
 const { RangePicker } = DatePicker;
 const { Option } = Select;
@@ -49,8 +50,11 @@ const SearchEstudios: React.FC<SearchEstudiosProps> = ({
           allowClear
         >
           <Option value="">Todos los tipos</Option>
-          <Option value="Colonoscopia">Colonoscopia</Option>
-          <Option value="Endoscopia">Endoscopia</Option>
+          {TIPOS_ESTUDIO.map((tipo) => (
+            <Option key={tipo} value={tipo}>
+              {tipo}
+            </Option>
+          ))}
         </Select>
 
         <Select

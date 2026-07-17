@@ -15,6 +15,7 @@ import { useNavigate } from "react-router-dom";
 import FirebaseEstudios from "../../features/FirebaseEstudios";
 import FirebasePacientes from "../../features/FirebasePacientes";
 import { useElectronStore } from "../../hooks/useElectronStore";
+import { TIPOS_ESTUDIO_OPTIONS } from "../../utils/tiposEstudio";
 
 interface ModalNuevoEstudioProps {
   visible: boolean;
@@ -200,12 +201,7 @@ const ModalNuevoEstudio: React.FC<ModalNuevoEstudioProps> = ({
                 },
               ]}
             >
-              <Select
-                options={[
-                  { label: "Colonoscopia", value: "Colonoscopia" },
-                  { label: "Endoscopia", value: "Endoscopia" },
-                ]}
-              />
+              <Select options={TIPOS_ESTUDIO_OPTIONS} />
             </Form.Item>
           </Col>
           <Col span={12}>

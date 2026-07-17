@@ -11,6 +11,7 @@ import {
 import { useElectronStore } from "../../hooks/useElectronStore";
 import FirebasePacientes from "../../features/FirebasePacientes";
 import FirebaseConsultas from "../../features/FirebaseConsultas";
+import { TIPOS_ESTUDIO_OPTIONS } from "../../utils/tiposEstudio";
 import dayjs from "dayjs";
 
 const { Option } = Select;
@@ -204,10 +205,10 @@ const ModalNuevaConsulta: React.FC<ModalNuevaConsultaProps> = ({
           label="Tipo de consulta"
           rules={[{ required: true, message: "Seleccione el tipo" }]}
         >
-          <Select placeholder="Seleccione tipo">
-            <Option value="Colonoscopia">Colonoscopia</Option>
-            <Option value="Endoscopia">Endoscopia</Option>
-          </Select>
+          <Select
+            placeholder="Seleccione tipo"
+            options={TIPOS_ESTUDIO_OPTIONS}
+          />
         </Form.Item>
 
         <Form.Item name="resultado" label="Resultado">
