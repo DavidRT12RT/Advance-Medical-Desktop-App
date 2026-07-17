@@ -1,7 +1,15 @@
-import { useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import firebaseLicense from '../features/FirebaseLicense';
 
-export const useElectronStore = () => {
+// Estado del electron store compartido vía Context: una ÚNICA fuente de
+// verdad para toda la app. Antes era un hook normal y cada componente que lo
+// llamaba creaba su propia copia del estado — al hacer login, el setUser de
+// Login actualizaba su copia pero Root (que decide Login vs App) nunca se
+// enteraba y había que recargar con Ctrl+R.
+
+const ElectronStoreContext = createContext(null);
+
+const useElectronStoreState = () => {
   const [authData, setAuthData] = useState(null);
   const [licenseData, setLicenseData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -20,6 +28,7 @@ export const useElectronStore = () => {
           // Invalidate local license data
           await window.electronStore.setLicenseData({});
           setLicenseData(null);
+          setAuthData(data.auth);
         } else {
           setAuthData(data.auth);
           setLicenseData(data.license);
@@ -90,4 +99,21 @@ export const useElectronStore = () => {
     machineId: authData?.machineId,
     isLicenseValid: licenseData?.isValid || false
   };
+};
+
+export const ElectronStoreProvider = ({ children }) => {
+  const value = useElectronStoreState();
+  return (
+    <ElectronStoreContext.Provider value={value}>
+      {children}
+    </ElectronStoreContext.Provider>
+  );
+};
+
+export const useElectronStore = () => {
+  const ctx = useContext(ElectronStoreContext);
+  if (!ctx) {
+    throw new Error('useElectronStore debe usarse dentro de <ElectronStoreProvider>');
+  }
+  return ctx;
 };

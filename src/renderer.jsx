@@ -6,15 +6,18 @@ import { HashRouter as Router } from "react-router"
 import "@ant-design/v5-patch-for-react-19"
 
 import Root from "./Root"
+import { ElectronStoreProvider } from "./hooks/useElectronStore"
 import "./index.css"
 
 const root = createRoot(document.getElementById("root"))
 
 root.render(
   <React.StrictMode>
-    <Router>
-      <Root />
-    </Router>
+    <ElectronStoreProvider>
+      <Router>
+        <Root />
+      </Router>
+    </ElectronStoreProvider>
   </React.StrictMode>
 )
 
