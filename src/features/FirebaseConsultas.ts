@@ -123,11 +123,13 @@ class FirebaseConsultas {
       "consultas",
     );
 
+    // Firestore rechaza valores `undefined`: sin doctorId el addDoc truena,
+    // y sin este campo la consulta no aparece en las listas filtradas por doctor.
     const consultaBody = {
       ...consultaInfo,
       empresa_id,
       paciente_id,
-      doctorId: userId || consultaInfo.doctorId,
+      doctorId: userId || consultaInfo.doctorId || null,
       fechaRegistro: new Date().toISOString(),
     };
 

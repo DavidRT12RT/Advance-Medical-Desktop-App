@@ -123,11 +123,13 @@ class FirebaseEstudios {
       "estudios",
     );
 
+    // Firestore rechaza valores `undefined`: sin doctorId el addDoc truena,
+    // y sin este campo el estudio no aparece en las listas filtradas por doctor.
     const estudioBody = {
       ...estudioInfo,
       empresa_id,
       paciente_id,
-      doctorId: userId || estudioInfo.doctorId,
+      doctorId: userId || estudioInfo.doctorId || null,
       fechaRegistro: new Date().toISOString(),
     };
 

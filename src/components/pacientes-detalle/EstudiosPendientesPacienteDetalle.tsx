@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Skeleton } from "antd";
 import { useParams, useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
 import FirebaseEstudios from "../../features/FirebaseEstudios";
 import { useElectronStore } from "../../hooks/useElectronStore";
 
@@ -9,6 +10,8 @@ const EstudiosPendientesPacienteDetalle = () => {
   const navigate = useNavigate();
   const { user } = useElectronStore();
   const empresaId = user?.empresa?.id;
+  // Se recarga la lista cuando se crea un estudio desde el modal del detalle
+  const refresh = useSelector((state: any) => state.pacientes.refresh);
 
   const [loading, setLoading] = useState(true);
   const [estudios, setEstudios] = useState<any[]>([]);
@@ -34,7 +37,7 @@ const EstudiosPendientesPacienteDetalle = () => {
     };
 
     fetchEstudios();
-  }, [empresaId, pacienteId]);
+  }, [empresaId, pacienteId, refresh]);
 
   if (loading) {
     return (

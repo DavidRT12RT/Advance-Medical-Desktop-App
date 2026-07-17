@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Skeleton, Tag } from "antd";
 import { useParams, useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
 import dayjs from "dayjs";
 import FirebaseConsultas from "../../features/FirebaseConsultas";
 import { useElectronStore } from "../../hooks/useElectronStore";
@@ -10,6 +11,8 @@ const ConsultasPendientesPacienteDetalle = () => {
   const navigate = useNavigate();
   const { user } = useElectronStore();
   const empresaId = user?.empresa?.id;
+  // Se recarga la lista cuando se crea una consulta desde el modal del detalle
+  const refresh = useSelector((state: any) => state.pacientes.refresh);
 
   const [loading, setLoading] = useState(true);
   const [consultas, setConsultas] = useState<any[]>([]);
@@ -35,7 +38,7 @@ const ConsultasPendientesPacienteDetalle = () => {
     };
 
     fetchConsultas();
-  }, [empresaId, pacienteId]);
+  }, [empresaId, pacienteId, refresh]);
 
   if (loading) {
     return (

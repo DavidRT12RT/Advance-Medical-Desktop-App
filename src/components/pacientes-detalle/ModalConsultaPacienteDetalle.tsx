@@ -1,19 +1,32 @@
 import { useAppSelector, useAppDispatch } from "../../store/hooks";
-import { Modal, Form, Input, DatePicker, Button, message } from "antd";
+import {
+  Modal,
+  Form,
+  Input,
+  Select,
+  DatePicker,
+  Button,
+  message,
+} from "antd";
 import { useParams } from "react-router-dom";
-import { setOpenModalConsultas } from "../../store/pacientesSlice";
+import { setOpenModalConsultas, setRefresh } from "../../store/pacientesSlice";
 import FirebaseConsultas from "../../features/FirebaseConsultas";
 import { useElectronStore } from "../../hooks/useElectronStore";
+import { TIPOS_ESTUDIO_OPTIONS } from "../../utils/tiposEstudio";
 
 const ModalConsultaPacienteDetalle = () => {
   const isOpenModal = useAppSelector(
     (state) => state.pacientes.openModalConsultas
+  );
+  const detalleDePaciente = useAppSelector(
+    (state) => state.pacientes.detalleDePaciente
   );
   const dispatch = useAppDispatch();
   const [form] = Form.useForm();
   const { id: pacienteId } = useParams<{ id: string }>();
   const { user } = useElectronStore();
   const empresaId = user?.empresa?.id;
+  const userId = user?.usuarioDetail?.id;
 
   const handleCancel = () => {
     form.resetFields();
@@ -23,8 +36,6 @@ const ModalConsultaPacienteDetalle = () => {
   const handleSubmit = async (values: any) => {
     try {
       await form.validateFields();
-      console.log("Datos de consulta básica:", values);
-      // Aquí iría la lógica para guardar la consulta básica
 
       if (!pacienteId) {
         console.error("No se encontró el ID del paciente en la ruta");
@@ -37,31 +48,43 @@ const ModalConsultaPacienteDetalle = () => {
         : null;
 
       const consultaBasica = {
-        tipo: "Consulta",
+        pacienteId,
+        paciente: {
+          id: detalleDePaciente?.id || pacienteId,
+          nombres: detalleDePaciente?.nombres || "",
+          apellidoPaterno: detalleDePaciente?.apellidoPaterno || "",
+          apellidoMaterno: detalleDePaciente?.apellidoMaterno || "",
+          sexo: detalleDePaciente?.sexo || "",
+          fechaNacimiento: detalleDePaciente?.fechaNacimiento || "",
+        },
+        tipo: values.tipo,
         fecha: fechaFormatoApi,
         motivo_consulta: values.motivo_consulta || "",
         notas: values.notas || "",
         hallazgos_generales: "",
         estado: "pendiente",
+        medico: {
+          id: userId || null,
+          nombre: user?.usuarioDetail?.nombre || "Sin nombre",
+        },
       };
 
       await FirebaseConsultas.crearConsultaBasica(
         empresaId,
         pacienteId,
-        consultaBasica
+        consultaBasica,
+        userId
       );
-
-      console.log("Consulta creada exitosamente");
 
       message.success("Consulta creada exitosamente");
       handleCancel();
+      dispatch(setRefresh(Math.random()));
     } catch (error) {
       console.error("Error al guardar consulta básica:", error);
       message.error("Error al crear la consulta");
     }
   };
 
-  console.log("isOpenModal:", isOpenModal);
   return (
     <Modal
       title="Crear Nueva Consulta"
@@ -83,6 +106,17 @@ const ModalConsultaPacienteDetalle = () => {
         onFinish={handleSubmit}
         autoComplete="off"
       >
+        <Form.Item
+          label="Tipo de Consulta"
+          name="tipo"
+          rules={[{ required: true, message: "Selecciona el tipo" }]}
+        >
+          <Select
+            placeholder="Seleccione tipo"
+            options={TIPOS_ESTUDIO_OPTIONS}
+          />
+        </Form.Item>
+
         <Form.Item
           label="Fecha de Consulta"
           name="fecha"
