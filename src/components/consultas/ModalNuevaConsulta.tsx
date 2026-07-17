@@ -14,7 +14,6 @@ import FirebaseConsultas from "../../features/FirebaseConsultas";
 import { TIPOS_ESTUDIO_OPTIONS } from "../../utils/tiposEstudio";
 import dayjs from "dayjs";
 
-const { Option } = Select;
 const { TextArea } = Input;
 
 interface ModalNuevaConsultaProps {
@@ -91,7 +90,7 @@ const ModalNuevaConsulta: React.FC<ModalNuevaConsultaProps> = ({
         fecha: values.fecha.format("YYYY-MM-DD"),
         tipo: values.tipo,
         estado: "pendiente",
-        resultado: values.resultado || null,
+        resultado: null,
         observaciones: values.observaciones || "",
         diagnostico: "",
         medico: {
@@ -209,13 +208,6 @@ const ModalNuevaConsulta: React.FC<ModalNuevaConsultaProps> = ({
             placeholder="Seleccione tipo"
             options={TIPOS_ESTUDIO_OPTIONS}
           />
-        </Form.Item>
-
-        <Form.Item name="resultado" label="Resultado">
-          <Select placeholder="Seleccione resultado" allowClear>
-            <Option value="Normal">Normal</Option>
-            <Option value="Anormal">Anormal</Option>
-          </Select>
         </Form.Item>
 
         <Form.Item name="observaciones" label="Observaciones iniciales">
