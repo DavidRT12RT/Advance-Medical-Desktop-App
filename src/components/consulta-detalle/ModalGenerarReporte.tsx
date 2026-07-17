@@ -278,25 +278,41 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
     );
   };
 
-  const handleVistaPrevia = async () => {
-    try {
-      setPreviewLoading(true);
-      const blob = await pdf(construirDocumento()).toBlob();
-      // Liberar la URL anterior si existía
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-      setPreviewUrl(URL.createObjectURL(blob));
-    } catch (error) {
-      console.error("Error generando vista previa:", error);
-      message.error("Error al generar la vista previa");
-    } finally {
-      setPreviewLoading(false);
-    }
-  };
+  // Vista previa en vivo: se regenera con debounce cada vez que cambia la
+  // configuración o las imágenes seleccionadas/editadas
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelado = false;
+    setPreviewLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const blob = await pdf(construirDocumento()).toBlob();
+        if (cancelado) return;
+        setPreviewUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return URL.createObjectURL(blob);
+        });
+      } catch (error) {
+        console.error("Error generando vista previa:", error);
+      } finally {
+        if (!cancelado) setPreviewLoading(false);
+      }
+    }, 600);
+    return () => {
+      cancelado = true;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, config, editedImages]);
 
-  const cerrarVistaPrevia = () => {
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setPreviewUrl(null);
-  };
+  // Limpiar la URL del blob al cerrar el modal
+  useEffect(() => {
+    if (!isOpen && previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   const handleGenerarPDF = async () => {
     try {
@@ -343,7 +359,8 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
       onCancel={onClose}
       footer={null}
       centered
-      width={800}
+      width="94vw"
+      style={{ top: 16, maxWidth: 1500 }}
       title={
         <div className="flex items-center gap-2">
           <FilePdfOutlined className="text-red-500 text-xl" />
@@ -353,7 +370,9 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
         </div>
       }
     >
-      <div className="space-y-6 py-4">
+      <div className="flex gap-5 py-2">
+      {/* Columna izquierda: configuración del reporte */}
+      <div className="w-[460px] shrink-0 max-h-[80vh] overflow-y-auto pr-2 space-y-6">
         {/* Sección: Datos Generales */}
         <div>
           <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">
@@ -796,14 +815,6 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
             Cancelar
           </Button>
           <Button
-            icon={<EyeOutlined />}
-            onClick={handleVistaPrevia}
-            loading={previewLoading}
-            disabled={generando}
-          >
-            Vista previa
-          </Button>
-          <Button
             type="primary"
             icon={generando ? <Spin size="small" /> : <DownloadOutlined />}
             onClick={handleGenerarPDF}
@@ -815,45 +826,35 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
         </div>
       </div>
 
-      {/* Vista previa del reporte completo */}
-      <Modal
-        open={!!previewUrl}
-        onCancel={cerrarVistaPrevia}
-        centered
-        width="88vw"
-        style={{ top: 12, maxWidth: 1100 }}
-        title={
-          <span className="flex items-center gap-2">
-            <EyeOutlined /> Vista previa del reporte
+      {/* Columna derecha: vista previa en vivo del reporte */}
+      <div className="flex-1 min-w-0 flex flex-col rounded-lg border border-gray-200 bg-gray-50 overflow-hidden">
+        <div className="px-3 py-2 border-b border-gray-200 bg-white flex items-center justify-between">
+          <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide flex items-center gap-1.5">
+            <EyeOutlined /> Vista previa en vivo
           </span>
-        }
-        footer={[
-          <Button key="cerrar" onClick={cerrarVistaPrevia}>
-            Cerrar
-          </Button>,
-          <Button
-            key="descargar"
-            type="primary"
-            icon={<DownloadOutlined />}
-            onClick={() => {
-              cerrarVistaPrevia();
-              handleGenerarPDF();
-            }}
-            className="bg-red-500 hover:bg-red-600 border-red-500"
-          >
-            Descargar este reporte
-          </Button>,
-        ]}
-      >
-        {previewUrl && (
-          <iframe
-            src={previewUrl}
-            title="Vista previa del reporte"
-            className="w-full rounded-md border border-gray-200"
-            style={{ height: "76vh" }}
-          />
-        )}
-      </Modal>
+          {previewLoading && (
+            <span className="text-[11px] text-gray-400 flex items-center gap-1.5">
+              <Spin size="small" /> actualizando…
+            </span>
+          )}
+        </div>
+        <div className="flex-1 relative">
+          {previewUrl ? (
+            <iframe
+              src={previewUrl}
+              title="Vista previa del reporte"
+              className="w-full h-full"
+              style={{ minHeight: "74vh", border: 0 }}
+            />
+          ) : (
+            <div className="h-full min-h-[74vh] flex flex-col items-center justify-center gap-3 text-gray-400 text-sm">
+              <Spin />
+              Generando vista previa…
+            </div>
+          )}
+        </div>
+      </div>
+      </div>
 
       {/* Modal de edición de imagen */}
       {editingImageUrl && (
