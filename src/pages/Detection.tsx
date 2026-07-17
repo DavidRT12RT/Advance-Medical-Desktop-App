@@ -1,7 +1,15 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Button, message, Modal, Progress, Spin } from "antd";
-import { ArrowLeftOutlined, VideoCameraOutlined } from "@ant-design/icons";
+import { Button, message, Modal, Popover, Progress, Slider, Spin } from "antd";
+import {
+  ArrowLeftOutlined,
+  CameraOutlined,
+  FullscreenOutlined,
+  FullscreenExitOutlined,
+  SlidersOutlined,
+  UndoOutlined,
+  VideoCameraOutlined,
+} from "@ant-design/icons";
 import Webcam from "react-webcam";
 import io, { Socket } from "socket.io-client";
 import FirebaseEstudios from "../features/FirebaseEstudios";
@@ -9,6 +17,14 @@ import FirebasePacientes from "../features/FirebasePacientes";
 import FirebaseMedia from "../features/FirebaseMedia";
 import SectionTitle from "../components/common/SectionTitle";
 import { useElectronStore } from "../hooks/useElectronStore";
+import {
+  AJUSTES_NEUTROS,
+  cargarAjustes,
+  guardarAjustes,
+  construirFiltro,
+  esNeutro,
+  type VideoAjustes,
+} from "../utils/videoAjustes";
 
 // URL del servidor de IA (API Python con YOLO/Ollama).
 // Se define en build con VITE_API_SERVER_URL (archivo .env en la raíz del
@@ -277,8 +293,26 @@ const Detection: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveProgress, setSaveProgress] = useState(0);
   const [saveStage, setSaveStage] = useState("Preparando…");
-  // Cronómetro de grabación (segundos)
+  // Cronómetro de grabación (segundos). El ref refleja el estado para que el
+  // loop de dibujo del canvas (closure de larga vida) lea el valor actual.
   const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const recordingSecondsRef = useRef(0);
+  // Reloj en vivo para el overlay de fecha/hora
+  const [ahora, setAhora] = useState(() => new Date());
+  // Video expandido (pantalla completa dentro de la ventana)
+  const [isExpanded, setIsExpanded] = useState(false);
+  // Ajustes de imagen (brillo/contraste/saturación/gamma), persistidos por máquina
+  const [ajustes, setAjustes] = useState<VideoAjustes>(() => cargarAjustes());
+  const ajustesRef = useRef(ajustes);
+  // Datos para el overlay quemado en el video (el loop de frames es un closure
+  // de larga vida: lee estos refs, no el estado)
+  const overlayInfoRef = useRef<{ paciente: string; estudio: string }>({
+    paciente: "",
+    estudio: "",
+  });
+  // Guard: un clic que cierra el popover de ajustes no debe capturar imagen
+  const ajustesOpenRef = useRef(false);
+  const popoverCierreRef = useRef(0);
 
   const subtitle = estudio
     ? [
@@ -384,9 +418,54 @@ const Detection: React.FC = () => {
   // Cronómetro: avanza mientras se graba y no está en pausa
   useEffect(() => {
     if (!isCapturing || isPaused) return;
-    const id = setInterval(() => setRecordingSeconds((s) => s + 1), 1000);
+    const id = setInterval(() => {
+      setRecordingSeconds((s) => {
+        recordingSecondsRef.current = s + 1;
+        return s + 1;
+      });
+    }, 1000);
     return () => clearInterval(id);
   }, [isCapturing, isPaused]);
+
+  // Reloj en vivo (overlay de fecha/hora sobre el video)
+  useEffect(() => {
+    const id = setInterval(() => setAhora(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    ajustesRef.current = ajustes;
+  }, [ajustes]);
+
+  useEffect(() => {
+    const nombrePaciente = paciente
+      ? [paciente.nombres, paciente.apellidoPaterno, paciente.apellidoMaterno]
+          .filter(Boolean)
+          .join(" ")
+      : "";
+    overlayInfoRef.current = {
+      paciente: nombrePaciente,
+      estudio: estudio?.tipo || "",
+    };
+  }, [paciente, estudio]);
+
+  // Salir del modo expandido con Esc
+  useEffect(() => {
+    if (!isExpanded) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsExpanded(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isExpanded]);
+
+  const actualizarAjustes = (parciales: Partial<VideoAjustes>) => {
+    setAjustes((prev) => {
+      const nuevos = { ...prev, ...parciales };
+      guardarAjustes(nuevos);
+      return nuevos;
+    });
+  };
 
   const formatTiempo = (total: number) => {
     const m = Math.floor(total / 60).toString().padStart(2, "0");
@@ -394,57 +473,79 @@ const Detection: React.FC = () => {
     return `${m}:${s}`;
   };
 
-  useEffect(() => {
-    const handleKeyPress = async (event: KeyboardEvent) => {
-      // Solo capturar si es la tecla Espacio y estamos capturando
-      if (event.code === "Space" && isCapturing && !isPaused) {
-        event.preventDefault();
+  // Aplica los ajustes de imagen del médico a una captura (dataURL). Las
+  // capturas deben coincidir con lo que se ve en pantalla y con la grabación;
+  // getScreenshot() de react-webcam entrega el frame crudo del sensor (los
+  // CSS filters del <video> no afectan a drawImage).
+  const aplicarAjustesACaptura = useCallback((dataUrl: string): Promise<string> => {
+    return new Promise((resolve) => {
+      const a = ajustesRef.current;
+      if (esNeutro(a)) return resolve(dataUrl);
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement("canvas");
+        c.width = img.width;
+        c.height = img.height;
+        const cx = c.getContext("2d");
+        if (!cx) return resolve(dataUrl);
+        cx.filter = construirFiltro(a);
+        cx.drawImage(img, 0, 0);
+        resolve(c.toDataURL("image/jpeg", 0.95));
+      };
+      img.onerror = () => resolve(dataUrl);
+      img.src = dataUrl;
+    });
+  }, []);
 
-        const screenshot = webcamRef.current?.getScreenshot();
-        if (!screenshot || !pacienteId || !estudioId) return;
+  // Captura manual de imagen: se dispara con clic izquierdo sobre el video
+  // o con el botón de cámara (antes era la barra espaciadora)
+  const capturarImagen = useCallback(async () => {
+    if (!isCapturing || isPaused) return;
+    // Ignorar el clic que está cerrando el popover de ajustes (rc-trigger
+    // cierra en mousedown y el click posterior llegaría hasta el canvas)
+    if (ajustesOpenRef.current || Date.now() - popoverCierreRef.current < 350) {
+      return;
+    }
 
-        try {
-          // Mostrar animación de feedback
-          setShowScreenshotAnimation(true);
-          setScreenshotFeedback(screenshot);
+    const rawScreenshot = webcamRef.current?.getScreenshot();
+    if (!rawScreenshot || !pacienteId || !estudioId) return;
+    const screenshot = await aplicarAjustesACaptura(rawScreenshot);
 
-          // Ocultar animación después de 800ms
-          setTimeout(() => {
-            setShowScreenshotAnimation(false);
-          }, 800);
+    try {
+      // Mostrar animación de feedback
+      setShowScreenshotAnimation(true);
+      setScreenshotFeedback(screenshot);
 
-          // Subir screenshot a Firebase
-          const blob = dataUrlToBlob(screenshot);
-          const sessionKey = sessionId || "manual";
-          const timestamp = Date.now();
+      // Ocultar animación después de 800ms
+      setTimeout(() => {
+        setShowScreenshotAnimation(false);
+      }, 800);
 
-          const url = await FirebaseMedia.subirFrameDeEstudio(
-            empresaId,
-            pacienteId,
-            estudioId,
-            `${sessionKey}_manual`,
-            timestamp,
-            blob,
-          );
+      // Subir screenshot a Firebase
+      const blob = dataUrlToBlob(screenshot);
+      const sessionKey = sessionId || "manual";
+      const timestamp = Date.now();
 
-          manualScreenshotsRef.current.push(url);
-          // Miniatura local inmediata para la tira lateral
-          setManualScreenshots((prev) => [...prev, screenshot]);
-          messageApi.success(
-            `Captura guardada (${manualScreenshotsRef.current.length})`,
-          );
-        } catch (error) {
-          console.error("Error capturando screenshot manual:", error);
-          messageApi.error("Error al guardar la captura");
-        }
-      }
-    };
+      const url = await FirebaseMedia.subirFrameDeEstudio(
+        empresaId,
+        pacienteId,
+        estudioId,
+        `${sessionKey}_manual`,
+        timestamp,
+        blob,
+      );
 
-    window.addEventListener("keydown", handleKeyPress);
-    return () => {
-      window.removeEventListener("keydown", handleKeyPress);
-    };
-  }, [isCapturing, isPaused, pacienteId, estudioId, empresaId, sessionId]);
+      manualScreenshotsRef.current.push(url);
+      // Miniatura local inmediata para la tira lateral
+      setManualScreenshots((prev) => [...prev, screenshot]);
+      messageApi.success(
+        `Captura guardada (${manualScreenshotsRef.current.length})`,
+      );
+    } catch (error) {
+      console.error("Error capturando screenshot manual:", error);
+      messageApi.error("Error al guardar la captura");
+    }
+  }, [isCapturing, isPaused, pacienteId, estudioId, empresaId, sessionId, aplicarAjustesACaptura]);
 
   // Función para dibujar bboxes en el canvas overlay
   const drawDetections = (detections: any[]) => {
@@ -642,7 +743,10 @@ const Detection: React.FC = () => {
               // Marcar inmediatamente que estamos procesando esta captura
               lastPolypFrameWithImageRef.current = data.frame_index;
 
-              drawDetectionsOnImage(screenshot, data.detections || [])
+              aplicarAjustesACaptura(screenshot)
+                .then((ajustado) =>
+                  drawDetectionsOnImage(ajustado, data.detections || []),
+                )
                 .then((blob) =>
                   FirebaseMedia.subirFrameDeEstudio(
                     empresaId,
@@ -735,6 +839,7 @@ const Detection: React.FC = () => {
 
     // Reiniciar cronómetro y miniaturas de la sesión anterior
     setRecordingSeconds(0);
+    recordingSecondsRef.current = 0;
     setManualScreenshots([]);
 
     // Si hay servidor conectado, iniciar sesión de IA
@@ -795,9 +900,12 @@ const Detection: React.FC = () => {
     }
   }, [isConnected, empresaId, pacienteId, estudioId, doctorId]);
 
-  // Capturar y enviar frames (funciona con o sin servidor)
+  // Capturar y enviar frames (funciona con o sin servidor).
+  // Depende también de isPaused: al pausar, el cleanup detiene el loop y al
+  // reanudar el efecto lo vuelve a arrancar (antes Reanudar no reiniciaba
+  // nada y la grabación quedaba congelada para siempre).
   useEffect(() => {
-    if (!isCapturing || !webcamRef.current) return;
+    if (!isCapturing || isPaused || !webcamRef.current) return;
 
     const captureFrames = async () => {
       isCapturingRef.current = true;
@@ -817,9 +925,42 @@ const Detection: React.FC = () => {
             const ctx = canvasRef.current.getContext("2d");
             if (!ctx) return;
 
+            // 1) Dibujar el frame CRUDO y extraerlo para la IA: el modelo debe
+            // recibir la imagen sin ajustes de color ni overlays (los ajustes
+            // son preferencia visual del médico, no deben alterar la detección)
             ctx.drawImage(img, 0, 0, FRAME_WIDTH, FRAME_HEIGHT);
+            const imageData = ctx.getImageData(0, 0, FRAME_WIDTH, FRAME_HEIGHT);
+            const data = imageData.data;
 
-            // Dibujar también los bounding boxes en el canvas de procesamiento
+            // RGBA → RGB
+            const rgbBuffer = new Uint8Array(FRAME_WIDTH * FRAME_HEIGHT * 3);
+            for (let i = 0, j = 0; i < data.length; i += 4, j += 3) {
+              rgbBuffer[j] = data[i];
+              rgbBuffer[j + 1] = data[i + 1];
+              rgbBuffer[j + 2] = data[i + 2];
+            }
+
+            // Enviar frame solo si hay servidor conectado
+            if (socketRef.current?.connected) {
+              socketRef.current.emit("frame", {
+                frame_index: frameIndexRef.current++,
+                data: rgbBuffer,
+              });
+            } else {
+              // Sin servidor, solo incrementar frame index para grabación
+              frameIndexRef.current++;
+            }
+
+            // 2) Redibujar con los ajustes de imagen del médico: la grabación
+            // (canvas → MediaRecorder) refleja lo que él ve en pantalla
+            const ajustesActuales = ajustesRef.current;
+            if (!esNeutro(ajustesActuales)) {
+              ctx.filter = construirFiltro(ajustesActuales);
+              ctx.drawImage(img, 0, 0, FRAME_WIDTH, FRAME_HEIGHT);
+              ctx.filter = "none";
+            }
+
+            // 3) Dibujar los bounding boxes (quedan en la grabación)
             const detections = lastDetectionsRef.current || [];
             ctx.strokeStyle = "#00FF00";
             ctx.lineWidth = 2;
@@ -848,27 +989,67 @@ const Detection: React.FC = () => {
               ctx.fillText(label, x1 + 2, y2 + 16);
             });
 
-            const imageData = ctx.getImageData(0, 0, FRAME_WIDTH, FRAME_HEIGHT);
-            const data = imageData.data;
+            // Banner de datos quemado en la grabación: fecha/hora, paciente,
+            // estudio y tiempo de grabación
+            const info = overlayInfoRef.current;
+            const fechaHora = new Date().toLocaleString("es-MX", {
+              day: "2-digit",
+              month: "2-digit",
+              year: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+              hour12: false,
+            });
+            const partes = [fechaHora];
+            if (info.paciente) partes.push(info.paciente);
+            if (info.estudio) partes.push(info.estudio);
+            const seg = recordingSecondsRef.current;
+            const mm = String(Math.floor(seg / 60)).padStart(2, "0");
+            const ss = String(seg % 60).padStart(2, "0");
+            const textoDer = `REC ${mm}:${ss}`;
 
-            // RGBA → RGB
-            const rgbBuffer = new Uint8Array(FRAME_WIDTH * FRAME_HEIGHT * 3);
-            for (let i = 0, j = 0; i < data.length; i += 4, j += 3) {
-              rgbBuffer[j] = data[i];
-              rgbBuffer[j + 1] = data[i + 1];
-              rgbBuffer[j + 2] = data[i + 2];
-            }
+            const bannerH = 26;
+            ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
+            ctx.fillRect(0, FRAME_HEIGHT - bannerH, FRAME_WIDTH, bannerH);
 
-            // Enviar frame solo si hay servidor conectado
-            if (socketRef.current?.connected) {
-              socketRef.current.emit("frame", {
-                frame_index: frameIndexRef.current++,
-                data: rgbBuffer,
-              });
-            } else {
-              // Sin servidor, solo incrementar frame index para grabación
-              frameIndexRef.current++;
+            ctx.font = "13px Arial";
+            ctx.textBaseline = "middle";
+
+            // Truncar con elipsis en vez de comprimir el texto (maxWidth de
+            // fillText deforma tipográficamente los nombres largos)
+            let textoIzq = partes.join("  •  ");
+            const maxAnchoIzq = FRAME_WIDTH - 130;
+            if (ctx.measureText(textoIzq).width > maxAnchoIzq) {
+              while (
+                textoIzq.length > 1 &&
+                ctx.measureText(textoIzq + "…").width > maxAnchoIzq
+              ) {
+                textoIzq = textoIzq.slice(0, -1);
+              }
+              textoIzq += "…";
             }
+            ctx.fillStyle = "#FFFFFF";
+            ctx.fillText(textoIzq, 8, FRAME_HEIGHT - bannerH / 2);
+
+            const anchoDer = ctx.measureText(textoDer).width;
+            ctx.fillStyle = "#F87171";
+            // Punto de grabación
+            ctx.beginPath();
+            ctx.arc(
+              FRAME_WIDTH - anchoDer - 18,
+              FRAME_HEIGHT - bannerH / 2,
+              4,
+              0,
+              Math.PI * 2,
+            );
+            ctx.fill();
+            ctx.fillText(
+              textoDer,
+              FRAME_WIDTH - anchoDer - 8,
+              FRAME_HEIGHT - bannerH / 2,
+            );
+            ctx.textBaseline = "alphabetic";
           };
           img.src = imageSrc;
 
@@ -887,12 +1068,18 @@ const Detection: React.FC = () => {
     return () => {
       isCapturingRef.current = false;
     };
-  }, [isCapturing]);
+  }, [isCapturing, isPaused]);
 
   // Controles (funcionan con o sin servidor)
   const handlePause = () => {
     setIsPaused(true);
-    isCapturingRef.current = false;
+
+    // Pausar también el MediaRecorder: así el webm no graba el canvas
+    // congelado y el tiempo REC queda sincronizado con la línea de tiempo real
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state === "recording") {
+      try { recorder.pause(); } catch { /* no soportado */ }
+    }
 
     // Si hay servidor, notificar
     if (socketRef.current?.connected) {
@@ -904,7 +1091,11 @@ const Detection: React.FC = () => {
 
   const handleResume = () => {
     setIsPaused(false);
-    setIsCapturing(true);
+
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state === "paused") {
+      try { recorder.resume(); } catch { /* no soportado */ }
+    }
 
     // Si hay servidor, notificar
     if (socketRef.current?.connected) {
@@ -1194,11 +1385,9 @@ const Detection: React.FC = () => {
               <div className="flex-1 min-h-0 overflow-y-auto p-2 flex flex-col gap-2">
                 {manualScreenshots.length === 0 ? (
                   <p className="text-[11px] text-gray-400 text-center mt-6 px-1 leading-relaxed">
-                    Presiona{" "}
-                    <kbd className="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded text-[9px] font-mono">
-                      ESPACIO
-                    </kbd>{" "}
-                    durante la grabación para capturar
+                    Haz <span className="font-semibold">clic en el video</span>{" "}
+                    o usa el botón <CameraOutlined /> durante la grabación para
+                    capturar
                   </p>
                 ) : (
                   [...manualScreenshots]
@@ -1224,13 +1413,26 @@ const Detection: React.FC = () => {
             </div>
           )}
 
-          {/* Video */}
-          <div className="bg-black rounded-xl overflow-hidden shadow-sm border border-gray-900 flex-1 h-full min-w-0">
+          {/* Video (expandible a pantalla completa dentro de la ventana) */}
+          <div
+            className={
+              isExpanded
+                ? "fixed inset-0 z-40 bg-black"
+                : `bg-black rounded-xl overflow-hidden shadow-sm border border-gray-900 flex-1 h-full min-w-0 ${
+                    isCapturing
+                      ? isPaused
+                        ? "ring-2 ring-yellow-400/80"
+                        : "ring-2 ring-red-500/80"
+                      : ""
+                  }`
+            }
+          >
           <div ref={containerRef} className="relative w-full h-full">
             <Webcam
               audio={false}
               ref={webcamRef}
               videoConstraints={getVideoConstraints(selectedDeviceId)}
+              style={{ filter: esNeutro(ajustes) ? undefined : construirFiltro(ajustes) }}
               className="w-full h-full object-contain relative z-0"
               disablePictureInPicture={true}
               forceScreenshotSourceSize={true}
@@ -1243,62 +1445,170 @@ const Detection: React.FC = () => {
             {/* Canvas oculto (procesamiento interno) */}
             <canvas ref={canvasRef} className="hidden" />
 
-            {/* Canvas overlay para detecciones */}
+            {/* Canvas overlay para detecciones. Clic izquierdo = capturar imagen */}
             <canvas
               ref={overlayCanvasRef}
               width={FRAME_WIDTH}
               height={FRAME_HEIGHT}
               className="absolute top-0 left-0 w-full h-full z-10"
-              style={{ cursor: "crosshair" }}
+              style={{ cursor: isCapturing && !isPaused ? "crosshair" : "default" }}
+              onClick={capturarImagen}
+              title={isCapturing ? "Clic para capturar imagen" : undefined}
             />
 
-            {/* Indicador de grabación: estilo sutil tipo glass */}
+            {/* Controles de sesión en modo expandido (los de abajo quedan tapados) */}
+            {isExpanded && (
+              <div className="absolute bottom-5 right-5 z-20 flex gap-2">
+                <Button
+                  icon={<CameraOutlined />}
+                  onClick={capturarImagen}
+                  disabled={!isCapturing || isPaused}
+                >
+                  Capturar
+                </Button>
+                <Button
+                  onClick={isPaused ? handleResume : handlePause}
+                  disabled={!isCapturing}
+                >
+                  {isPaused ? "Reanudar" : "Pausar"}
+                </Button>
+                <Button danger onClick={handleFinish} disabled={!isCapturing}>
+                  Finalizar y guardar
+                </Button>
+              </div>
+            )}
+
+            {/* Indicador de grabación: prominente, con punto pulsante y cronómetro */}
             {isCapturing && (
-              <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20">
-                <div className="flex items-center gap-2.5 pl-3 pr-4 py-1.5 rounded-full bg-black/50 backdrop-blur-md border border-white/10 shadow-lg">
-                  <span className="relative flex h-2.5 w-2.5">
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
+                <div className="flex items-center gap-3 pl-4 pr-5 py-2 rounded-full bg-black/60 backdrop-blur-md border border-white/15 shadow-xl">
+                  <span className="relative flex h-3.5 w-3.5">
                     {!isPaused && (
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-60" />
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-70" />
                     )}
                     <span
-                      className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
+                      className={`relative inline-flex rounded-full h-3.5 w-3.5 ${
                         isPaused ? "bg-yellow-400" : "bg-red-500"
                       }`}
                     />
                   </span>
                   <span
-                    className={`text-[11px] font-semibold tracking-[0.18em] ${
+                    className={`text-sm font-bold tracking-[0.2em] ${
                       isPaused ? "text-yellow-300" : "text-red-400"
                     }`}
                   >
                     {isPaused ? "PAUSA" : "REC"}
                   </span>
-                  <span className="font-mono text-[13px] text-white/90 tabular-nums">
+                  <span className="font-mono text-lg font-semibold text-white tabular-nums leading-none">
                     {formatTiempo(recordingSeconds)}
                   </span>
                 </div>
               </div>
             )}
 
-            {/* Mensaje informativo - Captura con Espacio */}
-            {isCapturing && (
-              <div className="absolute top-4 right-4 z-20">
-                <div className="bg-black/40 px-4 py-2 rounded-lg text-white text-xs">
-                  <div className="flex items-center gap-2">
-                    <kbd className="px-2 py-1 bg-white/20 rounded text-[10px] font-mono">
-                      ESPACIO
-                    </kbd>
-                    <span className="text-[11px] text-gray-200">
-                      para capturar imagen
-                    </span>
+            {/* Barra de herramientas del video: ajustes de color y expandir */}
+            <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+              <Popover
+                trigger="click"
+                placement="bottomRight"
+                title="Ajustes de imagen"
+                onOpenChange={(abierto) => {
+                  ajustesOpenRef.current = abierto;
+                  if (!abierto) popoverCierreRef.current = Date.now();
+                }}
+                content={
+                  <div className="w-56 flex flex-col gap-1">
+                    {([
+                      ["brillo", "Brillo"],
+                      ["contraste", "Contraste"],
+                      ["saturacion", "Color (saturación)"],
+                      ["gamma", "Gamma"],
+                    ] as const).map(([clave, etiqueta]) => (
+                      <div key={clave}>
+                        <div className="flex justify-between text-xs text-gray-600">
+                          <span>{etiqueta}</span>
+                          <span className="font-mono">{ajustes[clave]}%</span>
+                        </div>
+                        <Slider
+                          min={25}
+                          max={200}
+                          value={ajustes[clave]}
+                          onChange={(v) => actualizarAjustes({ [clave]: v })}
+                        />
+                      </div>
+                    ))}
+                    <Button
+                      size="small"
+                      icon={<UndoOutlined />}
+                      onClick={() => actualizarAjustes({ ...AJUSTES_NEUTROS })}
+                      disabled={esNeutro(ajustes)}
+                    >
+                      Restablecer
+                    </Button>
                   </div>
+                }
+              >
+                <button
+                  className={`w-9 h-9 rounded-full flex items-center justify-center text-white shadow-lg backdrop-blur-md border border-white/15 transition-colors ${
+                    esNeutro(ajustes)
+                      ? "bg-black/50 hover:bg-black/70"
+                      : "bg-[#009b9b]/80 hover:bg-[#009b9b]"
+                  }`}
+                  title="Ajustes de imagen (brillo, contraste, color, gamma)"
+                >
+                  <SlidersOutlined />
+                </button>
+              </Popover>
+              <button
+                onClick={() => setIsExpanded((v) => !v)}
+                className="w-9 h-9 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center text-white shadow-lg backdrop-blur-md border border-white/15 transition-colors"
+                title={isExpanded ? "Salir de pantalla completa (Esc)" : "Ampliar video"}
+              >
+                {isExpanded ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
+              </button>
+            </div>
+
+            {/* Hint de captura */}
+            {isCapturing && !isPaused && (
+              <div className="absolute top-16 right-4 z-20 pointer-events-none">
+                <div className="bg-black/40 backdrop-blur-sm px-3 py-1.5 rounded-lg text-[11px] text-gray-200 flex items-center gap-1.5">
+                  <CameraOutlined />
+                  Clic en el video para capturar imagen
                 </div>
               </div>
             )}
 
+            {/* Botón flotante de captura (obturador) */}
+            {isCapturing && !isPaused && (
+              <button
+                onClick={capturarImagen}
+                className="absolute bottom-5 left-1/2 -translate-x-1/2 z-20 w-14 h-14 rounded-full bg-white/90 hover:bg-white active:scale-95 transition-all shadow-2xl border-4 border-white/40 flex items-center justify-center"
+                title="Capturar imagen"
+              >
+                <CameraOutlined className="text-gray-800 text-xl" />
+              </button>
+            )}
+
+            {/* Overlay de fecha/hora y datos (también queda grabado en el video) */}
+            <div className="absolute bottom-4 left-4 z-20 max-w-[36%] pointer-events-none">
+              <div className="bg-black/50 backdrop-blur-sm px-3 py-2 rounded-lg text-white flex flex-col gap-0.5">
+                <span className="font-mono text-[13px] tabular-nums leading-tight whitespace-nowrap">
+                  {ahora.toLocaleDateString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric" })}{" "}
+                  {ahora.toLocaleTimeString("es-MX", { hour12: false })}
+                </span>
+                {(overlayInfoRef.current.paciente || overlayInfoRef.current.estudio) && (
+                  <span className="text-[11px] text-gray-300 leading-tight truncate">
+                    {[overlayInfoRef.current.paciente, overlayInfoRef.current.estudio]
+                      .filter(Boolean)
+                      .join(" • ")}
+                  </span>
+                )}
+              </div>
+            </div>
+
             {/* Animación de feedback de screenshot (estilo iPhone) */}
             {showScreenshotAnimation && screenshotFeedback && (
-              <div className="absolute top-4 left-4 z-30 animate-screenshot-feedback">
+              <div className="absolute top-4 left-4 z-30 animate-screenshot-feedback pointer-events-none">
                 <div className="bg-white rounded-lg shadow-2xl overflow-hidden border-4 border-white">
                   <img
                     src={screenshotFeedback}
@@ -1310,7 +1620,11 @@ const Detection: React.FC = () => {
             )}
 
             {/* Estadísticas */}
-            <div className="absolute bottom-4 right-4 z-20">
+            <div
+              className={`absolute right-4 z-20 pointer-events-none ${
+                isExpanded ? "bottom-20" : "bottom-4"
+              }`}
+            >
               <div className="bg-black/40 px-4 py-3 rounded-lg text-white text-xs space-y-2">
                 <div className="font-semibold text-gray-200 tracking-wide uppercase">
                   Resumen en tiempo real
@@ -1476,6 +1790,13 @@ const Detection: React.FC = () => {
               }
             >
               {isConnected ? "Iniciar con IA" : "Iniciar (sin IA)"}
+            </Button>
+            <Button
+              icon={<CameraOutlined />}
+              onClick={capturarImagen}
+              disabled={!isCapturing || isPaused}
+            >
+              Capturar foto
             </Button>
             <Button onClick={handlePause} disabled={!isCapturing || isPaused}>
               Pausar

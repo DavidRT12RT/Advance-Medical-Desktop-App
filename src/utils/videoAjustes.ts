@@ -1,0 +1,74 @@
+/**
+ * Ajustes de imagen de la cámara (brillo, contraste, saturación, gamma).
+ * Se persisten por máquina en localStorage y se aplican en dos capas:
+ *  - CSS filter sobre el <video> (vista en vivo)
+ *  - ctx.filter del canvas de grabación (quedan quemados en el video y
+ *    en los frames que analiza la IA)
+ * "Gamma" no existe como filtro CSS; se aproxima con brightness+contrast.
+ */
+
+export interface VideoAjustes {
+  brillo: number; // 100 = neutro
+  contraste: number; // 100 = neutro
+  saturacion: number; // 100 = neutro
+  gamma: number; // 100 = neutro (aproximado)
+}
+
+export const AJUSTES_NEUTROS: VideoAjustes = {
+  brillo: 100,
+  contraste: 100,
+  saturacion: 100,
+  gamma: 100,
+};
+
+const STORAGE_KEY = "aim-video-ajustes";
+
+export function cargarAjustes(): VideoAjustes {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { ...AJUSTES_NEUTROS };
+    const parsed = JSON.parse(raw);
+    return {
+      brillo: clamp(parsed.brillo),
+      contraste: clamp(parsed.contraste),
+      saturacion: clamp(parsed.saturacion),
+      gamma: clamp(parsed.gamma),
+    };
+  } catch {
+    return { ...AJUSTES_NEUTROS };
+  }
+}
+
+export function guardarAjustes(ajustes: VideoAjustes): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(ajustes));
+  } catch {
+    /* almacenamiento no disponible: los ajustes solo viven en memoria */
+  }
+}
+
+function clamp(valor: unknown): number {
+  const n = typeof valor === "number" && Number.isFinite(valor) ? valor : 100;
+  return Math.min(200, Math.max(25, Math.round(n)));
+}
+
+/**
+ * Construye el string de filtro (mismo formato para CSS y ctx.filter).
+ * La "gamma" se aproxima: gamma > 100 aclara medios tonos (más brightness,
+ * menos contrast) y gamma < 100 los oscurece.
+ */
+export function construirFiltro(a: VideoAjustes): string {
+  const gammaFactor = a.gamma / 100;
+  const brilloEfectivo = (a.brillo / 100) * Math.pow(gammaFactor, 0.5);
+  const contrasteEfectivo = (a.contraste / 100) * Math.pow(gammaFactor, -0.25);
+  return `brightness(${brilloEfectivo.toFixed(3)}) contrast(${contrasteEfectivo.toFixed(3)}) saturate(${(a.saturacion / 100).toFixed(3)})`;
+}
+
+export function esNeutro(a: VideoAjustes): boolean {
+  return (
+    a.brillo === 100 &&
+    a.contraste === 100 &&
+    a.saturacion === 100 &&
+    a.gamma === 100
+  );
+}
