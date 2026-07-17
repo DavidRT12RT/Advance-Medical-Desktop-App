@@ -9,7 +9,6 @@ import {
   DatePicker,
   Tag,
   Divider,
-  Modal,
   Collapse,
   List,
   Empty,
@@ -71,8 +70,6 @@ const EstudioDetalle: React.FC = () => {
   >(null);
   const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
-  const [isReopenModalOpen, setIsReopenModalOpen] = useState(false);
-  const [reopenReason, setReopenReason] = useState("");
   const [isHistorialModalOpen, setIsHistorialModalOpen] = useState(false);
 
   useEffect(() => {
@@ -246,17 +243,12 @@ const EstudioDetalle: React.FC = () => {
   }, [estudio?.estado, estudio?.fecha_reapertura, form, user]);
 
   const handleReopenEstudio = async () => {
-    if (!reopenReason.trim()) {
-      message.warning("Por favor ingresa un motivo para reabrir el estudio");
-      return;
-    }
-
     try {
       setSaving(true);
       const payload = {
         estado: "en_edicion",
         fecha_reapertura: new Date().toISOString(),
-        motivo_reapertura: reopenReason,
+        motivo_reapertura: null,
       };
 
       await FirebaseEstudios.actualizarEstudio(
@@ -267,8 +259,6 @@ const EstudioDetalle: React.FC = () => {
       );
 
       setEstudio((prev: any) => (prev ? { ...prev, ...payload } : prev));
-      setIsReopenModalOpen(false);
-      setReopenReason("");
       message.success("Estudio reabierto para edición");
     } catch (error) {
       console.error("Error reabriendo estudio:", error);
@@ -408,7 +398,6 @@ const EstudioDetalle: React.FC = () => {
     } finally {
       setSaving(false);
       setFinalizeOnSave(false);
-      setReopenReason("");
     }
   };
 
@@ -501,7 +490,8 @@ const EstudioDetalle: React.FC = () => {
               <Button
                 size="large"
                 type="default"
-                onClick={() => setIsReopenModalOpen(true)}
+                loading={saving}
+                onClick={handleReopenEstudio}
               >
                 Reabrir para edición
               </Button>
@@ -1270,61 +1260,6 @@ const EstudioDetalle: React.FC = () => {
           paciente={paciente}
         />
       )}
-      <Modal
-        title="Reabrir estudio para edición"
-        open={isReopenModalOpen}
-        onCancel={() => {
-          setIsReopenModalOpen(false);
-          setReopenReason("");
-        }}
-        footer={[
-          <Button
-            key="cancel"
-            onClick={() => {
-              setIsReopenModalOpen(false);
-              setReopenReason("");
-            }}
-          >
-            Cancelar
-          </Button>,
-          <Button
-            key="submit"
-            type="primary"
-            loading={saving}
-            onClick={handleReopenEstudio}
-          >
-            Reabrir estudio
-          </Button>,
-        ]}
-      >
-        <div className="space-y-4 flex flex-col">
-          <p className="text-sm text-gray-600">
-            Al reabrir este estudio, podrás realizar cambios en todos los
-            campos. Se registrará un historial de auditoría con los cambios
-            realizados.
-          </p>
-          <Form.Item
-            label="Motivo de reapertura"
-            required
-            style={{ display: "flex", flexDirection: "column" }}
-          >
-            <TextArea
-              rows={4}
-              placeholder="Describe el motivo por el cual necesitas reabrir este estudio finalizado..."
-              value={reopenReason}
-              onChange={(e) => setReopenReason(e.target.value)}
-              className="bg-gray-50"
-            />
-          </Form.Item>
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <p className="text-xs text-blue-800">
-              <strong>Nota:</strong> Este cambio quedará registrado en el
-              historial de auditoría del estudio para fines de cumplimiento
-              normativo.
-            </p>
-          </div>
-        </div>
-      </Modal>
       <ModalHistorialCambios
         visible={isHistorialModalOpen}
         onCancel={() => setIsHistorialModalOpen(false)}

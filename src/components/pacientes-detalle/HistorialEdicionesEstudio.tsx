@@ -116,7 +116,7 @@ const HistorialEdicionesEstudio: React.FC<HistorialEdicionesEstudioProps> = ({
         icon={<HistoryOutlined className="text-amber-600" />}
       />
 
-      {motivo_reapertura && fecha_reapertura && (
+      {fecha_reapertura && (
         <div className="mb-6 bg-amber-50 border border-amber-200 rounded-lg p-4">
           <p className="text-xs font-semibold text-amber-800 uppercase mb-2">
             Última reapertura
@@ -126,7 +126,7 @@ const HistorialEdicionesEstudio: React.FC<HistorialEdicionesEstudioProps> = ({
             {dayjs(fecha_reapertura).format("DD/MM/YYYY HH:mm:ss")}
           </p>
           <p className="text-sm text-amber-900">
-            <strong>Motivo:</strong> {motivo_reapertura}
+            <strong>Motivo:</strong> {motivo_reapertura || "No especificado"}
           </p>
         </div>
       )}
