@@ -15,7 +15,12 @@ import {
  * Ilustración anatómica detallada de los pulmones para reportes PDF
  * Incluye tráquea, bronquios, lóbulos pulmonares, fisuras y estructuras vasculares
  */
-const LungsIllustration: React.FC = () => {
+interface Props {
+  /** Marcador del hallazgo: coordenadas en el viewBox 200x180 */
+  marcador?: { cx: number; cy: number };
+}
+
+const LungsIllustration: React.FC<Props> = ({ marcador }) => {
   return (
     <Svg viewBox="0 0 200 180" width={140} height={126}>
       <Defs>
@@ -352,6 +357,23 @@ const LungsIllustration: React.FC = () => {
         <Circle cx="72" cy="125" r="3" fill="#5a9fd4" />
         <Circle cx="60" cy="130" r="2.5" fill="#5a9fd4" />
       </G>
+
+      {/* Marcador de ubicación del hallazgo */}
+      {marcador && (
+        <G>
+          <Circle
+            cx={marcador.cx}
+            cy={marcador.cy}
+            r={9}
+            fill="none"
+            stroke="#DC2626"
+            strokeWidth={2}
+            opacity={0.9}
+          />
+          <Circle cx={marcador.cx} cy={marcador.cy} r={4.5} fill="#DC2626" />
+          <Circle cx={marcador.cx} cy={marcador.cy} r={1.8} fill="#FFFFFF" />
+        </G>
+      )}
     </Svg>
   );
 };

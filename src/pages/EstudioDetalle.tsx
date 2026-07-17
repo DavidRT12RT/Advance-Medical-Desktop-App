@@ -32,6 +32,10 @@ import {
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import FirebaseEstudios from "../features/FirebaseEstudios";
+import {
+  REGIONES_ANATOMICAS,
+  organoPorTipoEstudio,
+} from "../utils/regionesAnatomicas";
 import FirebasePacientes from "../features/FirebasePacientes";
 import EstudioBasicoDetalle from "../components/pacientes-detalle/EstudioBasicoDetalle";
 import SectionTitle from "../components/common/SectionTitle";
@@ -763,16 +767,19 @@ const EstudioDetalle: React.FC = () => {
                           <Form.Item label="Tamaño (mm)" name="tamano">
                             <Input suffix="mm" placeholder="8" />
                           </Form.Item>
-                          <Form.Item label="Ubicación" name="ubicacion">
-                            <Select placeholder="Seleccionar...">
-                              <Option value="Ciego">Ciego</Option>
-                              <Option value="Colon Ascendente">
-                                Colon Ascendente
-                              </Option>
-                              <Option value="Transverso">Transverso</Option>
-                              <Option value="Descendente">Descendente</Option>
-                              <Option value="Sigmoides">Sigmoides</Option>
-                              <Option value="Recto">Recto</Option>
+                          <Form.Item
+                            label="Ubicación anatómica"
+                            name="ubicacion"
+                            tooltip="La región seleccionada se marca sobre la ilustración del órgano en el reporte PDF"
+                          >
+                            <Select placeholder="Seleccionar región..." allowClear>
+                              {REGIONES_ANATOMICAS[
+                                organoPorTipoEstudio(estudio?.tipo)
+                              ].map((r) => (
+                                <Option key={r.etiqueta} value={r.etiqueta}>
+                                  {r.etiqueta}
+                                </Option>
+                              ))}
                             </Select>
                           </Form.Item>
                           <Form.Item

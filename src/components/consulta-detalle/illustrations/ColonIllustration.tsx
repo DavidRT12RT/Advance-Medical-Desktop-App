@@ -14,7 +14,12 @@ import {
  * Ilustración anatómica detallada del colon para reportes PDF
  * Incluye todas las secciones del intestino grueso con detalles anatómicos precisos
  */
-const ColonIllustration: React.FC = () => {
+interface Props {
+  /** Marcador del hallazgo: coordenadas en el viewBox 200x180 */
+  marcador?: { cx: number; cy: number };
+}
+
+const ColonIllustration: React.FC<Props> = ({ marcador }) => {
   return (
     <Svg viewBox="0 0 200 180" width={140} height={126}>
       <Defs>
@@ -295,6 +300,23 @@ const ColonIllustration: React.FC = () => {
       <Text x="125" y="155" fontSize="8" fill="#333">Sigmoide</Text>
       <Text x="85" y="175" fontSize="8" fill="#333">Recto</Text>
       */}
+
+      {/* Marcador de ubicación del hallazgo */}
+      {marcador && (
+        <G>
+          <Circle
+            cx={marcador.cx}
+            cy={marcador.cy}
+            r={9}
+            fill="none"
+            stroke="#DC2626"
+            strokeWidth={2}
+            opacity={0.9}
+          />
+          <Circle cx={marcador.cx} cy={marcador.cy} r={4.5} fill="#DC2626" />
+          <Circle cx={marcador.cx} cy={marcador.cy} r={1.8} fill="#FFFFFF" />
+        </G>
+      )}
     </Svg>
   );
 };

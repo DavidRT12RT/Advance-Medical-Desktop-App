@@ -15,7 +15,12 @@ import {
  * Ilustración anatómica detallada del estómago para reportes PDF
  * Incluye esófago, cardias, fundus, cuerpo, antro, píloro, duodeno y pliegues gástricos
  */
-const StomachIllustration: React.FC = () => {
+interface Props {
+  /** Marcador del hallazgo: coordenadas en el viewBox 200x180 */
+  marcador?: { cx: number; cy: number };
+}
+
+const StomachIllustration: React.FC<Props> = ({ marcador }) => {
   return (
     <Svg viewBox="0 0 200 180" width={140} height={126}>
       <Defs>
@@ -418,6 +423,23 @@ const StomachIllustration: React.FC = () => {
           strokeDasharray="2,1"
         />
       </G>
+
+      {/* Marcador de ubicación del hallazgo */}
+      {marcador && (
+        <G>
+          <Circle
+            cx={marcador.cx}
+            cy={marcador.cy}
+            r={9}
+            fill="none"
+            stroke="#DC2626"
+            strokeWidth={2}
+            opacity={0.9}
+          />
+          <Circle cx={marcador.cx} cy={marcador.cy} r={4.5} fill="#DC2626" />
+          <Circle cx={marcador.cx} cy={marcador.cy} r={1.8} fill="#FFFFFF" />
+        </G>
+      )}
     </Svg>
   );
 };

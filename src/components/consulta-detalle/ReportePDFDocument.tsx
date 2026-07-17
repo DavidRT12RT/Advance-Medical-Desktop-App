@@ -8,6 +8,10 @@ import {
   Image,
 } from "@react-pdf/renderer";
 import ColonIllustration from "./illustrations/ColonIllustration";
+import {
+  organoPorTipoEstudio,
+  regionPorEtiqueta,
+} from "../../utils/regionesAnatomicas";
 import LungsIllustration from "./illustrations/LungsIllustration";
 import StomachIllustration from "./illustrations/StomachIllustration";
 //@ts-ignore
@@ -287,30 +291,16 @@ const styles = StyleSheet.create({
   },
 });
 
-// Get anatomical illustration based on procedure type
-const getAnatomyIllustration = (tipo: string) => {
-  const tipoLower = (tipo || "").toLowerCase();
-
-  if (tipoLower.includes("colon") || tipoLower.includes("colonoscopia")) {
-    return <ColonIllustration />;
-  }
-  if (
-    tipoLower.includes("bronco") ||
-    tipoLower.includes("pulmon") ||
-    tipoLower.includes("pulmón")
-  ) {
-    return <LungsIllustration />;
-  }
-  if (
-    tipoLower.includes("gastro") ||
-    tipoLower.includes("endoscopia") ||
-    tipoLower.includes("endoscopía") ||
-    tipoLower.includes("estomago") ||
-    tipoLower.includes("estómago")
-  ) {
-    return <StomachIllustration />;
-  }
-  return <ColonIllustration />;
+// Get anatomical illustration based on procedure type, con marcador opcional
+// de la ubicación del hallazgo (coordenadas del viewBox 200x180)
+const getAnatomyIllustration = (
+  tipo: string,
+  marcador?: { cx: number; cy: number },
+) => {
+  const organo = organoPorTipoEstudio(tipo);
+  if (organo === "pulmon") return <LungsIllustration marcador={marcador} />;
+  if (organo === "estomago") return <StomachIllustration marcador={marcador} />;
+  return <ColonIllustration marcador={marcador} />;
 };
 
 export interface ImagenSeleccionada {
@@ -399,6 +389,13 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
     </View>
   );
 
+  // Ubicación del hallazgo sobre la ilustración anatómica (match por la
+  // etiqueta guardada en estudio.ubicacion; estudios viejos también aplican)
+  const regionHallazgo = regionPorEtiqueta(
+    organoPorTipoEstudio(tipoEstudio),
+    estudio?.ubicacion,
+  );
+
   // La página 2 solo existe si hay contenido secundario que mostrar
   const haySegundaPagina = Boolean(
     imagesToShow.length > 0 ||
@@ -413,7 +410,8 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
 
   return (
     <Document>
-      <Page size="A4" style={styles.page} wrap>
+      {/* La página 1 reserva espacio inferior para las firmas ancladas */}
+      <Page size="A4" style={{ ...styles.page, paddingBottom: 165 }} wrap>
         {/* Header with Logo, Title, and Anatomy */}
         <View style={styles.header}>
           <View style={styles.logoContainer}>
@@ -443,7 +441,24 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
             )}
           </View>
           <View style={styles.anatomyContainer}>
-            {getAnatomyIllustration(tipoEstudio)}
+            {getAnatomyIllustration(
+              tipoEstudio,
+              regionHallazgo
+                ? { cx: regionHallazgo.cx, cy: regionHallazgo.cy }
+                : undefined,
+            )}
+            {regionHallazgo && (
+              <Text
+                style={{
+                  fontSize: 6.5,
+                  color: "#DC2626",
+                  textAlign: "center",
+                  marginTop: 2,
+                }}
+              >
+                ● Hallazgo: {regionHallazgo.etiqueta}
+              </Text>
+            )}
           </View>
         </View>
 
@@ -567,8 +582,19 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
             </View>
           )}
 
-        {/* SIGNATURES - En la primera página, junto a la información clínica */}
-        <View style={styles.signaturesContainer} wrap={false}>
+        {/* SIGNATURES - Ancladas al pie de la página 1 (como el header, no
+            se mueven aunque el contenido varíe) */}
+        <View
+          style={{
+            ...styles.signaturesContainer,
+            position: "absolute",
+            bottom: 60,
+            left: 30,
+            right: 30,
+            marginTop: 0,
+          }}
+          fixed={false}
+        >
           <View style={styles.signaturesRow}>
             {/* Doctor signature */}
             {config.incluirDatosMedico && (
@@ -642,8 +668,17 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
           </View>
         </View>
 
-        {/* Footer página 1 */}
-        <View style={styles.footer}>
+        {/* Footer página 1 (anclado al fondo) */}
+        <View
+          style={{
+            ...styles.footer,
+            position: "absolute",
+            bottom: 24,
+            left: 30,
+            right: 30,
+            marginTop: 0,
+          }}
+        >
           <Text style={styles.footerText}>
             Generado el {new Date().toLocaleDateString("es-MX")}
           </Text>
