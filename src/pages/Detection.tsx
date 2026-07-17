@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Button, message, Modal, Spin } from "antd";
+import { Button, message, Modal, Progress, Spin } from "antd";
 import { ArrowLeftOutlined, VideoCameraOutlined } from "@ant-design/icons";
 import Webcam from "react-webcam";
 import io, { Socket } from "socket.io-client";
@@ -275,6 +275,8 @@ const Detection: React.FC = () => {
   const [manualScreenshots, setManualScreenshots] = useState<string[]>([]);
   // Modal bloqueante mientras se sube el video y se guardan los resultados
   const [isSaving, setIsSaving] = useState(false);
+  const [saveProgress, setSaveProgress] = useState(0);
+  const [saveStage, setSaveStage] = useState("Preparando…");
   // Cronómetro de grabación (segundos)
   const [recordingSeconds, setRecordingSeconds] = useState(0);
 
@@ -917,6 +919,8 @@ const Detection: React.FC = () => {
     setIsCapturing(false);
     setIsPaused(false);
     // Modal bloqueante: nada de acciones del usuario mientras se guarda
+    setSaveProgress(0);
+    setSaveStage("Finalizando grabación…");
     setIsSaving(true);
 
     try {
@@ -981,17 +985,24 @@ const Detection: React.FC = () => {
             type: "video/webm",
           });
           const sessionKey = sessionId || "general";
+          setSaveStage("Subiendo video de captura…");
+          // La subida del video es ~90% del trabajo; el resto es guardar resultados
           videoUrl = await FirebaseMedia.subirVideoDeEstudio(
             empresaId,
             pacienteId,
             estudioId,
             sessionKey,
             videoBlob,
+            (percent) => setSaveProgress(Math.round(percent * 0.9)),
           );
         } catch (error) {
           console.error("Error subiendo video de consulta:", error);
         }
+      } else {
+        setSaveProgress(80);
       }
+      setSaveStage("Guardando resultados del estudio…");
+      setSaveProgress((p) => Math.max(p, 90));
 
       // Solo agregar sección si hay datos de IA, video o capturas manuales
       if (
@@ -1018,6 +1029,8 @@ const Detection: React.FC = () => {
           estudioId,
           { secciones_ai: newSecciones },
         );
+
+        setSaveProgress(100);
 
         if (socketRef.current?.connected) {
           messageApi.success(
@@ -1051,13 +1064,19 @@ const Detection: React.FC = () => {
         centered
         width={400}
       >
-        <div className="flex flex-col items-center gap-4 py-6">
+        <div className="flex flex-col items-center gap-3 py-6">
           <Spin size="large" />
           <p className="text-base font-semibold text-gray-800">
             Guardando video de captura…
           </p>
+          <Progress
+            percent={saveProgress}
+            status="active"
+            strokeColor="#009b9b"
+            className="w-full px-2"
+          />
           <p className="text-xs text-gray-500 text-center leading-relaxed">
-            Subiendo el video, las capturas y los resultados del estudio.
+            {saveStage}
             <br />
             No cierres la aplicación.
           </p>
@@ -1157,13 +1176,13 @@ const Detection: React.FC = () => {
         )}
 
         {/* Video + panel lateral de capturas.
-            El panel va en absolute anclado a la altura del video: así nunca
-            estira el contenedor hacia abajo; con muchas capturas scrollea
-            internamente. */}
-        <div className="relative flex-1 min-h-[360px]">
+            La fila tiene altura fija (viewport - header/controles): el panel
+            y el video miden siempre lo mismo, y las capturas scrollean
+            dentro del panel sin estirar la página. */}
+        <div className="flex gap-4 min-h-[360px] h-[calc(100vh-300px)]">
           {/* Panel izquierdo: capturas manuales */}
           {(isCapturing || manualScreenshots.length > 0) && (
-            <div className="absolute left-0 top-0 bottom-0 w-36 bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col overflow-hidden">
+            <div className="w-36 shrink-0 h-full bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col overflow-hidden">
               <div className="px-3 py-2.5 border-b border-gray-100 flex items-center justify-between">
                 <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
                   Capturas
@@ -1172,7 +1191,7 @@ const Detection: React.FC = () => {
                   {manualScreenshots.length}
                 </span>
               </div>
-              <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-2">
+              <div className="flex-1 min-h-0 overflow-y-auto p-2 flex flex-col gap-2">
                 {manualScreenshots.length === 0 ? (
                   <p className="text-[11px] text-gray-400 text-center mt-6 px-1 leading-relaxed">
                     Presiona{" "}
@@ -1206,11 +1225,7 @@ const Detection: React.FC = () => {
           )}
 
           {/* Video */}
-          <div
-            className={`bg-black rounded-xl overflow-hidden shadow-sm border border-gray-900 h-full transition-[margin] duration-200 ${
-              isCapturing || manualScreenshots.length > 0 ? "ml-40" : ""
-            }`}
-          >
+          <div className="bg-black rounded-xl overflow-hidden shadow-sm border border-gray-900 flex-1 h-full min-w-0">
           <div ref={containerRef} className="relative w-full h-full">
             <Webcam
               audio={false}

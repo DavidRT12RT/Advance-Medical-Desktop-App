@@ -1,4 +1,4 @@
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytes, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { storage } from "../firebaseConfig";
 
 class FirebaseMedia {
@@ -57,14 +57,28 @@ class FirebaseMedia {
     pacienteId: string,
     estudioId: string,
     sessionId: string,
-    blob: Blob
+    blob: Blob,
+    onProgress?: (percent: number) => void
   ): Promise<string> {
     const path = `empresas/${empresaId}/pacientes/${pacienteId}/estudios/${estudioId}/sesiones/${sessionId}/videos/estudio_${Date.now()}.webm`;
     const fileRef = ref(storage, path);
-    const snapshot = await uploadBytes(fileRef, blob, {
+    // Subida resumable para poder reportar el progreso a la UI
+    const task = uploadBytesResumable(fileRef, blob, {
       contentType: "video/webm",
     });
-    const url = await getDownloadURL(snapshot.ref);
+    await new Promise<void>((resolve, reject) => {
+      task.on(
+        "state_changed",
+        (snap) => {
+          if (onProgress && snap.totalBytes > 0) {
+            onProgress((snap.bytesTransferred / snap.totalBytes) * 100);
+          }
+        },
+        reject,
+        () => resolve()
+      );
+    });
+    const url = await getDownloadURL(task.snapshot.ref);
     return url;
   }
 }
