@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Button, message } from "antd";
+import { Button, message, Modal, Spin } from "antd";
 import { ArrowLeftOutlined, VideoCameraOutlined } from "@ant-design/icons";
 import Webcam from "react-webcam";
 import io, { Socket } from "socket.io-client";
@@ -271,6 +271,12 @@ const Detection: React.FC = () => {
     null,
   );
   const [showScreenshotAnimation, setShowScreenshotAnimation] = useState(false);
+  // Miniaturas de las capturas manuales (dataURLs locales, para UI inmediata)
+  const [manualScreenshots, setManualScreenshots] = useState<string[]>([]);
+  // Modal bloqueante mientras se sube el video y se guardan los resultados
+  const [isSaving, setIsSaving] = useState(false);
+  // Cronómetro de grabación (segundos)
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
 
   const subtitle = estudio
     ? [
@@ -373,6 +379,19 @@ const Detection: React.FC = () => {
   }, [empresaId, pacienteId, estudioId]);
 
   // Captura manual con tecla Espacio
+  // Cronómetro: avanza mientras se graba y no está en pausa
+  useEffect(() => {
+    if (!isCapturing || isPaused) return;
+    const id = setInterval(() => setRecordingSeconds((s) => s + 1), 1000);
+    return () => clearInterval(id);
+  }, [isCapturing, isPaused]);
+
+  const formatTiempo = (total: number) => {
+    const m = Math.floor(total / 60).toString().padStart(2, "0");
+    const s = (total % 60).toString().padStart(2, "0");
+    return `${m}:${s}`;
+  };
+
   useEffect(() => {
     const handleKeyPress = async (event: KeyboardEvent) => {
       // Solo capturar si es la tecla Espacio y estamos capturando
@@ -407,6 +426,8 @@ const Detection: React.FC = () => {
           );
 
           manualScreenshotsRef.current.push(url);
+          // Miniatura local inmediata para la tira lateral
+          setManualScreenshots((prev) => [...prev, screenshot]);
           messageApi.success(
             `Captura guardada (${manualScreenshotsRef.current.length})`,
           );
@@ -710,6 +731,10 @@ const Detection: React.FC = () => {
       return;
     }
 
+    // Reiniciar cronómetro y miniaturas de la sesión anterior
+    setRecordingSeconds(0);
+    setManualScreenshots([]);
+
     // Si hay servidor conectado, iniciar sesión de IA
     if (socketRef.current?.connected) {
       socketRef.current.emit("start_session", {
@@ -891,7 +916,10 @@ const Detection: React.FC = () => {
     isCapturingRef.current = false;
     setIsCapturing(false);
     setIsPaused(false);
+    // Modal bloqueante: nada de acciones del usuario mientras se guarda
+    setIsSaving(true);
 
+    try {
     // Si hay servidor, notificar
     if (socketRef.current?.connected) {
       socketRef.current.emit("finish");
@@ -1004,11 +1032,37 @@ const Detection: React.FC = () => {
 
       navigate(`/paciente-detalle/${pacienteId}/estudios/${estudioId}`);
     }
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {contextHolder}
+
+      {/* Modal bloqueante mientras se guarda el video y los resultados */}
+      <Modal
+        open={isSaving}
+        closable={false}
+        maskClosable={false}
+        keyboard={false}
+        footer={null}
+        centered
+        width={400}
+      >
+        <div className="flex flex-col items-center gap-4 py-6">
+          <Spin size="large" />
+          <p className="text-base font-semibold text-gray-800">
+            Guardando video de captura…
+          </p>
+          <p className="text-xs text-gray-500 text-center leading-relaxed">
+            Subiendo el video, las capturas y los resultados del estudio.
+            <br />
+            No cierres la aplicación.
+          </p>
+        </div>
+      </Modal>
       {/* Header */}
       <div className="bg-white w-full">
         <Button
@@ -1130,6 +1184,29 @@ const Detection: React.FC = () => {
               style={{ cursor: "crosshair" }}
             />
 
+            {/* Indicador de grabación: punto pulsante + cronómetro */}
+            {isCapturing && (
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20">
+                <div
+                  className={`flex items-center gap-2.5 px-4 py-1.5 rounded-full shadow-lg backdrop-blur-sm text-white text-sm font-semibold ${
+                    isPaused ? "bg-yellow-600/90" : "bg-red-600/90"
+                  }`}
+                >
+                  <span
+                    className={`w-2.5 h-2.5 rounded-full bg-white ${
+                      isPaused ? "opacity-60" : "animate-pulse"
+                    }`}
+                  />
+                  <span className="tracking-widest">
+                    {isPaused ? "PAUSA" : "REC"}
+                  </span>
+                  <span className="font-mono text-[13px] opacity-90">
+                    {formatTiempo(recordingSeconds)}
+                  </span>
+                </div>
+              </div>
+            )}
+
             {/* Mensaje informativo - Captura con Espacio */}
             {isCapturing && (
               <div className="absolute top-4 right-4 z-20">
@@ -1142,12 +1219,33 @@ const Detection: React.FC = () => {
                       para capturar imagen
                     </span>
                   </div>
-                  {manualScreenshotsRef.current.length > 0 && (
-                    <div className="mt-1 text-[10px] text-green-300">
-                      {manualScreenshotsRef.current.length} captura(s)
-                      guardada(s)
+                </div>
+              </div>
+            )}
+
+            {/* Tira lateral de capturas manuales (miniaturas + contador) */}
+            {manualScreenshots.length > 0 && (
+              <div className="absolute left-4 bottom-4 z-20 flex flex-col items-start gap-2 max-h-[55%]">
+                <div className="bg-black/60 backdrop-blur-sm text-white text-[11px] px-2.5 py-1 rounded-full font-semibold">
+                  📷 {manualScreenshots.length} captura
+                  {manualScreenshots.length === 1 ? "" : "s"}
+                </div>
+                <div className="flex flex-col-reverse gap-2 overflow-y-auto pr-1">
+                  {manualScreenshots.map((src, i) => (
+                    <div
+                      key={i}
+                      className="relative rounded-md overflow-hidden border-2 border-white/70 shadow-lg shrink-0"
+                    >
+                      <img
+                        src={src}
+                        alt={`Captura ${i + 1}`}
+                        className="w-20 h-14 object-cover"
+                      />
+                      <span className="absolute bottom-0 right-0 bg-black/60 text-white text-[9px] px-1 rounded-tl">
+                        #{i + 1}
+                      </span>
                     </div>
-                  )}
+                  ))}
                 </div>
               </div>
             )}
