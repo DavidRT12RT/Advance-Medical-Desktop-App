@@ -47,15 +47,20 @@ const ModalConsultaPacienteDetalle = () => {
         ? values.fecha.format("YYYY-MM-DD")
         : null;
 
+      // detalleDePaciente es estado global y puede traer al paciente anterior
+      // si su fetch aún no resuelve — solo se embebe si coincide con la ruta
+      const pacienteValido =
+        detalleDePaciente?.id === pacienteId ? detalleDePaciente : null;
+
       const consultaBasica = {
         pacienteId,
         paciente: {
-          id: detalleDePaciente?.id || pacienteId,
-          nombres: detalleDePaciente?.nombres || "",
-          apellidoPaterno: detalleDePaciente?.apellidoPaterno || "",
-          apellidoMaterno: detalleDePaciente?.apellidoMaterno || "",
-          sexo: detalleDePaciente?.sexo || "",
-          fechaNacimiento: detalleDePaciente?.fechaNacimiento || "",
+          id: pacienteId,
+          nombres: pacienteValido?.nombres || "",
+          apellidoPaterno: pacienteValido?.apellidoPaterno || "",
+          apellidoMaterno: pacienteValido?.apellidoMaterno || "",
+          sexo: pacienteValido?.sexo || "",
+          fechaNacimiento: pacienteValido?.fechaNacimiento || "",
         },
         tipo: values.tipo,
         fecha: fechaFormatoApi,

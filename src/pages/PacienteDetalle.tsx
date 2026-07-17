@@ -48,6 +48,13 @@ const PacienteDetalle = () => {
         return;
       }
 
+      // Al navegar de un paciente a otro, no renderizar los datos del
+      // anterior bajo la nueva URL mientras resuelve el fetch
+      if (detalleDePaciente?.id && detalleDePaciente.id !== pacienteId) {
+        dispatch(setLoading(true));
+        dispatch(setDetalleDePaciente(null));
+      }
+
       try {
         const data = await FirebasePacientes.obtenerPacientePorId(
           empresaId,
