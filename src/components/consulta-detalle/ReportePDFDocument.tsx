@@ -593,7 +593,7 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
             right: 30,
             marginTop: 0,
           }}
-          fixed={false}
+          wrap={false}
         >
           <View style={styles.signaturesRow}>
             {/* Doctor signature */}
@@ -678,6 +678,7 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
             right: 30,
             marginTop: 0,
           }}
+          wrap={false}
         >
           <Text style={styles.footerText}>
             Generado el {new Date().toLocaleDateString("es-MX")}
