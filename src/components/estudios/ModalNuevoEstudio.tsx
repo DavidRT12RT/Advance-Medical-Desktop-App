@@ -36,6 +36,7 @@ const ModalNuevoEstudio: React.FC<ModalNuevoEstudioProps> = ({
   const [loadingPacientes, setLoadingPacientes] = useState(false);
   const [searchValue, setSearchValue] = useState("");
   const [selectedPaciente, setSelectedPaciente] = useState<any>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -65,7 +66,9 @@ const ModalNuevoEstudio: React.FC<ModalNuevoEstudioProps> = ({
   };
 
   const handleSubmit = async (values: any) => {
+    if (saving) return;
     try {
+      setSaving(true);
       await form.validateFields();
 
       if (!selectedPaciente) {
@@ -101,6 +104,8 @@ const ModalNuevoEstudio: React.FC<ModalNuevoEstudioProps> = ({
     } catch (error) {
       console.error("Error al guardar estudio básico:", error);
       message.error("Error al crear el estudio");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -135,10 +140,15 @@ const ModalNuevoEstudio: React.FC<ModalNuevoEstudioProps> = ({
       onCancel={handleCancel}
       width={700}
       footer={[
-        <Button key="cancel" onClick={handleCancel}>
+        <Button key="cancel" disabled={saving} onClick={handleCancel}>
           Cancelar
         </Button>,
-        <Button key="submit" type="primary" onClick={() => form.submit()}>
+        <Button
+          key="submit"
+          type="primary"
+          loading={saving}
+          onClick={() => form.submit()}
+        >
           Crear Estudio
         </Button>,
       ]}

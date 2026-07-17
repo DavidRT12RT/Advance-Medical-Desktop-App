@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useAppSelector, useAppDispatch } from "../../store/hooks";
 import {
   Modal,
@@ -27,6 +28,7 @@ const ModalEstudioPacienteDetalle = () => {
   const { user } = useElectronStore();
   const empresaId = user?.empresa?.id;
   const userId = user?.usuarioDetail?.id;
+  const [saving, setSaving] = useState(false);
 
   const handleCancel = () => {
     form.resetFields();
@@ -34,7 +36,9 @@ const ModalEstudioPacienteDetalle = () => {
   };
 
   const handleSubmit = async (values: any) => {
+    if (saving) return;
     try {
+      setSaving(true);
       await form.validateFields();
       console.log("Datos de estudio básico:", values);
 
@@ -72,6 +76,8 @@ const ModalEstudioPacienteDetalle = () => {
     } catch (error) {
       console.error("Error al guardar estudio básico:", error);
       message.error("Error al crear el estudio");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -83,10 +89,15 @@ const ModalEstudioPacienteDetalle = () => {
       onCancel={handleCancel}
       width={600}
       footer={[
-        <Button key="cancel" onClick={handleCancel}>
+        <Button key="cancel" disabled={saving} onClick={handleCancel}>
           Cancelar
         </Button>,
-        <Button key="submit" type="primary" onClick={() => form.submit()}>
+        <Button
+          key="submit"
+          type="primary"
+          loading={saving}
+          onClick={() => form.submit()}
+        >
           Crear Estudio
         </Button>,
       ]}
