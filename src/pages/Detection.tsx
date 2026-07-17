@@ -1156,8 +1156,54 @@ const Detection: React.FC = () => {
           </div>
         )}
 
-        {/* Video */}
-        <div className="bg-black rounded-xl overflow-hidden shadow-sm border border-gray-900 flex-1 min-h-[360px]">
+        {/* Video + panel lateral de capturas */}
+        <div className="flex gap-4 flex-1 min-h-[360px]">
+          {/* Panel izquierdo: capturas manuales */}
+          {(isCapturing || manualScreenshots.length > 0) && (
+            <div className="w-36 shrink-0 bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col overflow-hidden">
+              <div className="px-3 py-2.5 border-b border-gray-100 flex items-center justify-between">
+                <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                  Capturas
+                </span>
+                <span className="text-[11px] font-bold bg-gray-900 text-white rounded-full min-w-[22px] text-center px-1.5 py-0.5">
+                  {manualScreenshots.length}
+                </span>
+              </div>
+              <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-2">
+                {manualScreenshots.length === 0 ? (
+                  <p className="text-[11px] text-gray-400 text-center mt-6 px-1 leading-relaxed">
+                    Presiona{" "}
+                    <kbd className="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded text-[9px] font-mono">
+                      ESPACIO
+                    </kbd>{" "}
+                    durante la grabación para capturar
+                  </p>
+                ) : (
+                  [...manualScreenshots]
+                    .map((src, i) => ({ src, num: i + 1 }))
+                    .reverse()
+                    .map(({ src, num }) => (
+                      <div
+                        key={num}
+                        className="relative rounded-lg overflow-hidden border border-gray-200 shadow-sm shrink-0 group"
+                      >
+                        <img
+                          src={src}
+                          alt={`Captura ${num}`}
+                          className="w-full aspect-video object-cover"
+                        />
+                        <span className="absolute bottom-1 right-1 bg-black/60 text-white text-[9px] font-semibold px-1.5 py-0.5 rounded-full">
+                          #{num}
+                        </span>
+                      </div>
+                    ))
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Video */}
+          <div className="bg-black rounded-xl overflow-hidden shadow-sm border border-gray-900 flex-1">
           <div ref={containerRef} className="relative w-full h-full">
             <Webcam
               audio={false}
@@ -1184,23 +1230,28 @@ const Detection: React.FC = () => {
               style={{ cursor: "crosshair" }}
             />
 
-            {/* Indicador de grabación: punto pulsante + cronómetro */}
+            {/* Indicador de grabación: estilo sutil tipo glass */}
             {isCapturing && (
               <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20">
-                <div
-                  className={`flex items-center gap-2.5 px-4 py-1.5 rounded-full shadow-lg backdrop-blur-sm text-white text-sm font-semibold ${
-                    isPaused ? "bg-yellow-600/90" : "bg-red-600/90"
-                  }`}
-                >
+                <div className="flex items-center gap-2.5 pl-3 pr-4 py-1.5 rounded-full bg-black/50 backdrop-blur-md border border-white/10 shadow-lg">
+                  <span className="relative flex h-2.5 w-2.5">
+                    {!isPaused && (
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-60" />
+                    )}
+                    <span
+                      className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
+                        isPaused ? "bg-yellow-400" : "bg-red-500"
+                      }`}
+                    />
+                  </span>
                   <span
-                    className={`w-2.5 h-2.5 rounded-full bg-white ${
-                      isPaused ? "opacity-60" : "animate-pulse"
+                    className={`text-[11px] font-semibold tracking-[0.18em] ${
+                      isPaused ? "text-yellow-300" : "text-red-400"
                     }`}
-                  />
-                  <span className="tracking-widest">
+                  >
                     {isPaused ? "PAUSA" : "REC"}
                   </span>
-                  <span className="font-mono text-[13px] opacity-90">
+                  <span className="font-mono text-[13px] text-white/90 tabular-nums">
                     {formatTiempo(recordingSeconds)}
                   </span>
                 </div>
@@ -1219,33 +1270,6 @@ const Detection: React.FC = () => {
                       para capturar imagen
                     </span>
                   </div>
-                </div>
-              </div>
-            )}
-
-            {/* Tira lateral de capturas manuales (miniaturas + contador) */}
-            {manualScreenshots.length > 0 && (
-              <div className="absolute left-4 bottom-4 z-20 flex flex-col items-start gap-2 max-h-[55%]">
-                <div className="bg-black/60 backdrop-blur-sm text-white text-[11px] px-2.5 py-1 rounded-full font-semibold">
-                  📷 {manualScreenshots.length} captura
-                  {manualScreenshots.length === 1 ? "" : "s"}
-                </div>
-                <div className="flex flex-col-reverse gap-2 overflow-y-auto pr-1">
-                  {manualScreenshots.map((src, i) => (
-                    <div
-                      key={i}
-                      className="relative rounded-md overflow-hidden border-2 border-white/70 shadow-lg shrink-0"
-                    >
-                      <img
-                        src={src}
-                        alt={`Captura ${i + 1}`}
-                        className="w-20 h-14 object-cover"
-                      />
-                      <span className="absolute bottom-0 right-0 bg-black/60 text-white text-[9px] px-1 rounded-tl">
-                        #{i + 1}
-                      </span>
-                    </div>
-                  ))}
                 </div>
               </div>
             )}
@@ -1373,6 +1397,7 @@ const Detection: React.FC = () => {
                 )}
               </div>
             )}
+          </div>
           </div>
         </div>
       </div>
