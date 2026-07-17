@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { firestore, FIREBASE_TARGET } from '../firebaseConfig';
-import { ejecutarDiagnostico } from '../utils/diagnosticoConexion';
+import { ejecutarDiagnostico, recopilarContexto, generarReporteTexto } from '../utils/diagnosticoConexion';
 import { doc, getDoc } from 'firebase/firestore';
-import { Button, Tooltip } from 'antd';
+import { Button, Tooltip, Modal, Spin } from 'antd';
 import logo from "../assets/logo.png";
 import FirebaseLicense from '../features/FirebaseLicense';
 import AppVersion from './AppVersion';
@@ -11,18 +11,39 @@ export default function LicenseGate({ machineId, onLicensed }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [segments, setSegments] = useState(['', '', '']); // 3 grupos de 4
+  const [diagOpen, setDiagOpen] = useState(false);
   const [diagResultados, setDiagResultados] = useState(null);
+  const [diagReporte, setDiagReporte] = useState('');
   const [diagLoading, setDiagLoading] = useState(false);
+  const [copiado, setCopiado] = useState(false);
 
   const handleDiagnostico = async () => {
+    setDiagOpen(true);
     setDiagLoading(true);
     setDiagResultados(null);
+    setDiagReporte('');
+    setCopiado(false);
     try {
-      const resultados = await ejecutarDiagnostico();
+      const [contexto, resultados] = await Promise.all([
+        recopilarContexto(machineId),
+        ejecutarDiagnostico(),
+      ]);
+      const reporte = generarReporteTexto(contexto, resultados);
       setDiagResultados(resultados);
-      console.log('[Diagnóstico]', resultados);
+      setDiagReporte(reporte);
+      console.log('[Diagnóstico]\n' + reporte);
     } finally {
       setDiagLoading(false);
+    }
+  };
+
+  const handleCopiarReporte = async () => {
+    try {
+      await navigator.clipboard.writeText(diagReporte);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2500);
+    } catch (e) {
+      console.error('No se pudo copiar el reporte:', e);
     }
   };
   // No usamos el hook de electron store aquí para evitar instancias separadas del estado
@@ -209,21 +230,6 @@ export default function LicenseGate({ machineId, onLicensed }) {
           <div className="mt-3 text-sm text-red-600">{error}</div>
         ) : null}
 
-        <div className="mt-4 flex flex-col items-center gap-2">
-          <Button size="small" onClick={handleDiagnostico} loading={diagLoading}>
-            Diagnóstico de conexión
-          </Button>
-          {diagResultados ? (
-            <div className="w-full mt-1 text-xs bg-gray-50 border border-gray-200 rounded-md p-3 flex flex-col gap-1">
-              {diagResultados.map((r) => (
-                <div key={r.nombre} className={r.ok ? 'text-green-700' : 'text-red-600'}>
-                  {r.ok ? '✓' : '✗'} <span className="font-medium">{r.nombre}</span>
-                  {': '}{r.detalle} <span className="text-gray-400">({r.ms}ms)</span>
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </div>
 
         <div className="mt-5 text-xs text-gray-500 flex flex-col items-center">
           <p>Machine ID:</p>
@@ -235,8 +241,76 @@ export default function LicenseGate({ machineId, onLicensed }) {
               {FIREBASE_TARGET.projectId} · db: {FIREBASE_TARGET.database}
             </code>
           </Tooltip>
+          <Button
+            type="link"
+            size="small"
+            className="mt-1"
+            onClick={handleDiagnostico}
+          >
+            ¿Problemas para vincular? Ejecutar diagnóstico
+          </Button>
         </div>
       </div>
+
+      <Modal
+        title="Diagnóstico de conexión"
+        open={diagOpen}
+        onCancel={() => setDiagOpen(false)}
+        footer={[
+          <Button key="cerrar" onClick={() => setDiagOpen(false)}>
+            Cerrar
+          </Button>,
+          <Button key="reintentar" onClick={handleDiagnostico} disabled={diagLoading}>
+            Volver a probar
+          </Button>,
+          <Button
+            key="copiar"
+            type="primary"
+            onClick={handleCopiarReporte}
+            disabled={diagLoading || !diagReporte}
+          >
+            {copiado ? '¡Copiado!' : 'Copiar reporte'}
+          </Button>,
+        ]}
+        width={620}
+      >
+        {diagLoading ? (
+          <div className="flex flex-col items-center gap-3 py-8">
+            <Spin />
+            <p className="text-sm text-gray-500">Ejecutando pruebas de conectividad…</p>
+          </div>
+        ) : (
+          <>
+            {diagResultados ? (
+              <div className="flex flex-col gap-2 mb-4">
+                {diagResultados.map((r) => (
+                  <div
+                    key={r.nombre}
+                    className={`flex items-start gap-2 text-sm rounded-md border p-2 ${r.ok ? 'border-green-200 bg-green-50 text-green-800' : 'border-red-200 bg-red-50 text-red-700'}`}
+                  >
+                    <span className="font-bold">{r.ok ? '✓' : '✗'}</span>
+                    <span>
+                      <span className="font-medium">{r.nombre}</span>
+                      {' — '}{r.detalle}{' '}
+                      <span className="opacity-60">({r.ms}ms)</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            {diagReporte ? (
+              <>
+                <p className="text-xs text-gray-500 mb-1">
+                  Reporte completo — usa "Copiar reporte" y envíanoslo tal cual:
+                </p>
+                <pre className="text-[11px] leading-relaxed bg-gray-900 text-gray-100 rounded-md p-3 overflow-auto max-h-56 whitespace-pre-wrap">
+                  {diagReporte}
+                </pre>
+              </>
+            ) : null}
+          </>
+        )}
+      </Modal>
 
       <AppVersion style={{ marginTop: '16px' }} />
     </div>

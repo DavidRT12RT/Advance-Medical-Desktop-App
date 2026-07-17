@@ -47,7 +47,7 @@ Los métodos estáticos de antd (`message.*`, `Modal.confirm`, `notification.*`)
 
 ### Consultas a Firestore sensibles a red
 
-El SDK de Firestore, sin conexión, **responde desde caché local vacío sin lanzar error** — un `getDocs` puede devolver vacío y parecer "el dato no existe" cuando en realidad no hay red. Para operaciones donde esa ambigüedad importa (búsqueda de licencia), usar `getDocsFromServer` y mensajear el error de red aparte (ver `FirebaseLicense.vincularComputadoraConLicencia`). La pantalla de licencia incluye botón "Diagnóstico de conexión" (`src/utils/diagnosticoConexion.js`) que prueba internet/Firestore/Auth con resultados visibles.
+El SDK de Firestore, sin conexión, **responde desde caché local vacío sin lanzar error** — un `getDocs` puede devolver vacío y parecer "el dato no existe" cuando en realidad no hay red. Para operaciones donde esa ambigüedad importa (búsqueda de licencia), usar `getDocsFromServer` y mensajear el error de red aparte (ver `FirebaseLicense.vincularComputadoraConLicencia`). La pantalla de licencia incluye un diagnóstico de conexión (`src/utils/diagnosticoConexion.js`): modal que prueba internet/Firestore/Auth/Storage y genera un reporte completo copiable (versión, machineId, sistema, IPs, resultados con latencia) para que el personal externo lo envíe tal cual.
 
 ### Detección por IA (Detection.tsx)
 
