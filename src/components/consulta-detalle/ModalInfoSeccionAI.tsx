@@ -1,12 +1,20 @@
-import React, { useState } from "react";
-import { Modal } from "antd";
+import React, { useRef, useState } from "react";
+import { Modal, Button, message } from "antd";
+import { CameraOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
+import FirebaseMedia from "../../features/FirebaseMedia";
+import FirebaseEstudios from "../../features/FirebaseEstudios";
 
 interface ModalInfoSeccionAIProps {
   isSessionModalOpen: boolean;
   setIsSessionModalOpen: (open: boolean) => void;
   selectedSessionIndex: number;
   aiSessions: any[];
+  // Contexto para poder capturar fotogramas del video y persistirlos
+  empresaId?: string;
+  pacienteId?: string;
+  estudioId?: string;
+  onSeccionesActualizadas?: (nuevasSecciones: any[]) => void;
 }
 
 const ModalInfoSeccionAI = ({
@@ -14,8 +22,74 @@ const ModalInfoSeccionAI = ({
   setIsSessionModalOpen,
   selectedSessionIndex,
   aiSessions,
+  empresaId,
+  pacienteId,
+  estudioId,
+  onSeccionesActualizadas,
 }: ModalInfoSeccionAIProps) => {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [capturando, setCapturando] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Captura el fotograma actual del video reproducido y lo agrega a las
+  // capturas manuales de la sesión (queda disponible para el reporte)
+  const capturarDelVideo = async () => {
+    const video = videoRef.current;
+    if (!video || !empresaId || !pacienteId || !estudioId) return;
+    if (video.readyState < 2) {
+      message.warning("El video aún no ha cargado");
+      return;
+    }
+    try {
+      setCapturando(true);
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas no disponible");
+      ctx.drawImage(video, 0, 0);
+      const blob: Blob = await new Promise((resolve, reject) =>
+        canvas.toBlob(
+          (b) => (b ? resolve(b) : reject(new Error("No se pudo extraer el fotograma"))),
+          "image/jpeg",
+          0.95,
+        ),
+      );
+
+      const url = await FirebaseMedia.subirFrameDeEstudio(
+        empresaId,
+        pacienteId,
+        estudioId,
+        "video_revision",
+        Date.now(),
+        blob,
+      );
+
+      const nuevasSecciones = aiSessions.map((s, i) =>
+        i === selectedSessionIndex
+          ? {
+              ...s,
+              manualScreenshots: [
+                ...(Array.isArray(s.manualScreenshots)
+                  ? s.manualScreenshots
+                  : []),
+                url,
+              ],
+            }
+          : s,
+      );
+      await FirebaseEstudios.actualizarEstudio(empresaId, pacienteId, estudioId, {
+        secciones_ai: nuevasSecciones,
+      });
+      onSeccionesActualizadas?.(nuevasSecciones);
+      message.success("Fotograma capturado y agregado a las capturas manuales");
+    } catch (error) {
+      console.error("Error capturando fotograma del video:", error);
+      message.error("No se pudo capturar el fotograma");
+    } finally {
+      setCapturando(false);
+    }
+  };
 
   return (
     <Modal
@@ -77,16 +151,36 @@ const ModalInfoSeccionAI = ({
 
                 {videoUrl && (
                   <div className="space-y-2">
-                    <p className="text-xs font-semibold text-gray-300 uppercase tracking-wide">
-                      Video de la sesión
-                    </p>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-semibold text-gray-300 uppercase tracking-wide">
+                        Video de la sesión
+                      </p>
+                      {empresaId && pacienteId && estudioId && (
+                        <Button
+                          size="small"
+                          icon={<CameraOutlined />}
+                          loading={capturando}
+                          onClick={capturarDelVideo}
+                          title="Captura el fotograma actual del video y lo agrega a las capturas manuales"
+                        >
+                          Capturar fotograma
+                        </Button>
+                      )}
+                    </div>
                     <div className="aspect-video w-full rounded-md overflow-hidden bg-black">
                       <video
+                        ref={videoRef}
                         src={videoUrl}
                         controls
+                        crossOrigin="anonymous"
                         className="w-full h-full object-contain"
                       />
                     </div>
+                    <p className="text-[10px] text-gray-500">
+                      Pausa el video en el momento deseado y pulsa "Capturar
+                      fotograma" para agregar esa imagen a las capturas del
+                      estudio.
+                    </p>
                   </div>
                 )}
 

@@ -5,6 +5,7 @@ import {
   DownloadOutlined,
   EditOutlined,
   BgColorsOutlined,
+  EyeOutlined,
 } from "@ant-design/icons";
 import { pdf } from "@react-pdf/renderer";
 import ReportePDFDocument, {
@@ -42,6 +43,9 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
 
   const [generando, setGenerando] = useState(false);
   const [cargandoConfig, setCargandoConfig] = useState(false);
+  // Vista previa del PDF (blob URL renderizado en el visor de Chromium)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [editingImageUrl, setEditingImageUrl] = useState<string | null>(null);
   const [editedImages, setEditedImages] = useState<Map<string, string>>(
     new Map(),
@@ -252,30 +256,53 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
     return editedImages.get(originalUrl) || originalUrl;
   };
 
+  // Construye el documento PDF con la configuración actual (compartido por
+  // la vista previa y la descarga)
+  const construirDocumento = () => {
+    const configConImagenesEditadas = {
+      ...config,
+      imagenesSeleccionadas: config.imagenesSeleccionadas.map((img) => ({
+        ...img,
+        url: getDisplayUrl(img.url), // Usar imagen editada si existe
+      })),
+    };
+    return (
+      <ReportePDFDocument
+        estudio={estudio}
+        paciente={paciente}
+        config={configConImagenesEditadas}
+        organizacion={organizacion}
+        configuracionMedica={configuracionDatosMedicos}
+        nombreDoctor={user?.usuarioDetail?.nombre}
+      />
+    );
+  };
+
+  const handleVistaPrevia = async () => {
+    try {
+      setPreviewLoading(true);
+      const blob = await pdf(construirDocumento()).toBlob();
+      // Liberar la URL anterior si existía
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(URL.createObjectURL(blob));
+    } catch (error) {
+      console.error("Error generando vista previa:", error);
+      message.error("Error al generar la vista previa");
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const cerrarVistaPrevia = () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+  };
+
   const handleGenerarPDF = async () => {
     try {
       setGenerando(true);
 
-      // Actualizar las URLs de las imágenes seleccionadas con las versiones editadas
-      const configConImagenesEditadas = {
-        ...config,
-        imagenesSeleccionadas: config.imagenesSeleccionadas.map((img) => ({
-          ...img,
-          url: getDisplayUrl(img.url), // Usar imagen editada si existe
-        })),
-      };
-
-      const doc = (
-        <ReportePDFDocument
-          estudio={estudio}
-          paciente={paciente}
-          config={configConImagenesEditadas}
-          organizacion={organizacion}
-          configuracionMedica={configuracionDatosMedicos}
-          nombreDoctor={user?.usuarioDetail?.nombre}
-        />
-      );
-      const blob = await pdf(doc).toBlob();
+      const blob = await pdf(construirDocumento()).toBlob();
 
       // Crear nombre del archivo
       const nombrePaciente = paciente
@@ -769,6 +796,14 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
             Cancelar
           </Button>
           <Button
+            icon={<EyeOutlined />}
+            onClick={handleVistaPrevia}
+            loading={previewLoading}
+            disabled={generando}
+          >
+            Vista previa
+          </Button>
+          <Button
             type="primary"
             icon={generando ? <Spin size="small" /> : <DownloadOutlined />}
             onClick={handleGenerarPDF}
@@ -779,6 +814,46 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
           </Button>
         </div>
       </div>
+
+      {/* Vista previa del reporte completo */}
+      <Modal
+        open={!!previewUrl}
+        onCancel={cerrarVistaPrevia}
+        centered
+        width="88vw"
+        style={{ top: 12, maxWidth: 1100 }}
+        title={
+          <span className="flex items-center gap-2">
+            <EyeOutlined /> Vista previa del reporte
+          </span>
+        }
+        footer={[
+          <Button key="cerrar" onClick={cerrarVistaPrevia}>
+            Cerrar
+          </Button>,
+          <Button
+            key="descargar"
+            type="primary"
+            icon={<DownloadOutlined />}
+            onClick={() => {
+              cerrarVistaPrevia();
+              handleGenerarPDF();
+            }}
+            className="bg-red-500 hover:bg-red-600 border-red-500"
+          >
+            Descargar este reporte
+          </Button>,
+        ]}
+      >
+        {previewUrl && (
+          <iframe
+            src={previewUrl}
+            title="Vista previa del reporte"
+            className="w-full rounded-md border border-gray-200"
+            style={{ height: "76vh" }}
+          />
+        )}
+      </Modal>
 
       {/* Modal de edición de imagen */}
       {editingImageUrl && (

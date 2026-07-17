@@ -1251,6 +1251,15 @@ const EstudioDetalle: React.FC = () => {
           setIsSessionModalOpen={setIsSessionModalOpen}
           selectedSessionIndex={selectedSessionIndex}
           aiSessions={aiSessions}
+          empresaId={empresaId}
+          pacienteId={pacienteId}
+          estudioId={estudioId}
+          onSeccionesActualizadas={(nuevasSecciones) =>
+            setEstudio((prev: any) => ({
+              ...prev,
+              secciones_ai: nuevasSecciones,
+            }))
+          }
         />
       )}
       {isFinalizado && (
