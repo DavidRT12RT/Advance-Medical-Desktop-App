@@ -18,9 +18,12 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [unlinking, setUnlinking] = useState(false);
+  // Modal.confirm estático no funciona con React 19 + antd 5 (el modal nunca
+  // se monta); hay que usar el hook con su contextHolder
+  const [modal, contextHolder] = Modal.useModal();
 
   const handleDesvincularLicencia = () => {
-    Modal.confirm({
+    modal.confirm({
       title: 'Desvincular licencia',
       content: 'Se desvinculará la licencia de esta computadora y podrás vincular otra. ¿Deseas continuar?',
       okText: 'Sí, desvincular',
@@ -129,6 +132,7 @@ export default function Login() {
 
   return (
     <div className="min-h-[100vh] w-full bg-gray-50 flex flex-col items-center justify-center p-6 gap-5">
+      {contextHolder}
       <img src={logo} alt="Logo" width={200} height={200} />
       <div className="w-full max-w-md bg-white shadow-lg border border-gray-200 rounded-xl p-6 mx-auto">
         <h2 className="text-xl font-semibold text-gray-900">Iniciar sesión</h2>
