@@ -396,22 +396,25 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
     estudio?.ubicacion,
   );
 
-  // La página 2 solo existe si hay contenido secundario que mostrar
+  // La página 2 solo existe si hay contenido secundario REAL que mostrar
+  // (una sección habilitada pero sin datos no cuenta)
   const haySegundaPagina = Boolean(
     imagesToShow.length > 0 ||
-      config.incluirMedicamentos ||
-      config.incluirComplicaciones ||
-      config.incluirSeguimiento ||
+      (config.incluirMedicamentos && estudio?.medicamentos) ||
+      (config.incluirComplicaciones && estudio?.complicaciones) ||
+      (config.incluirSeguimiento && estudio?.seguimiento) ||
+      estudio?.intervaloSeguimiento ||
+      estudio?.tolerancia ||
       (config.incluirSedacion && estudio?.metodo_sedacion) ||
       (config.incluirEquipo && estudio?.equipo_endoscopio) ||
       (config.incluirDatosClinica && estudio?.clinica_nombre) ||
-      (config.incluirAnalisisIA && lastSession),
+      (config.incluirAnalisisIA &&
+        (lastSession?.ia_cnn?.summary || lastSession?.ia_llm)),
   );
 
   return (
     <Document>
-      {/* La página 1 reserva espacio inferior para las firmas ancladas */}
-      <Page size="A4" style={{ ...styles.page, paddingBottom: 165 }} wrap>
+      <Page size="A4" style={styles.page} wrap>
         {/* Header with Logo, Title, and Anatomy */}
         <View style={styles.header}>
           <View style={styles.logoContainer}>
@@ -456,7 +459,7 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
                   marginTop: 2,
                 }}
               >
-                ● Hallazgo: {regionHallazgo.etiqueta}
+                • Hallazgo: {regionHallazgo.etiqueta}
               </Text>
             )}
           </View>
@@ -503,8 +506,11 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
           </View>
         )}
 
-        {/* Section 2: Clinical Information and Findings */}
-        {(config.incluirHallazgos || config.incluirResultado) && (
+        {/* Section 2: Clinical Information and Findings.
+            Solo se muestra si hay contenido real, aunque esté habilitada. */}
+        {((config.incluirResultado && estudio?.resultado) ||
+          (config.incluirHallazgos && estudio?.hallazgos) ||
+          estudio?.observaciones) && (
           <View style={styles.sectionCard} wrap={false}>
             <SectionTitle title="Información Clínica y Hallazgos" />
             {config.incluirResultado && estudio?.resultado && (
@@ -582,19 +588,13 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
             </View>
           )}
 
-        {/* SIGNATURES - Ancladas al pie de la página 1 (como el header, no
-            se mueven aunque el contenido varíe) */}
-        <View
-          style={{
-            ...styles.signaturesContainer,
-            position: "absolute",
-            bottom: 60,
-            left: 30,
-            right: 30,
-            marginTop: 0,
-          }}
-          wrap={false}
-        >
+        {/* Espaciador flexible: empuja las firmas al pie de la página 1.
+            (El position absolute de react-pdf se rompe en páginas con wrap:
+            partía el bloque y generaba una página fantasma.) */}
+        <View style={{ flexGrow: 1 }} />
+
+        {/* SIGNATURES - Al pie de la página 1, como bloque indivisible */}
+        <View style={styles.signaturesContainer} wrap={false}>
           <View style={styles.signaturesRow}>
             {/* Doctor signature */}
             {config.incluirDatosMedico && (
@@ -668,18 +668,8 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
           </View>
         </View>
 
-        {/* Footer página 1 (anclado al fondo) */}
-        <View
-          style={{
-            ...styles.footer,
-            position: "absolute",
-            bottom: 24,
-            left: 30,
-            right: 30,
-            marginTop: 0,
-          }}
-          wrap={false}
-        >
+        {/* Footer página 1 */}
+        <View style={styles.footer} wrap={false}>
           <Text style={styles.footerText}>
             Generado el {new Date().toLocaleDateString("es-MX")}
           </Text>
@@ -742,10 +732,13 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
           </View>
         )}
 
-        {/* Section 4: Plan and Follow-up */}
-        {(config.incluirMedicamentos ||
-          config.incluirComplicaciones ||
-          config.incluirSeguimiento) && (
+        {/* Section 4: Plan and Follow-up.
+            Solo se muestra si hay contenido real, aunque esté habilitada. */}
+        {((config.incluirMedicamentos && estudio?.medicamentos) ||
+          (config.incluirComplicaciones && estudio?.complicaciones) ||
+          (config.incluirSeguimiento && estudio?.seguimiento) ||
+          estudio?.intervaloSeguimiento ||
+          estudio?.tolerancia) && (
           <View style={styles.sectionCard} wrap={false}>
             <SectionTitle title="Plan y Seguimiento" />
             <View style={styles.gridRow}>
@@ -755,11 +748,11 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
                   <Text style={styles.fieldValue}>{estudio.medicamentos}</Text>
                 </View>
               )}
-              {config.incluirComplicaciones && (
+              {config.incluirComplicaciones && estudio?.complicaciones && (
                 <View style={styles.gridItem2}>
                   <Text style={styles.fieldLabel}>Complicaciones</Text>
                   <Text style={styles.fieldValue}>
-                    {estudio?.complicaciones || "Ninguna"}
+                    {estudio.complicaciones}
                   </Text>
                 </View>
               )}
@@ -894,8 +887,9 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
           </View>
         )}
 
-        {/* AI Analysis */}
-        {config.incluirAnalisisIA && lastSession && (
+        {/* AI Analysis — solo si la sesión trae resultados reales */}
+        {config.incluirAnalisisIA &&
+          (lastSession?.ia_cnn?.summary || lastSession?.ia_llm) && (
           <View style={styles.sectionCard} wrap={false}>
             <SectionTitle title="Análisis Asistido por IA" />
             <View style={styles.aiSection}>
