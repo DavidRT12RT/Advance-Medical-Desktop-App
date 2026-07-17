@@ -35,6 +35,8 @@ Las reglas de Firestore de `suite`: lectura pública, escritura con auth, **exce
 
 `LicenseGate` (licencia vinculada a la máquina) → `Login` (Firebase Auth + perfil en `empresas/{emp}/organizaciones/{org}/perfiles`) → `App`. Dos validaciones cruzadas: la licencia se vincula por `machineId` (node-machine-id), y el login exige que la **organización del usuario coincida con la de la licencia local** (claims `idEmpresa`/`idOrganizacion` en el JWT).
 
+Hay dos orígenes de usuarios: los dados de alta desde el panel de la suite (tienen custom claims en el JWT, puestos por su backend con Admin SDK) y los **registrados self-service desde la propia máquina** (`FirebaseRegistro.ts`, formulario "Crear cuenta" en el Login): estos NO tienen claims — el cliente no puede ponerlos — así que Login/Root hacen fallback a `licenseData.idEmpresa`/`licenseData.organizacion` de la licencia local. El perfil creado replica la estructura del de la suite (campo extra `creadoDesde: "aim-desktop"`).
+
 ### Estado compartido: ElectronStoreProvider
 
 `src/hooks/useElectronStore.jsx` es un **Context** montado en `renderer.jsx` — única fuente de verdad de auth/licencia, persistida vía IPC en electron-store (`src/services/electronStore.js`, disco en `%AppData%`). Historia: antes era un hook normal y cada componente creaba su propia copia del estado (el login no redirigía hasta Ctrl+R). No convertirlo de vuelta a hook suelto. `setLicenseData({})` con objeto vacío **limpia** la licencia local (reset a defaults, no merge).

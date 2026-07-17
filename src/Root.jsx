@@ -63,8 +63,10 @@ export default function Root() {
           const decodedToken = jwtDecode(idToken);
 
           const firebaseUID = firebaseUser.uid;
-          const idEmpresa = decodedToken.idEmpresa;
-          const idOrganizacion = decodedToken.idOrganizacion;
+          // Usuarios registrados desde la máquina no tienen custom claims:
+          // fallback a la empresa/organización de la licencia local
+          const idEmpresa = decodedToken.idEmpresa || licenseData?.idEmpresa;
+          const idOrganizacion = decodedToken.idOrganizacion || licenseData?.organizacion;
 
           if (!idEmpresa || !idOrganizacion) {
             await logout();
@@ -125,7 +127,7 @@ export default function Root() {
     });
 
     return () => unsub();
-  }, [auth, setUser, logout, user]);
+  }, [auth, setUser, logout, user, licenseData]);
 
   // Real-time listener para observar cambios en el perfil del usuario
   useEffect(() => {
