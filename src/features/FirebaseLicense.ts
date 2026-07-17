@@ -7,6 +7,7 @@ import {
   where,
   collection,
   getDocs,
+  getDocsFromServer,
 } from "firebase/firestore";
 import { firestore } from "../firebaseConfig";
 
@@ -78,13 +79,25 @@ class FirebaseLicense {
     machineId: string,
     machineInformation: Record<string, any>,
   ): Promise<any> {
-    // Buscar licencia en Firestore
+    // Buscar licencia en Firestore — forzando ir al SERVIDOR. Con getDocs
+    // normal, si la máquina no puede conectar (sin internet o firewall
+    // bloqueando firestore.googleapis.com) el SDK responde desde el caché
+    // local vacío sin lanzar error, y "La licencia no existe" sería un
+    // falso negativo por problema de red.
     const licenciaCollection = collection(firestore, "licencias");
     const licenciaQuery = query(
       licenciaCollection,
       where("claveLicencia", "==", license),
     );
-    const licenciaSnapshot = await getDocs(licenciaQuery);
+    let licenciaSnapshot;
+    try {
+      licenciaSnapshot = await getDocsFromServer(licenciaQuery);
+    } catch (error: any) {
+      console.error("[FirebaseLicense] Error consultando el servidor:", error);
+      throw new Error(
+        "No hay conexión con el servidor de licencias. Verifica el internet o el firewall de esta máquina.",
+      );
+    }
     if (licenciaSnapshot.empty) throw new Error("La licencia no existe");
     const firstDoc = licenciaSnapshot.docs[0];
     const licencia = { id: firstDoc.id, ...firstDoc.data() } as any;
