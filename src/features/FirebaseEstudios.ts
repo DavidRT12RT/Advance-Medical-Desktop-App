@@ -291,8 +291,10 @@ class FirebaseEstudios {
             indiceRiesgo,
             paciente: {
               id: pacienteId,
-              nombre: pacienteData.nombre || "",
-              apellido: pacienteData.apellido || "",
+              nombres: pacienteData.nombres || pacienteData.nombre || "",
+              apellidoPaterno:
+                pacienteData.apellidoPaterno || pacienteData.apellido || "",
+              apellidoMaterno: pacienteData.apellidoMaterno || "",
               fechaNacimiento: pacienteData.fechaNacimiento || "",
               sexo: pacienteData.sexo || "",
             },

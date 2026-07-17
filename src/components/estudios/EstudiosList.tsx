@@ -6,6 +6,7 @@ import {
   TIPOS_ESTUDIO_FILTERS,
   colorPorTipo,
 } from "../../utils/tiposEstudio";
+import { nombreCompletoPaciente } from "../../utils/nombrePaciente";
 
 interface EstudiosListProps {
   estudios: any[];
@@ -23,10 +24,14 @@ const EstudiosList: React.FC<EstudiosListProps> = ({
       title: "Paciente",
       key: "paciente",
       width: 200,
+      sorter: (a, b) =>
+        nombreCompletoPaciente(a.paciente).localeCompare(
+          nombreCompletoPaciente(b.paciente),
+        ),
       render: (_, record) => (
         <div>
           <div className="font-semibold text-gray-900">
-            {record.paciente?.nombre} {record.paciente?.apellido}
+            {nombreCompletoPaciente(record.paciente) || "Sin nombre"}
           </div>
           <div className="text-xs text-gray-500">
             {record.paciente?.sexo} | {record.paciente?.fechaNacimiento}

@@ -8,6 +8,7 @@ import HeaderConsultas from "../components/consultas/HeaderConsultas";
 import SearchConsultas from "../components/consultas/SearchConsultas";
 import ConsultasList from "../components/consultas/ConsultasList";
 import ModalNuevaConsulta from "../components/consultas/ModalNuevaConsulta";
+import { nombreCompletoPaciente } from "../utils/nombrePaciente";
 import dayjs from "dayjs";
 
 const Consultas = () => {
@@ -90,8 +91,9 @@ const Consultas = () => {
   const filteredConsultas = consultas.filter((consulta: any) => {
     const searchLower = searchText.toLowerCase();
     const matchesSearch =
-      consulta.paciente?.nombre?.toLowerCase().includes(searchLower) ||
-      consulta.paciente?.apellido?.toLowerCase().includes(searchLower) ||
+      nombreCompletoPaciente(consulta.paciente)
+        .toLowerCase()
+        .includes(searchLower) ||
       consulta.tipo?.toLowerCase().includes(searchLower) ||
       consulta.resultado?.toLowerCase().includes(searchLower) ||
       consulta.diagnostico?.toLowerCase().includes(searchLower) ||

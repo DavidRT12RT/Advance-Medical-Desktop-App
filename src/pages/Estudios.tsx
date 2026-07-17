@@ -7,6 +7,7 @@ import HeaderEstudios from "../components/estudios/HeaderEstudios";
 import SearchEstudios from "../components/estudios/SearchEstudios";
 import EstudiosList from "../components/estudios/EstudiosList";
 import ModalNuevoEstudio from "../components/estudios/ModalNuevoEstudio";
+import { nombreCompletoPaciente } from "../utils/nombrePaciente";
 import dayjs from "dayjs";
 
 const Estudios = () => {
@@ -61,8 +62,9 @@ const Estudios = () => {
   const filteredEstudios = estudios.filter((estudio: any) => {
     const searchLower = searchText.toLowerCase();
     const matchesSearch =
-      estudio.paciente?.nombre?.toLowerCase().includes(searchLower) ||
-      estudio.paciente?.apellido?.toLowerCase().includes(searchLower) ||
+      nombreCompletoPaciente(estudio.paciente)
+        .toLowerCase()
+        .includes(searchLower) ||
       estudio.tipo?.toLowerCase().includes(searchLower) ||
       estudio.resultado?.toLowerCase().includes(searchLower) ||
       estudio.hallazgos?.toLowerCase().includes(searchLower) ||
