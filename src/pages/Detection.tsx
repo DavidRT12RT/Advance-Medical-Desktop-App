@@ -1156,11 +1156,14 @@ const Detection: React.FC = () => {
           </div>
         )}
 
-        {/* Video + panel lateral de capturas */}
-        <div className="flex gap-4 flex-1 min-h-[360px]">
+        {/* Video + panel lateral de capturas.
+            El panel va en absolute anclado a la altura del video: así nunca
+            estira el contenedor hacia abajo; con muchas capturas scrollea
+            internamente. */}
+        <div className="relative flex-1 min-h-[360px]">
           {/* Panel izquierdo: capturas manuales */}
           {(isCapturing || manualScreenshots.length > 0) && (
-            <div className="w-36 shrink-0 bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col overflow-hidden">
+            <div className="absolute left-0 top-0 bottom-0 w-36 bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col overflow-hidden">
               <div className="px-3 py-2.5 border-b border-gray-100 flex items-center justify-between">
                 <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
                   Capturas
@@ -1203,7 +1206,11 @@ const Detection: React.FC = () => {
           )}
 
           {/* Video */}
-          <div className="bg-black rounded-xl overflow-hidden shadow-sm border border-gray-900 flex-1">
+          <div
+            className={`bg-black rounded-xl overflow-hidden shadow-sm border border-gray-900 h-full transition-[margin] duration-200 ${
+              isCapturing || manualScreenshots.length > 0 ? "ml-40" : ""
+            }`}
+          >
           <div ref={containerRef} className="relative w-full h-full">
             <Webcam
               audio={false}
