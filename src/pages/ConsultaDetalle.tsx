@@ -7,6 +7,7 @@ import {
   Button,
   Tag,
   message,
+  Modal,
   Collapse,
   List,
   Empty,
@@ -33,6 +34,7 @@ const ConsultaDetalle: React.FC = () => {
     consultaId: string;
   }>();
   const [messageApi, contextHolder] = message.useMessage();
+  const [modal, modalContextHolder] = Modal.useModal();
   const navigate = useNavigate();
   const { user } = useElectronStore();
   const empresaId = user?.empresa?.id;
@@ -154,6 +156,7 @@ const ConsultaDetalle: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50/50 pb-10">
       {contextHolder}
+      {modalContextHolder}
       <div className="max-w-7xl mx-auto p-6">
         <Button
           type="default"
@@ -209,8 +212,15 @@ const ConsultaDetalle: React.FC = () => {
                 danger
                 loading={saving}
                 onClick={() => {
-                  setFinalizeOnSave(true);
-                  handleSave(true);
+                  modal.confirm({
+                    title: "Finalizar consulta",
+                    content:
+                      "¿Estás seguro de que deseas finalizar esta consulta? Una vez finalizada ya no podrá editarse.",
+                    okText: "Sí, finalizar",
+                    cancelText: "Cancelar",
+                    okButtonProps: { danger: true },
+                    onOk: () => handleSave(true),
+                  });
                 }}
               >
                 Finalizar consulta
