@@ -1,6 +1,7 @@
 import path from 'path';
+import { promises as fsPromises } from 'fs';
 import { fileURLToPath } from 'url';
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import { machineId } from 'node-machine-id';
 import { networkInterfaces, hostname, platform, release, arch, totalmem, freemem, cpus, userInfo } from 'os';
 import * as electronStore from './services/electronStore.js';
@@ -412,6 +413,59 @@ ipcMain.handle('update:installUpdate', async () => {
 ipcMain.handle('update:cancelDownload', async () => {
   autoUpdater.cancelDownload();
   return { success: true };
+});
+
+// Exporta la carpeta de un estudio (reporte PDF, fotografías y video) al
+// destino que elija el usuario (memoria USB, disco externo, etc.). Los
+// archivos llegan como base64 o como URL https que se descarga aquí en el
+// main process (sin restricciones de CORS del renderer).
+ipcMain.handle('estudio:exportarCarpeta', async (event, payload) => {
+  try {
+    const { nombreCarpeta, archivos } = payload || {};
+    if (!nombreCarpeta || !Array.isArray(archivos) || archivos.length === 0) {
+      return { success: false, error: 'No hay archivos para exportar' };
+    }
+
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const result = await dialog.showOpenDialog(win, {
+      title: 'Selecciona dónde guardar la carpeta del estudio',
+      buttonLabel: 'Guardar aquí',
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    if (result.canceled || !result.filePaths.length) {
+      return { success: false, canceled: true };
+    }
+
+    const destino = path.join(result.filePaths[0], nombreCarpeta);
+    await fsPromises.mkdir(destino, { recursive: true });
+
+    let guardados = 0;
+    const errores = [];
+    for (const archivo of archivos) {
+      try {
+        let buffer;
+        if (archivo.dataBase64) {
+          buffer = Buffer.from(archivo.dataBase64, 'base64');
+        } else if (archivo.url) {
+          const res = await fetch(archivo.url);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          buffer = Buffer.from(await res.arrayBuffer());
+        } else {
+          continue;
+        }
+        await fsPromises.writeFile(path.join(destino, archivo.nombre), buffer);
+        guardados++;
+      } catch (error) {
+        console.error(`[IPC] Error guardando ${archivo.nombre}:`, error);
+        errores.push(archivo.nombre);
+      }
+    }
+
+    return { success: true, destino, guardados, errores };
+  } catch (error) {
+    console.error('[IPC] Error exportando carpeta del estudio:', error);
+    return { success: false, error: error.message };
+  }
 });
 
 ipcMain.handle('update:getDownloadProgress', async () => {

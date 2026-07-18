@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { Modal, Checkbox, Button, Divider, message, Spin, Input } from "antd";
 import {
   FilePdfOutlined,
@@ -6,6 +6,8 @@ import {
   EditOutlined,
   BgColorsOutlined,
   EyeOutlined,
+  PrinterOutlined,
+  FolderOpenOutlined,
 } from "@ant-design/icons";
 import { pdf } from "@react-pdf/renderer";
 import ReportePDFDocument, {
@@ -42,10 +44,12 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
   const organizacion = user?.organizacion;
 
   const [generando, setGenerando] = useState(false);
+  const [exportando, setExportando] = useState(false);
   const [cargandoConfig, setCargandoConfig] = useState(false);
   // Vista previa del PDF (blob URL renderizado en el visor de Chromium)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const previewIframeRef = useRef<HTMLIFrameElement | null>(null);
   const [editingImageUrl, setEditingImageUrl] = useState<string | null>(null);
   const [editedImages, setEditedImages] = useState<Map<string, string>>(
     new Map(),
@@ -349,6 +353,114 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
     } finally {
       setGenerando(false);
     }
+  };
+
+  // Exportar la carpeta del estudio (reporte PDF + fotografías + video) a la
+  // ubicación que elija el usuario (USB, disco externo...). Los archivos van
+  // nombrados con los datos del paciente para identificarlos fácilmente.
+  const handleExportarCarpeta = async () => {
+    const api = (window as any).estudioExport;
+    if (!api?.exportarCarpeta) {
+      message.error("La exportación no está disponible en esta versión");
+      return;
+    }
+
+    try {
+      setExportando(true);
+
+      const nombreCompleto =
+        [paciente?.nombres, paciente?.apellidoPaterno, paciente?.apellidoMaterno]
+          .filter(Boolean)
+          .join(" ") || "Paciente";
+      const tipo = estudio?.tipo || "Estudio";
+      const fecha = estudio?.fecha || new Date().toISOString().split("T")[0];
+      // Nombre base con los datos del paciente, sin caracteres inválidos
+      const base = `${nombreCompleto} - ${tipo} - ${fecha}`.replace(
+        /[\\/:*?"<>|]/g,
+        "-",
+      );
+
+      const archivos: { nombre: string; dataBase64?: string; url?: string }[] =
+        [];
+
+      // 1) Reporte PDF con la configuración actual del modal
+      const blob = await pdf(construirDocumento()).toBlob();
+      const pdfBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () =>
+          resolve(String(reader.result).split(",")[1] || "");
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+      archivos.push({ nombre: `${base} - Reporte.pdf`, dataBase64: pdfBase64 });
+
+      // 2) Todas las fotografías del estudio (con edición aplicada si existe)
+      todasLasImagenes.forEach((url, idx) => {
+        const displayUrl = getDisplayUrl(url);
+        const num = String(idx + 1).padStart(2, "0");
+        const ext =
+          displayUrl.match(/\.(png|jpe?g|webp)(\?|$)/i)?.[1] || "jpg";
+        if (displayUrl.startsWith("data:")) {
+          archivos.push({
+            nombre: `${base} - Foto ${num}.${ext}`,
+            dataBase64: displayUrl.split(",")[1] || "",
+          });
+        } else {
+          archivos.push({
+            nombre: `${base} - Foto ${num}.${ext}`,
+            url: displayUrl,
+          });
+        }
+      });
+
+      // 3) Videos de las sesiones del estudio
+      const videos = (
+        Array.isArray(estudio?.secciones_ai) ? estudio.secciones_ai : []
+      )
+        .map((sesion: any) => sesion?.videoUrl)
+        .filter(Boolean);
+      videos.forEach((url: string, idx: number) => {
+        const num = String(idx + 1).padStart(2, "0");
+        archivos.push({ nombre: `${base} - Video ${num}.webm`, url });
+      });
+
+      const resultado = await api.exportarCarpeta({
+        nombreCarpeta: base,
+        archivos,
+      });
+
+      if (resultado?.canceled) return;
+      if (!resultado?.success) {
+        message.error(resultado?.error || "Error al exportar la carpeta");
+        return;
+      }
+      if (resultado.errores?.length) {
+        message.warning(
+          `Carpeta guardada en ${resultado.destino}, pero ${resultado.errores.length} archivo(s) no se pudieron descargar`,
+        );
+      } else {
+        message.success(
+          `Carpeta del estudio guardada (${resultado.guardados} archivos) en: ${resultado.destino}`,
+        );
+      }
+    } catch (error) {
+      console.error("Error exportando carpeta del estudio:", error);
+      message.error("Error al exportar la carpeta del estudio");
+    } finally {
+      setExportando(false);
+    }
+  };
+
+  // Imprimir el reporte directamente desde la ventana, usando el PDF de la
+  // vista previa ya renderizado en el iframe
+  const handleImprimir = () => {
+    const iframe = previewIframeRef.current;
+    if (!iframe?.contentWindow || !previewUrl) {
+      message.warning("Espera a que la vista previa termine de generarse");
+      return;
+    }
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
   };
 
   const sectionCheckboxStyle = "flex items-center gap-2 py-1";
@@ -811,15 +923,31 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
       </div>
 
       {/* Botones de acción fijos al pie de la columna (fuera del scroll) */}
-      <div className="flex justify-end gap-3 pt-4 mt-1 border-t border-gray-200 bg-white">
-        <Button onClick={onClose} disabled={generando}>
+      <div className="flex justify-end gap-3 pt-4 mt-1 border-t border-gray-200 bg-white flex-wrap">
+        <Button onClick={onClose} disabled={generando || exportando}>
           Cancelar
+        </Button>
+        <Button
+          icon={<FolderOpenOutlined />}
+          onClick={handleExportarCarpeta}
+          loading={exportando}
+          disabled={generando}
+        >
+          {exportando ? "Exportando..." : "Exportar carpeta (PDF, fotos y video)"}
+        </Button>
+        <Button
+          icon={<PrinterOutlined />}
+          onClick={handleImprimir}
+          disabled={generando || exportando || !previewUrl}
+        >
+          Imprimir
         </Button>
         <Button
           type="primary"
           icon={generando ? <Spin size="small" /> : <DownloadOutlined />}
           onClick={handleGenerarPDF}
           loading={generando}
+          disabled={exportando}
           className="bg-red-500 hover:bg-red-600 border-red-500"
         >
           {generando ? "Generando..." : "Generar y Descargar PDF"}
@@ -842,6 +970,7 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
         <div className="flex-1 relative">
           {previewUrl ? (
             <iframe
+              ref={previewIframeRef}
               src={previewUrl}
               title="Vista previa del reporte"
               className="w-full h-full"

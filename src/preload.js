@@ -69,6 +69,11 @@ window.electronStore = {
   isLicenseActiveWithGrace: () => ipcRenderer.invoke('store:isLicenseActiveWithGrace'),
 };
 
+window.estudioExport = {
+  // Exportar carpeta del estudio (PDF + fotos + video) a USB/disco
+  exportarCarpeta: (payload) => ipcRenderer.invoke('estudio:exportarCarpeta', payload),
+};
+
 window.updater = {
   getCurrentVersion: () => ipcRenderer.invoke('update:getCurrentVersion'),
   checkForUpdates: () => ipcRenderer.invoke('update:checkForUpdates'),
