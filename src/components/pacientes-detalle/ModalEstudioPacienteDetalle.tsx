@@ -4,7 +4,6 @@ import {
   Modal,
   Form,
   Input,
-  Select,
   DatePicker,
   Button,
   Row,
@@ -15,7 +14,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { setOpenModalEstudios, setRefresh } from "../../store/pacientesSlice";
 import FirebaseEstudios from "../../features/FirebaseEstudios";
 import { useElectronStore } from "../../hooks/useElectronStore";
-import { TIPOS_ESTUDIO_OPTIONS } from "../../utils/tiposEstudio";
+import { useCatalogosEstudio } from "../../hooks/useCatalogosEstudio";
+import SelectCatalogo from "../common/SelectCatalogo";
 
 const ModalEstudioPacienteDetalle = () => {
   const isOpenModal = useAppSelector(
@@ -29,6 +29,11 @@ const ModalEstudioPacienteDetalle = () => {
   const empresaId = user?.empresa?.id;
   const userId = user?.usuarioDetail?.id;
   const [saving, setSaving] = useState(false);
+  const {
+    items: itemsCatalogo,
+    agregarItem,
+    eliminarItem,
+  } = useCatalogosEstudio();
 
   const handleCancel = () => {
     form.resetFields();
@@ -121,7 +126,12 @@ const ModalEstudioPacienteDetalle = () => {
                 },
               ]}
             >
-              <Select options={TIPOS_ESTUDIO_OPTIONS} />
+              <SelectCatalogo
+                items={itemsCatalogo("tiposProcedimiento")}
+                onAgregar={(v) => agregarItem("tiposProcedimiento", v)}
+                onEliminar={(v) => eliminarItem("tiposProcedimiento", v)}
+                placeholder="Seleccionar procedimiento"
+              />
             </Form.Item>
           </Col>
           <Col span={12}>

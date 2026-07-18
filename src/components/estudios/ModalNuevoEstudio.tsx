@@ -3,7 +3,6 @@ import {
   Modal,
   Form,
   Input,
-  Select,
   DatePicker,
   Button,
   Row,
@@ -15,7 +14,8 @@ import { useNavigate } from "react-router-dom";
 import FirebaseEstudios from "../../features/FirebaseEstudios";
 import FirebasePacientes from "../../features/FirebasePacientes";
 import { useElectronStore } from "../../hooks/useElectronStore";
-import { TIPOS_ESTUDIO_OPTIONS } from "../../utils/tiposEstudio";
+import { useCatalogosEstudio } from "../../hooks/useCatalogosEstudio";
+import SelectCatalogo from "../common/SelectCatalogo";
 
 interface ModalNuevoEstudioProps {
   visible: boolean;
@@ -31,6 +31,11 @@ const ModalNuevoEstudio: React.FC<ModalNuevoEstudioProps> = ({
   const { user } = useElectronStore();
   const empresaId = user?.empresa?.id;
   const userId = user?.usuarioDetail?.id;
+  const {
+    items: itemsCatalogo,
+    agregarItem,
+    eliminarItem,
+  } = useCatalogosEstudio();
 
   const [pacientes, setPacientes] = useState<any[]>([]);
   const [loadingPacientes, setLoadingPacientes] = useState(false);
@@ -211,7 +216,12 @@ const ModalNuevoEstudio: React.FC<ModalNuevoEstudioProps> = ({
                 },
               ]}
             >
-              <Select options={TIPOS_ESTUDIO_OPTIONS} />
+              <SelectCatalogo
+                items={itemsCatalogo("tiposProcedimiento")}
+                onAgregar={(v) => agregarItem("tiposProcedimiento", v)}
+                onEliminar={(v) => eliminarItem("tiposProcedimiento", v)}
+                placeholder="Seleccionar procedimiento"
+              />
             </Form.Item>
           </Col>
           <Col span={12}>

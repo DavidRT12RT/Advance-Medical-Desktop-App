@@ -38,6 +38,8 @@ import {
 import FirebasePacientes from "../features/FirebasePacientes";
 import EstudioBasicoDetalle from "../components/pacientes-detalle/EstudioBasicoDetalle";
 import SectionTitle from "../components/common/SectionTitle";
+import SelectCatalogo from "../components/common/SelectCatalogo";
+import { useCatalogosEstudio } from "../hooks/useCatalogosEstudio";
 import ModalInfoSeccionAI from "../components/consulta-detalle/ModalInfoSeccionAI";
 import ModalGenerarReporte from "../components/consulta-detalle/ModalGenerarReporte";
 import HistorialEdicionesEstudio from "../components/pacientes-detalle/HistorialEdicionesEstudio";
@@ -57,6 +59,11 @@ const EstudioDetalle: React.FC = () => {
   const { message } = App.useApp();
   const { user } = useElectronStore();
   const empresaId = user?.empresa?.id;
+  const {
+    items: itemsCatalogo,
+    agregarItem,
+    eliminarItem,
+  } = useCatalogosEstudio();
 
   const [loading, setLoading] = useState(true);
   const [estudio, setEstudio] = useState<any | null>(null);
@@ -130,6 +137,10 @@ const EstudioDetalle: React.FC = () => {
 
         // Setear explícitamente todos los campos clínicos que usamos en el detalle
         form.setFieldsValue({
+          tipo: data.tipo,
+          motivo_estudio: data.motivo_estudio,
+          fecha: data.fecha ? dayjs(data.fecha) : null,
+          enfermeria_nombre: data.enfermeria_nombre,
           resultado: data.resultado,
           hallazgos: data.hallazgos,
           polipo: data.polipo,
@@ -201,6 +212,10 @@ const EstudioDetalle: React.FC = () => {
 
     // Actualizar formulario con los datos actuales del estudio
     form.setFieldsValue({
+      tipo: estudio.tipo,
+      motivo_estudio: estudio.motivo_estudio,
+      fecha: estudio.fecha ? dayjs(estudio.fecha) : null,
+      enfermeria_nombre: estudio.enfermeria_nombre,
       resultado: estudio.resultado,
       hallazgos: estudio.hallazgos,
       polipo: estudio.polipo,
@@ -279,6 +294,10 @@ const EstudioDetalle: React.FC = () => {
       const seguimientoValue = allValues.seguimiento;
 
       const payload: any = {
+        tipo: allValues.tipo ?? null,
+        motivo_estudio: allValues.motivo_estudio ?? null,
+        fecha: allValues.fecha ? allValues.fecha.format("YYYY-MM-DD") : null,
+        enfermeria_nombre: allValues.enfermeria_nombre ?? null,
         resultado: allValues.resultado ?? null,
         hallazgos: allValues.hallazgos ?? null,
         polipo: allValues.polipo ?? null,
@@ -702,7 +721,251 @@ const EstudioDetalle: React.FC = () => {
                 disabled={estudio?.estado === "finalizado"}
               >
                 <div className="space-y-8">
-                  {/* Sección 1: Información clínica y hallazgos */}
+                  {/* Datos del estudio */}
+                  <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <SectionTitle
+                      title="Datos del estudio"
+                      icon={<FileTextOutlined className="text-indigo-600" />}
+                    />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <Form.Item label="Tipo de procedimiento" name="tipo">
+                        <SelectCatalogo
+                          items={itemsCatalogo("tiposProcedimiento")}
+                          onAgregar={(v) =>
+                            agregarItem("tiposProcedimiento", v)
+                          }
+                          onEliminar={(v) =>
+                            eliminarItem("tiposProcedimiento", v)
+                          }
+                          placeholder="Seleccionar procedimiento"
+                        />
+                      </Form.Item>
+                      <Form.Item
+                        label="Motivo del estudio"
+                        name="motivo_estudio"
+                      >
+                        <SelectCatalogo
+                          items={itemsCatalogo("motivosEstudio")}
+                          onAgregar={(v) => agregarItem("motivosEstudio", v)}
+                          onEliminar={(v) => eliminarItem("motivosEstudio", v)}
+                          placeholder="Ej. STDA, Gastritis, Dolor Abdominal"
+                        />
+                      </Form.Item>
+                      <Form.Item label="Fecha del estudio" name="fecha">
+                        <DatePicker
+                          style={{ width: "100%" }}
+                          format="DD/MM/YYYY"
+                          placeholder="Seleccionar fecha"
+                        />
+                      </Form.Item>
+                    </div>
+                  </div>
+
+                  {/* Equipo Utilizado */}
+                  <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <SectionTitle
+                      title="Equipo Utilizado"
+                      icon={<ToolOutlined className="text-gray-600" />}
+                    />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <Form.Item label="Marca" name="equipo_marca">
+                        <SelectCatalogo
+                          items={itemsCatalogo("equiposMarca")}
+                          onAgregar={(v) => agregarItem("equiposMarca", v)}
+                          onEliminar={(v) => eliminarItem("equiposMarca", v)}
+                          placeholder="Olympus, Fujifilm, Pentax, etc."
+                        />
+                      </Form.Item>
+                      <Form.Item label="Modelo" name="equipo_modelo">
+                        <SelectCatalogo
+                          items={itemsCatalogo("equiposModelo")}
+                          onAgregar={(v) => agregarItem("equiposModelo", v)}
+                          onEliminar={(v) => eliminarItem("equiposModelo", v)}
+                          placeholder="CF-HQ190L, etc."
+                        />
+                      </Form.Item>
+                      <Form.Item
+                        label="Tipo de endoscopio"
+                        name="equipo_endoscopio"
+                      >
+                        <Select placeholder="Seleccionar tipo">
+                          <Option value="Colonoscopio">Colonoscopio</Option>
+                          <Option value="Gastroscopio">Gastroscopio</Option>
+                          <Option value="Duodenoscopio">Duodenoscopio</Option>
+                          <Option value="Enteroscopio">Enteroscopio</Option>
+                          <Option value="Sigmoidoscopio">Sigmoidoscopio</Option>
+                          <Option value="Otro">Otro</Option>
+                        </Select>
+                      </Form.Item>
+                      <Form.Item label="Número de serie" name="equipo_serie">
+                        <Input placeholder="SN-XXXXX" />
+                      </Form.Item>
+                    </div>
+                  </div>
+
+                  {/* Médico Tratante */}
+                  <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <SectionTitle
+                      title="Médico Tratante"
+                      icon={<UserOutlined className="text-blue-600" />}
+                    />
+                    <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-sm text-blue-700 flex items-center gap-2">
+                        <InfoCircleOutlined className="text-blue-600" />
+                        <span>
+                          Estos datos corresponden a tu información profesional.
+                          Para modificarlos, ve a{" "}
+                          <strong>
+                            Configuración → Datos Médicos Profesionales
+                          </strong>
+                        </span>
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <Form.Item label="Nombre completo" name="medico_nombre">
+                        <Input
+                          placeholder="Dr. Juan Pérez García"
+                          disabled
+                          className="bg-gray-50"
+                        />
+                      </Form.Item>
+                      <Form.Item
+                        label="Cédula profesional"
+                        name="medico_cedula"
+                      >
+                        <Input
+                          placeholder="12345678"
+                          disabled
+                          className="bg-gray-50"
+                        />
+                      </Form.Item>
+                      <Form.Item
+                        label="Especialidad"
+                        name="medico_especialidad"
+                      >
+                        <Input
+                          placeholder="Gastroenterología"
+                          disabled
+                          className="bg-gray-50"
+                        />
+                      </Form.Item>
+                    </div>
+                  </div>
+
+                  {/* Anestesiólogo */}
+                  <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <SectionTitle
+                      title="Anestesiólogo"
+                      icon={<UserOutlined className="text-purple-600" />}
+                    />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <Form.Item
+                        label="Nombre completo"
+                        name="anestesiologo_nombre"
+                      >
+                        <SelectCatalogo
+                          items={itemsCatalogo("anestesiologos")}
+                          onAgregar={(v) => agregarItem("anestesiologos", v)}
+                          onEliminar={(v) => eliminarItem("anestesiologos", v)}
+                          placeholder="Dr. María López Ruiz"
+                        />
+                      </Form.Item>
+                      <Form.Item
+                        label="Cédula profesional"
+                        name="anestesiologo_cedula"
+                      >
+                        <Input placeholder="87654321" />
+                      </Form.Item>
+                      <Form.Item
+                        label="Especialidad"
+                        name="anestesiologo_especialidad"
+                      >
+                        <Input placeholder="Anestesiología" />
+                      </Form.Item>
+                    </div>
+                  </div>
+
+                  {/* Método de Sedación */}
+                  <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <SectionTitle
+                      title="Método de Sedación"
+                      icon={<MedicineBoxOutlined className="text-orange-600" />}
+                    />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <Form.Item
+                        label="Tipo de sedación"
+                        name="metodo_sedacion"
+                      >
+                        <SelectCatalogo
+                          items={itemsCatalogo("tiposSedacion")}
+                          onAgregar={(v) => agregarItem("tiposSedacion", v)}
+                          onEliminar={(v) => eliminarItem("tiposSedacion", v)}
+                          placeholder="Seleccionar método"
+                        />
+                      </Form.Item>
+                      <Form.Item
+                        label="Dosis administrada"
+                        name="sedacion_dosis"
+                      >
+                        <Input placeholder="Ej. Propofol 200mg IV, Fentanilo 100mcg" />
+                      </Form.Item>
+                      <Form.Item
+                        label="Observaciones de sedación"
+                        name="sedacion_observaciones"
+                        className="md:col-span-2"
+                      >
+                        <TextArea
+                          rows={2}
+                          placeholder="Notas sobre la sedación, respuesta del paciente, etc."
+                        />
+                      </Form.Item>
+                    </div>
+                  </div>
+
+                  {/* Enfermería y Asistente */}
+                  <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <SectionTitle
+                      title="Enfermería y Asistente"
+                      icon={<TeamOutlined className="text-teal-600" />}
+                    />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <Form.Item
+                        label="Nombre de enfermería"
+                        name="enfermeria_nombre"
+                      >
+                        <SelectCatalogo
+                          items={itemsCatalogo("enfermeras")}
+                          onAgregar={(v) => agregarItem("enfermeras", v)}
+                          onEliminar={(v) => eliminarItem("enfermeras", v)}
+                          placeholder="Enf. Ana Martínez"
+                        />
+                      </Form.Item>
+                      <Form.Item
+                        label="Nombre del asistente"
+                        name="asistente_nombre"
+                      >
+                        <SelectCatalogo
+                          items={itemsCatalogo("asistentes")}
+                          onAgregar={(v) => agregarItem("asistentes", v)}
+                          onEliminar={(v) => eliminarItem("asistentes", v)}
+                          placeholder="Asistente del procedimiento"
+                        />
+                      </Form.Item>
+                      <Form.Item label="Rol / Función" name="asistente_rol">
+                        <Select placeholder="Seleccionar rol">
+                          <Option value="Enfermero(a)">Enfermero(a)</Option>
+                          <Option value="Técnico">Técnico</Option>
+                          <Option value="Asistente médico">
+                            Asistente médico
+                          </Option>
+                          <Option value="Residente">Residente</Option>
+                          <Option value="Otro">Otro</Option>
+                        </Select>
+                      </Form.Item>
+                    </div>
+                  </div>
+
+                  {/* Información clínica y hallazgos */}
                   <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                     <SectionTitle
                       title="Información clínica y hallazgos"
@@ -730,7 +993,7 @@ const EstudioDetalle: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Sección 2: Detalle de pólipos */}
+                  {/* Detalle de pólipos */}
                   <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-20 h-20 bg-indigo-50 rounded-bl-full -mr-10 -mt-10 z-0" />
                     <div className="relative z-10">
@@ -800,7 +1063,7 @@ const EstudioDetalle: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Sección 3: Plan y seguimiento */}
+                  {/* Plan y seguimiento */}
                   <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                     <SectionTitle
                       title="Plan y seguimiento"
@@ -854,111 +1117,7 @@ const EstudioDetalle: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Sección 4: Datos del Médico Tratante */}
-                  <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <SectionTitle
-                      title="Médico Tratante"
-                      icon={<UserOutlined className="text-blue-600" />}
-                    />
-                    <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                      <p className="text-sm text-blue-700 flex items-center gap-2">
-                        <InfoCircleOutlined className="text-blue-600" />
-                        <span>
-                          Estos datos corresponden a tu información profesional.
-                          Para modificarlos, ve a{" "}
-                          <strong>
-                            Configuración → Datos Médicos Profesionales
-                          </strong>
-                        </span>
-                      </p>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <Form.Item label="Nombre completo" name="medico_nombre">
-                        <Input
-                          placeholder="Dr. Juan Pérez García"
-                          disabled
-                          className="bg-gray-50"
-                        />
-                      </Form.Item>
-                      <Form.Item
-                        label="Cédula profesional"
-                        name="medico_cedula"
-                      >
-                        <Input
-                          placeholder="12345678"
-                          disabled
-                          className="bg-gray-50"
-                        />
-                      </Form.Item>
-                      <Form.Item
-                        label="Especialidad"
-                        name="medico_especialidad"
-                      >
-                        <Input
-                          placeholder="Gastroenterología"
-                          disabled
-                          className="bg-gray-50"
-                        />
-                      </Form.Item>
-                    </div>
-                  </div>
-
-                  {/* Sección 5: Datos del Anestesiólogo */}
-                  <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <SectionTitle
-                      title="Anestesiólogo"
-                      icon={<UserOutlined className="text-purple-600" />}
-                    />
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <Form.Item
-                        label="Nombre completo"
-                        name="anestesiologo_nombre"
-                      >
-                        <Input placeholder="Dr. María López Ruiz" />
-                      </Form.Item>
-                      <Form.Item
-                        label="Cédula profesional"
-                        name="anestesiologo_cedula"
-                      >
-                        <Input placeholder="87654321" />
-                      </Form.Item>
-                      <Form.Item
-                        label="Especialidad"
-                        name="anestesiologo_especialidad"
-                      >
-                        <Input placeholder="Anestesiología" />
-                      </Form.Item>
-                    </div>
-                  </div>
-
-                  {/* Sección 6: Datos del Asistente */}
-                  <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <SectionTitle
-                      title="Asistente / Enfermero(a)"
-                      icon={<TeamOutlined className="text-teal-600" />}
-                    />
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <Form.Item
-                        label="Nombre completo"
-                        name="asistente_nombre"
-                      >
-                        <Input placeholder="Enf. Ana Martínez" />
-                      </Form.Item>
-                      <Form.Item label="Rol / Función" name="asistente_rol">
-                        <Select placeholder="Seleccionar rol">
-                          <Option value="Enfermero(a)">Enfermero(a)</Option>
-                          <Option value="Técnico">Técnico</Option>
-                          <Option value="Asistente médico">
-                            Asistente médico
-                          </Option>
-                          <Option value="Residente">Residente</Option>
-                          <Option value="Otro">Otro</Option>
-                        </Select>
-                      </Form.Item>
-                    </div>
-                  </div>
-
-                  {/* Sección 7: Datos del Consultorio / Clínica */}
+                  {/* Consultorio / Clínica */}
                   <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                     <SectionTitle
                       title="Consultorio / Clínica"
@@ -990,87 +1149,6 @@ const EstudioDetalle: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Sección 8: Método de Sedación */}
-                  <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <SectionTitle
-                      title="Método de Sedación"
-                      icon={<MedicineBoxOutlined className="text-orange-600" />}
-                    />
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <Form.Item
-                        label="Tipo de sedación"
-                        name="metodo_sedacion"
-                      >
-                        <Select placeholder="Seleccionar método">
-                          <Option value="Sedación consciente">
-                            Sedación consciente
-                          </Option>
-                          <Option value="Sedación profunda">
-                            Sedación profunda
-                          </Option>
-                          <Option value="Anestesia general">
-                            Anestesia general
-                          </Option>
-                          <Option value="Sin sedación">Sin sedación</Option>
-                          <Option value="Sedación con Propofol">
-                            Sedación con Propofol
-                          </Option>
-                          <Option value="Sedación con Midazolam">
-                            Sedación con Midazolam
-                          </Option>
-                          <Option value="Otro">Otro</Option>
-                        </Select>
-                      </Form.Item>
-                      <Form.Item
-                        label="Dosis administrada"
-                        name="sedacion_dosis"
-                      >
-                        <Input placeholder="Ej. Propofol 200mg IV, Fentanilo 100mcg" />
-                      </Form.Item>
-                      <Form.Item
-                        label="Observaciones de sedación"
-                        name="sedacion_observaciones"
-                        className="md:col-span-2"
-                      >
-                        <TextArea
-                          rows={2}
-                          placeholder="Notas sobre la sedación, respuesta del paciente, etc."
-                        />
-                      </Form.Item>
-                    </div>
-                  </div>
-
-                  {/* Sección 9: Equipo Utilizado */}
-                  <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <SectionTitle
-                      title="Equipo Utilizado"
-                      icon={<ToolOutlined className="text-gray-600" />}
-                    />
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <Form.Item
-                        label="Tipo de endoscopio"
-                        name="equipo_endoscopio"
-                      >
-                        <Select placeholder="Seleccionar tipo">
-                          <Option value="Colonoscopio">Colonoscopio</Option>
-                          <Option value="Gastroscopio">Gastroscopio</Option>
-                          <Option value="Duodenoscopio">Duodenoscopio</Option>
-                          <Option value="Enteroscopio">Enteroscopio</Option>
-                          <Option value="Sigmoidoscopio">Sigmoidoscopio</Option>
-                          <Option value="Otro">Otro</Option>
-                        </Select>
-                      </Form.Item>
-                      <Form.Item label="Marca" name="equipo_marca">
-                        <Input placeholder="Olympus, Fujifilm, Pentax, etc." />
-                      </Form.Item>
-                      <Form.Item label="Modelo" name="equipo_modelo">
-                        <Input placeholder="CF-HQ190L, etc." />
-                      </Form.Item>
-                      <Form.Item label="Número de serie" name="equipo_serie">
-                        <Input placeholder="SN-XXXXX" />
-                      </Form.Item>
-                    </div>
-                  </div>
                 </div>
               </Form>
             </div>
