@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Form, message, Modal } from "antd";
 import SearchPacientes from "../components/pacientes/SearchPacientes";
 import PacientesTable from "../components/pacientes/PacientesTable";
@@ -21,6 +22,7 @@ import { cleanUndefinedValues } from "../helpers/cleanUndefinedValues";
 import { useElectronStore } from "../hooks/useElectronStore";
 
 const Pacientes = () => {
+  const navigate = useNavigate();
   const { user } = useElectronStore();
   const empresaId = user?.empresa?.id;
   const userId = user?.usuarioDetail?.id;
@@ -113,6 +115,12 @@ const Pacientes = () => {
         dispatch(setListaDePacientes(pacientesActualizados));
         dispatch(setDetalleDePaciente(pacienteCreado));
         message.success("Paciente creado exitosamente");
+
+        // Entrar directo al detalle del paciente recién creado para
+        // registrar su estudio o consulta sin pasos intermedios
+        if (pacienteCreado.id) {
+          navigate(`/paciente-detalle/${pacienteCreado.id}`);
+        }
       } else {
         values.id = detalleDePaciente?.id || "";
         const pacienteActualizado =
