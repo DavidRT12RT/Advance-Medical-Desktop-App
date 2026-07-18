@@ -94,5 +94,46 @@ export function useCatalogosEstudio() {
     [items, persistir],
   );
 
-  return { items, agregarItem, eliminarItem, loading };
+  const renombrarItem = useCallback(
+    (clave: ClaveCatalogo, anterior: string, nuevo: string) => {
+      const v = (nuevo || "").trim();
+      if (!v || v === anterior) return;
+      const actuales = items(clave);
+      if (
+        actuales.some(
+          (i) => i !== anterior && i.toLowerCase() === v.toLowerCase(),
+        )
+      ) {
+        message.warning("Ya existe una entrada con ese nombre");
+        return;
+      }
+      persistir(
+        clave,
+        actuales.map((i) => (i === anterior ? v : i)),
+      );
+    },
+    [items, persistir],
+  );
+
+  /** Reincorpora los valores sugeridos del código sin perder los propios. */
+  const restaurarSugeridos = useCallback(
+    (clave: ClaveCatalogo) => {
+      const actuales = items(clave);
+      const faltantes = (CATALOGOS_ESTUDIO_DEFAULTS[clave] ?? []).filter(
+        (d) => !actuales.some((i) => i.toLowerCase() === d.toLowerCase()),
+      );
+      if (!faltantes.length) return;
+      persistir(clave, [...actuales, ...faltantes]);
+    },
+    [items, persistir],
+  );
+
+  return {
+    items,
+    agregarItem,
+    eliminarItem,
+    renombrarItem,
+    restaurarSugeridos,
+    loading,
+  };
 }

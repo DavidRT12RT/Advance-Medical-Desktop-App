@@ -18,6 +18,18 @@ export type ClaveCatalogo =
   | "enfermeras"
   | "asistentes";
 
+/** Etiquetas para la pantalla de administración de listados. */
+export const CATALOGOS_ESTUDIO_LABELS: Record<ClaveCatalogo, string> = {
+  tiposProcedimiento: "Tipos de procedimiento",
+  motivosEstudio: "Motivos del estudio",
+  equiposMarca: "Marcas de equipo",
+  equiposModelo: "Modelos de equipo",
+  anestesiologos: "Anestesiólogos",
+  tiposSedacion: "Tipos de sedación",
+  enfermeras: "Enfermería",
+  asistentes: "Asistentes",
+};
+
 export const CATALOGOS_ESTUDIO_DEFAULTS: Record<ClaveCatalogo, string[]> = {
   tiposProcedimiento: [...TIPOS_ESTUDIO, "Panendoscopia"],
   motivosEstudio: [

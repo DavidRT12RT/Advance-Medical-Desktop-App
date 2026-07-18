@@ -1,9 +1,15 @@
 import { useState } from "react";
 import { Tabs } from "antd";
-import { FileTextOutlined, UserOutlined, VideoCameraOutlined } from "@ant-design/icons";
+import {
+  FileTextOutlined,
+  UserOutlined,
+  VideoCameraOutlined,
+  UnorderedListOutlined,
+} from "@ant-design/icons";
 import ConfiguracionReporte from "../components/configuraciones/ConfiguracionReporte";
 import DatosMedicoDoctor from "../components/configuraciones/DatosMedicoDoctor";
 import ConfiguracionCamara from "../components/configuraciones/ConfiguracionCamara";
+import CatalogosEstudioConfig from "../components/configuraciones/CatalogosEstudioConfig";
 import { useElectronStore } from "../hooks/useElectronStore";
 
 const Configuracion = () => {
@@ -48,6 +54,15 @@ const Configuracion = () => {
             No se pudo cargar los datos médicos. Verifica tu sesión.
           </div>
         ),
+    },
+    {
+      key: "listados",
+      label: (
+        <span>
+          <UnorderedListOutlined /> Listados del Estudio
+        </span>
+      ),
+      children: <CatalogosEstudioConfig />,
     },
     {
       key: "camara",
