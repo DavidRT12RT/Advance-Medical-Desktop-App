@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Empty, Skeleton, Tag } from "antd";
+import { DatePicker, Empty, Input, Select, Skeleton, Tag } from "antd";
+import { SearchOutlined } from "@ant-design/icons";
 import { useParams, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import dayjs from "dayjs";
@@ -13,6 +14,8 @@ interface Registro {
   id: string;
   data: any;
 }
+
+const { RangePicker } = DatePicker;
 
 const ESTADOS_PROGRAMADOS = ["pendiente", "en_progreso", "en_edicion"];
 
@@ -45,6 +48,14 @@ const EstudiosYConsultasPacienteDetalle = () => {
 
   const [loading, setLoading] = useState(true);
   const [registros, setRegistros] = useState<Registro[]>([]);
+
+  const [searchText, setSearchText] = useState("");
+  const [claseFiltro, setClaseFiltro] = useState("");
+  const [tipoFiltro, setTipoFiltro] = useState("");
+  const [estadoFiltro, setEstadoFiltro] = useState("");
+  const [fechaRango, setFechaRango] = useState<
+    [dayjs.Dayjs | null, dayjs.Dayjs | null] | null
+  >(null);
 
   useEffect(() => {
     const fetchRegistros = async () => {
@@ -84,10 +95,59 @@ const EstudiosYConsultasPacienteDetalle = () => {
     return <Skeleton active paragraph={{ rows: 6 }} />;
   }
 
-  const programados = [...registros]
+  // Tipos presentes en los registros del paciente, para el filtro
+  const tiposDisponibles = Array.from(
+    new Set(registros.map((r) => r.data.tipo).filter(Boolean)),
+  ).sort() as string[];
+
+  const cumpleFiltros = (registro: Registro) => {
+    const d = registro.data;
+
+    const searchLower = searchText.toLowerCase();
+    const matchesSearch =
+      !searchLower ||
+      [
+        d.tipo,
+        d.motivo_estudio,
+        d.motivo_consulta,
+        d.observaciones,
+        d.notas,
+        d.hallazgos,
+        d.hallazgos_generales,
+        d.resultado,
+      ].some((campo) => campo?.toLowerCase?.().includes(searchLower));
+
+    const matchesClase = !claseFiltro || registro.kind === claseFiltro;
+    const matchesTipo = !tipoFiltro || d.tipo === tipoFiltro;
+
+    let matchesEstado = true;
+    if (estadoFiltro === "pendiente") {
+      matchesEstado = d.estado === "pendiente";
+    } else if (estadoFiltro === "en_progreso") {
+      matchesEstado = d.estado === "en_progreso" || d.estado === "en_edicion";
+    } else if (estadoFiltro === "finalizado") {
+      matchesEstado = !ESTADOS_PROGRAMADOS.includes(d.estado || "");
+    }
+
+    let matchesFecha = true;
+    if (fechaRango && fechaRango[0] && fechaRango[1]) {
+      const fecha = dayjs(d.fecha || d.fechaRegistro);
+      matchesFecha =
+        fecha.isAfter(fechaRango[0].startOf("day")) &&
+        fecha.isBefore(fechaRango[1].endOf("day"));
+    }
+
+    return (
+      matchesSearch && matchesClase && matchesTipo && matchesEstado && matchesFecha
+    );
+  };
+
+  const filtrados = registros.filter(cumpleFiltros);
+
+  const programados = [...filtrados]
     .filter(esProgramado)
     .sort((a, b) => (a.data.fecha || "").localeCompare(b.data.fecha || ""));
-  const previos = [...registros]
+  const previos = [...filtrados]
     .filter((r) => !esProgramado(r))
     .sort((a, b) => (b.data.fecha || "").localeCompare(a.data.fecha || ""));
 
@@ -369,33 +429,105 @@ const EstudiosYConsultasPacienteDetalle = () => {
     );
   }
 
+  const hayFiltrosActivos =
+    !!searchText || !!claseFiltro || !!tipoFiltro || !!estadoFiltro || !!fechaRango;
+
   return (
     <section className="space-y-8">
-      <div className="space-y-4">
-        <h2 className="text-lg font-semibold text-gray-800 border-l-4 border-indigo-600 pl-3">
-          Programados y pendientes
-        </h2>
-        {programados.length === 0 ? (
-          <p className="text-sm text-gray-500">
-            No hay estudios ni consultas pendientes.
-          </p>
-        ) : (
-          renderLista(programados)
-        )}
+      {/* Buscador y filtros */}
+      <div className="flex flex-col gap-3">
+        <Input
+          placeholder="Buscar por tipo, motivo, hallazgos, observaciones..."
+          prefix={<SearchOutlined style={{ color: "#bfbfbf" }} />}
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          size="large"
+          allowClear
+        />
+        <div className="flex items-center gap-3 flex-wrap">
+          <Select
+            placeholder="Estudios y consultas"
+            value={claseFiltro || undefined}
+            onChange={(v) => setClaseFiltro(v || "")}
+            size="large"
+            style={{ width: 190 }}
+            allowClear
+            options={[
+              { label: "Estudios y consultas", value: "" },
+              { label: "Solo estudios", value: "estudio" },
+              { label: "Solo consultas", value: "consulta" },
+            ]}
+          />
+          <Select
+            placeholder="Tipo"
+            value={tipoFiltro || undefined}
+            onChange={(v) => setTipoFiltro(v || "")}
+            size="large"
+            style={{ width: 200 }}
+            allowClear
+            options={[
+              { label: "Todos los tipos", value: "" },
+              ...tiposDisponibles.map((tipo) => ({
+                label: tipo,
+                value: tipo,
+              })),
+            ]}
+          />
+          <Select
+            placeholder="Estado"
+            value={estadoFiltro || undefined}
+            onChange={(v) => setEstadoFiltro(v || "")}
+            size="large"
+            style={{ width: 170 }}
+            allowClear
+            options={[
+              { label: "Todos los estados", value: "" },
+              { label: "Pendiente", value: "pendiente" },
+              { label: "En progreso", value: "en_progreso" },
+              { label: "Finalizado", value: "finalizado" },
+            ]}
+          />
+          <RangePicker
+            value={fechaRango}
+            onChange={setFechaRango}
+            size="large"
+            placeholder={["Fecha inicio", "Fecha fin"]}
+            format="YYYY-MM-DD"
+          />
+        </div>
       </div>
 
-      <div className="space-y-4">
-        <h2 className="text-lg font-semibold text-gray-800 border-l-4 border-indigo-600 pl-3">
-          Previos
-        </h2>
-        {previos.length === 0 ? (
-          <p className="text-sm text-gray-500">
-            No hay estudios ni consultas finalizados.
-          </p>
-        ) : (
-          renderLista(previos)
-        )}
-      </div>
+      {filtrados.length === 0 && hayFiltrosActivos ? (
+        <Empty description="Ningún estudio o consulta coincide con la búsqueda o los filtros." />
+      ) : (
+        <>
+          <div className="space-y-4">
+            <h2 className="text-lg font-semibold text-gray-800 border-l-4 border-indigo-600 pl-3">
+              Programados y pendientes
+            </h2>
+            {programados.length === 0 ? (
+              <p className="text-sm text-gray-500">
+                No hay estudios ni consultas pendientes.
+              </p>
+            ) : (
+              renderLista(programados)
+            )}
+          </div>
+
+          <div className="space-y-4">
+            <h2 className="text-lg font-semibold text-gray-800 border-l-4 border-indigo-600 pl-3">
+              Previos
+            </h2>
+            {previos.length === 0 ? (
+              <p className="text-sm text-gray-500">
+                No hay estudios ni consultas finalizados.
+              </p>
+            ) : (
+              renderLista(previos)
+            )}
+          </div>
+        </>
+      )}
     </section>
   );
 };
