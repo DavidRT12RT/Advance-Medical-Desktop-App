@@ -990,8 +990,10 @@ const Detection: React.FC = () => {
               ctx.fillText(label, x1 + 2, y2 + 16);
             });
 
-            // Banner de datos quemado en la grabación: fecha/hora, paciente,
-            // estudio y tiempo de grabación
+            // Banner de contexto clínico quemado en la grabación: fecha/hora,
+            // paciente y estudio. Los datos de grabación (REC, tiempo,
+            // contador de fotos) solo se muestran en pantalla — no deben
+            // quedar visibles en el video guardado.
             const info = overlayInfoRef.current;
             const fechaHora = new Date().toLocaleString("es-MX", {
               day: "2-digit",
@@ -1005,10 +1007,6 @@ const Detection: React.FC = () => {
             const partes = [fechaHora];
             if (info.paciente) partes.push(info.paciente);
             if (info.estudio) partes.push(info.estudio);
-            const seg = recordingSecondsRef.current;
-            const mm = String(Math.floor(seg / 60)).padStart(2, "0");
-            const ss = String(seg % 60).padStart(2, "0");
-            const textoDer = `REC ${mm}:${ss}`;
 
             const bannerH = 26;
             ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
@@ -1020,7 +1018,7 @@ const Detection: React.FC = () => {
             // Truncar con elipsis en vez de comprimir el texto (maxWidth de
             // fillText deforma tipográficamente los nombres largos)
             let textoIzq = partes.join("  •  ");
-            const maxAnchoIzq = FRAME_WIDTH - 130;
+            const maxAnchoIzq = FRAME_WIDTH - 16;
             if (ctx.measureText(textoIzq).width > maxAnchoIzq) {
               while (
                 textoIzq.length > 1 &&
@@ -1032,24 +1030,6 @@ const Detection: React.FC = () => {
             }
             ctx.fillStyle = "#FFFFFF";
             ctx.fillText(textoIzq, 8, FRAME_HEIGHT - bannerH / 2);
-
-            const anchoDer = ctx.measureText(textoDer).width;
-            ctx.fillStyle = "#F87171";
-            // Punto de grabación
-            ctx.beginPath();
-            ctx.arc(
-              FRAME_WIDTH - anchoDer - 18,
-              FRAME_HEIGHT - bannerH / 2,
-              4,
-              0,
-              Math.PI * 2,
-            );
-            ctx.fill();
-            ctx.fillText(
-              textoDer,
-              FRAME_WIDTH - anchoDer - 8,
-              FRAME_HEIGHT - bannerH / 2,
-            );
             ctx.textBaseline = "alphabetic";
           };
           img.src = imageSrc;
