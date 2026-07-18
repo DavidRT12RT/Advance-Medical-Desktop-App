@@ -417,6 +417,81 @@ ipcMain.handle('update:cancelDownload', async () => {
   return { success: true };
 });
 
+// --- Archivos locales del estudio (guardado en tiempo real) --------------
+// Las fotos y el video de cada sesión se escriben conforme se capturan en
+// userData/EstudiosAIM/<carpeta del estudio>, para no perder nada si se cae
+// la conexión o la aplicación.
+ipcMain.handle('estudio:guardarArchivoLocal', async (event, payload) => {
+  try {
+    const { carpeta, nombre, dataBase64, append } = payload || {};
+    if (!carpeta || !nombre || !dataBase64) {
+      return { success: false, error: 'Datos incompletos' };
+    }
+    const dir = path.join(app.getPath('userData'), 'EstudiosAIM', carpeta);
+    await fsPromises.mkdir(dir, { recursive: true });
+    const ruta = path.join(dir, nombre);
+    const buffer = Buffer.from(dataBase64, 'base64');
+    if (append) {
+      await fsPromises.appendFile(ruta, buffer);
+    } else {
+      await fsPromises.writeFile(ruta, buffer);
+    }
+    return { success: true, ruta };
+  } catch (error) {
+    console.error('[IPC] Error guardando archivo local:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('estudio:leerArchivoLocal', async (event, payload) => {
+  try {
+    const buffer = await fsPromises.readFile(payload?.ruta);
+    return { success: true, dataBase64: buffer.toString('base64') };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Copia archivos locales ya guardados (fotos o video) a la ubicación que
+// elija el usuario (memoria USB, disco externo...).
+ipcMain.handle('estudio:exportarArchivosLocales', async (event, payload) => {
+  try {
+    const { nombreCarpeta, rutas } = payload || {};
+    if (!Array.isArray(rutas) || rutas.length === 0) {
+      return { success: false, error: 'No hay archivos para exportar' };
+    }
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const result = await dialog.showOpenDialog(win, {
+      title: 'Selecciona dónde guardar los archivos',
+      buttonLabel: 'Guardar aquí',
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    if (result.canceled || !result.filePaths.length) {
+      return { success: false, canceled: true };
+    }
+    const destinoDir = nombreCarpeta
+      ? path.join(result.filePaths[0], nombreCarpeta)
+      : result.filePaths[0];
+    await fsPromises.mkdir(destinoDir, { recursive: true });
+
+    let guardados = 0;
+    const errores = [];
+    for (const ruta of rutas) {
+      try {
+        await fsPromises.copyFile(ruta, path.join(destinoDir, path.basename(ruta)));
+        guardados++;
+      } catch (error) {
+        console.error(`[IPC] Error copiando ${ruta}:`, error);
+        errores.push(path.basename(ruta));
+      }
+    }
+    return { success: true, destino: destinoDir, guardados, errores };
+  } catch (error) {
+    console.error('[IPC] Error exportando archivos locales:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 // Exporta la carpeta de un estudio (reporte PDF, fotografías y video) al
 // destino que elija el usuario (memoria USB, disco externo, etc.). Los
 // archivos llegan como base64 o como URL https que se descarga aquí en el

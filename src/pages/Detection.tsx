@@ -315,6 +315,23 @@ const Detection: React.FC = () => {
   const ajustesOpenRef = useRef(false);
   const popoverCierreRef = useRef(0);
 
+  // Guardado local en tiempo real (userData/EstudiosAIM/<carpeta del estudio>):
+  // cada foto se escribe al capturarse y el video por chunks mientras graba,
+  // para no perder nada si se cae la conexión o la aplicación.
+  const carpetaLocalRef = useRef<string>("");
+  const carpetaVideoLocalRef = useRef<string>("");
+  const rutasFotosLocalesRef = useRef<string[]>([]);
+  const contadorFotoLocalRef = useRef(0);
+  const rutaVideoLocalRef = useRef<string | null>(null);
+  const nombreVideoLocalRef = useRef<string>("");
+  const colaVideoLocalRef = useRef<Promise<void>>(Promise.resolve());
+  const [exporteFinal, setExporteFinal] = useState<{
+    rutasFotos: string[];
+    rutaVideo: string | null;
+  } | null>(null);
+  const [exportandoFotos, setExportandoFotos] = useState(false);
+  const [exportandoVideo, setExportandoVideo] = useState(false);
+
   const subtitle = estudio
     ? [
         estudio.tipo,
@@ -448,6 +465,12 @@ const Detection: React.FC = () => {
       paciente: nombrePaciente,
       estudio: estudio?.tipo || "",
     };
+    carpetaLocalRef.current = `${nombrePaciente || "Paciente"} - ${
+      estudio?.tipo || "Estudio"
+    } - ${estudio?.fecha || new Date().toISOString().split("T")[0]}`.replace(
+      /[\\/:*?"<>|]/g,
+      "-",
+    );
   }, [paciente, estudio]);
 
   // Salir del modo expandido con Esc
@@ -473,6 +496,103 @@ const Detection: React.FC = () => {
     const s = (total % 60).toString().padStart(2, "0");
     return `${m}:${s}`;
   };
+
+  const obtenerCarpetaLocal = useCallback(
+    () => carpetaLocalRef.current || `estudio-${estudioId || "sin-id"}`,
+    [estudioId],
+  );
+
+  const blobABase64 = (blob: Blob) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(",")[1] || "");
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+
+  // Foto → disco local inmediatamente (independiente de la subida a la nube)
+  const guardarFotoLocalmente = useCallback(
+    async (dataUrl: string) => {
+      const api = (window as any).estudioExport;
+      if (!api?.guardarArchivoLocal) return;
+      const numero = ++contadorFotoLocalRef.current;
+      try {
+        const res = await api.guardarArchivoLocal({
+          carpeta: obtenerCarpetaLocal(),
+          nombre: `Foto ${String(numero).padStart(2, "0")}.jpg`,
+          dataBase64: dataUrl.split(",")[1] || "",
+        });
+        if (res?.success && res.ruta) {
+          rutasFotosLocalesRef.current.push(res.ruta);
+        }
+      } catch (error) {
+        console.error("Error guardando foto localmente:", error);
+      }
+    },
+    [obtenerCarpetaLocal],
+  );
+
+  // Chunk de video → disco local (cola secuencial para conservar el orden)
+  const persistirChunkLocal = useCallback(
+    (chunk: Blob) => {
+      const api = (window as any).estudioExport;
+      if (!api?.guardarArchivoLocal) return;
+      colaVideoLocalRef.current = colaVideoLocalRef.current.then(async () => {
+        try {
+          if (!nombreVideoLocalRef.current) {
+            nombreVideoLocalRef.current = `Video ${new Date()
+              .toISOString()
+              .replace(/[:.]/g, "-")}.webm`;
+            // La carpeta se congela al primer chunk: los appends siguientes
+            // deben ir siempre al mismo archivo
+            carpetaVideoLocalRef.current = obtenerCarpetaLocal();
+          }
+          const dataBase64 = await blobABase64(chunk);
+          const res = await api.guardarArchivoLocal({
+            carpeta: carpetaVideoLocalRef.current,
+            nombre: nombreVideoLocalRef.current,
+            dataBase64,
+            append: !!rutaVideoLocalRef.current,
+          });
+          if (res?.success && res.ruta) {
+            rutaVideoLocalRef.current = res.ruta;
+          }
+        } catch (error) {
+          console.error("Error guardando chunk de video local:", error);
+        }
+      });
+    },
+    [obtenerCarpetaLocal],
+  );
+
+  // Copiar archivos locales a memoria USB / disco elegido por el usuario
+  const exportarLocalesAMemoria = useCallback(
+    async (rutas: string[], setLoading: (v: boolean) => void) => {
+      const api = (window as any).estudioExport;
+      if (!api?.exportarArchivosLocales) {
+        messageApi.error("La exportación no está disponible");
+        return;
+      }
+      try {
+        setLoading(true);
+        const res = await api.exportarArchivosLocales({
+          nombreCarpeta: obtenerCarpetaLocal(),
+          rutas,
+        });
+        if (res?.canceled) return;
+        if (res?.success) {
+          messageApi.success(
+            `${res.guardados} archivo(s) guardados en: ${res.destino}`,
+          );
+        } else {
+          messageApi.error(res?.error || "No se pudo exportar");
+        }
+      } finally {
+        setLoading(false);
+      }
+    },
+    [messageApi, obtenerCarpetaLocal],
+  );
 
   // Aplica los ajustes de imagen del médico a una captura (dataURL). Las
   // capturas deben coincidir con lo que se ve en pantalla y con la grabación;
@@ -512,6 +632,9 @@ const Detection: React.FC = () => {
     if (!rawScreenshot || !pacienteId || !estudioId) return;
     const screenshot = await aplicarAjustesACaptura(rawScreenshot);
 
+    // Guardado local inmediato, pase lo que pase con la nube
+    guardarFotoLocalmente(screenshot);
+
     try {
       // Mostrar animación de feedback
       setShowScreenshotAnimation(true);
@@ -546,7 +669,7 @@ const Detection: React.FC = () => {
       console.error("Error capturando screenshot manual:", error);
       messageApi.error("Error al guardar la captura");
     }
-  }, [isCapturing, isPaused, pacienteId, estudioId, empresaId, sessionId, aplicarAjustesACaptura]);
+  }, [isCapturing, isPaused, pacienteId, estudioId, empresaId, sessionId, aplicarAjustesACaptura, guardarFotoLocalmente]);
 
   // Función para dibujar bboxes en el canvas overlay
   const drawDetections = (detections: any[]) => {
@@ -892,14 +1015,17 @@ const Detection: React.FC = () => {
         recorder.ondataavailable = (event: BlobEvent) => {
           if (event.data && event.data.size > 0) {
             recordedChunksRef.current.push(event.data);
+            persistirChunkLocal(event.data);
           }
         };
-        recorder.start();
+        // Timeslice: entrega chunks cada segundo para poder escribir el
+        // video a disco local en tiempo real
+        recorder.start(1000);
       } catch (error) {
         console.error("No se pudo iniciar la grabación de video:", error);
       }
     }
-  }, [isConnected, empresaId, pacienteId, estudioId, doctorId]);
+  }, [isConnected, empresaId, pacienteId, estudioId, doctorId, persistirChunkLocal]);
 
   // Capturar y enviar frames (funciona con o sin servidor).
   // Depende también de isPaused: al pausar, el cleanup detiene el loop y al
@@ -1110,6 +1236,13 @@ const Detection: React.FC = () => {
       });
     }
 
+    // Esperar a que terminen las escrituras locales pendientes del video
+    try {
+      await colaVideoLocalRef.current;
+    } catch {
+      /* las escrituras locales fallidas ya quedaron logueadas */
+    }
+
     if (pacienteId && estudioId) {
       const allEvents = polypEventsRef.current;
       const allSegments = buildPolypSegments(allEvents);
@@ -1215,7 +1348,14 @@ const Detection: React.FC = () => {
         messageApi.error("No se pudieron guardar los resultados");
       }
 
-      navigate(`/paciente-detalle/${pacienteId}/estudios/${estudioId}`);
+      // Ofrecer copiar a memoria USB los archivos locales antes de salir
+      const rutasFotos = rutasFotosLocalesRef.current;
+      const rutaVideo = rutaVideoLocalRef.current;
+      if (rutasFotos.length > 0 || rutaVideo) {
+        setExporteFinal({ rutasFotos, rutaVideo });
+      } else {
+        navigate(`/paciente-detalle/${pacienteId}/estudios/${estudioId}`);
+      }
     }
     } finally {
       setIsSaving(false);
@@ -1263,6 +1403,61 @@ const Detection: React.FC = () => {
             <br />
             No cierres la aplicación.
           </p>
+        </div>
+      </Modal>
+
+      {/* Modal final: copiar fotos/video a memoria USB o disco externo */}
+      <Modal
+        open={exporteFinal !== null}
+        closable={false}
+        maskClosable={false}
+        keyboard={false}
+        footer={null}
+        centered
+        width={460}
+        title="Estudio guardado"
+      >
+        <div className="flex flex-col gap-3 pt-2">
+          <p className="text-sm text-gray-600">
+            Las fotografías y el video quedaron guardados en esta computadora.
+            Si lo necesitas, cópialos ahora a una memoria USB o disco externo
+            para entregarlos al paciente, médico u hospital.
+          </p>
+          <Button
+            icon={<CameraOutlined />}
+            disabled={!exporteFinal?.rutasFotos.length}
+            loading={exportandoFotos}
+            onClick={() =>
+              exporteFinal &&
+              exportarLocalesAMemoria(exporteFinal.rutasFotos, setExportandoFotos)
+            }
+          >
+            Guardar fotografías en memoria (
+            {exporteFinal?.rutasFotos.length ?? 0})
+          </Button>
+          <Button
+            icon={<VideoCameraOutlined />}
+            disabled={!exporteFinal?.rutaVideo}
+            loading={exportandoVideo}
+            onClick={() =>
+              exporteFinal?.rutaVideo &&
+              exportarLocalesAMemoria(
+                [exporteFinal.rutaVideo],
+                setExportandoVideo,
+              )
+            }
+          >
+            Guardar video en memoria
+          </Button>
+          <Button
+            type="primary"
+            disabled={exportandoFotos || exportandoVideo}
+            onClick={() =>
+              navigate(`/paciente-detalle/${pacienteId}/estudios/${estudioId}`)
+            }
+          >
+            Continuar al estudio
+          </Button>
         </div>
       </Modal>
       {/* Header */}

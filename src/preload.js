@@ -72,6 +72,10 @@ window.electronStore = {
 window.estudioExport = {
   // Exportar carpeta del estudio (PDF + fotos + video) a USB/disco
   exportarCarpeta: (payload) => ipcRenderer.invoke('estudio:exportarCarpeta', payload),
+  // Guardado local en tiempo real de fotos/video del estudio
+  guardarArchivoLocal: (payload) => ipcRenderer.invoke('estudio:guardarArchivoLocal', payload),
+  leerArchivoLocal: (payload) => ipcRenderer.invoke('estudio:leerArchivoLocal', payload),
+  exportarArchivosLocales: (payload) => ipcRenderer.invoke('estudio:exportarArchivosLocales', payload),
 };
 
 window.updater = {
