@@ -81,8 +81,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   logo: {
-    width: 52,
-    height: 52,
+    width: 82,
+    height: 64,
     objectFit: "contain",
   },
   headerCenter: {
@@ -367,30 +367,108 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
     10
   );
 
-  // Acomodo dinámico: las fotos crecen según cuántas se seleccionen,
-  // llenando dos filas de izquierda a derecha (4 → 2 por fila, 6 → 3,
-  // 8 → 4, 10 → 5).
-  const columnasImagenes =
+  // ---- Acomodo de fotografías -------------------------------------------
+  // Las fotos van en la página 1 siempre que quepan en el espacio que dejan
+  // las demás secciones; si sobra espacio crecen para aprovecharlo, y solo
+  // pasan a la página 2 (en formato grande, 4→2 por fila, 6→3) cuando no
+  // caben. Alturas estimadas calibradas contra renders reales del componente.
+  const contarLineas = (texto: any, porLinea = 100) =>
+    texto ? Math.max(1, Math.ceil(String(texto).length / porLinea)) : 0;
+
+  const camposProcedimiento = [
+    true, // tipo
+    true, // fecha
+    !!estudio?.motivo_estudio,
+    !!(config.incluirDatosMedico && (estudio?.medico_nombre || nombreDoctor)),
+    !!(config.incluirDatosAnestesiologo && estudio?.anestesiologo_nombre),
+    !!(config.incluirSedacion && estudio?.metodo_sedacion),
+    !!(
+      config.incluirEquipo &&
+      (estudio?.equipo_endoscopio ||
+        estudio?.equipo_marca ||
+        estudio?.equipo_modelo ||
+        estudio?.equipo_serie)
+    ),
+    !!estudio?.enfermeria_nombre,
+    !!(config.incluirDatosAsistente && estudio?.asistente_nombre),
+  ].filter(Boolean).length;
+
+  const altoEncabezado = 125;
+  const altoPaciente = config.incluirDatosPaciente && paciente ? 68 : 0;
+  const altoProcedimiento =
+    30 +
+    Math.ceil(camposProcedimiento / 3) * 26 +
+    (config.incluirSedacion && estudio?.sedacion_observaciones
+      ? 14 + contarLineas(estudio.sedacion_observaciones) * 11
+      : 0);
+  const lineasHallazgos =
+    (config.incluirHallazgos ? contarLineas(estudio?.hallazgos) : 0) +
+    contarLineas(estudio?.observaciones);
+  const altoHallazgos = lineasHallazgos ? 55 + lineasHallazgos * 12.2 : 0;
+  const lineasDiagnostico = config.incluirResultado
+    ? contarLineas(estudio?.resultado)
+    : 0;
+  const altoDiagnostico = lineasDiagnostico ? 36 + lineasDiagnostico * 12.2 : 0;
+  const altoFirmas = 75;
+
+  // A4 = 842pt − padding 24 − paddingBottom 42 (reserva del pie fijo)
+  const espacioParaFotos =
+    776 -
+    altoEncabezado -
+    altoPaciente -
+    altoProcedimiento -
+    altoHallazgos -
+    altoDiagnostico -
+    altoFirmas -
+    45; // margen de seguridad (calibrado contra renders reales)
+
+  // Alto ideal y mínimo aceptable por número de columnas
+  const ALTO_IDEAL: Record<number, number> = {
+    1: 220,
+    2: 175,
+    3: 125,
+    4: 90,
+    5: 75,
+  };
+  const ALTO_MINIMO: Record<number, number> = {
+    1: 120,
+    2: 100,
+    3: 80,
+    4: 50,
+    5: 45,
+  };
+
+  // Página 1: probar disposiciones y quedarse con la de fotos más grandes
+  // que sí quepa (38 de tarjeta + ~18 por fila de título/margen).
+  let mejorLayout: { columnas: number; alto: number } | null = null;
+  if (imagesToShow.length > 0 && espacioParaFotos > 0) {
+    const candidatas =
+      imagesToShow.length === 1 ? [1] : [2, 3, 4, 5];
+    for (const cols of candidatas) {
+      if (cols > imagesToShow.length) continue;
+      const filas = Math.ceil(imagesToShow.length / cols);
+      const disponible = (espacioParaFotos - 38 - filas * 18) / filas;
+      const alto = Math.min(ALTO_IDEAL[cols], Math.floor(disponible));
+      if (alto < ALTO_MINIMO[cols]) continue;
+      if (!mejorLayout || alto > mejorLayout.alto) {
+        mejorLayout = { columnas: cols, alto };
+      }
+    }
+  }
+
+  const fotosEnPagina1 = mejorLayout !== null;
+  // Página 2: formato grande del requerimiento (4 → 2 por fila, 6 → 3)
+  const columnasGrandes =
     imagesToShow.length <= 1
       ? 1
       : Math.min(5, Math.max(2, Math.ceil(imagesToShow.length / 2)));
+  const columnasImagenes = mejorLayout
+    ? mejorLayout.columnas
+    : columnasGrandes;
+  const altoImagen = mejorLayout
+    ? mejorLayout.alto
+    : (ALTO_IDEAL[columnasGrandes] ?? 90);
   const anchoImagen = `${Math.floor(100 / columnasImagenes) - 1}%`;
-  const altoImagen =
-    { 1: 220, 2: 175, 3: 125, 4: 56, 5: 52 }[columnasImagenes] ?? 56;
-
-  // El formato estándar (7+ fotos, compactas a 4-5 por fila) va en la
-  // primera página siempre que el texto clínico deje espacio real; los
-  // formatos grandes (1-6 fotos) ocupan demasiado y van a la página 2.
-  // Con hallazgos muy extensos las fotos también pasan a la página 2 para
-  // no partir la cuadrícula ni desplazar las firmas.
-  const textoClinico = [
-    estudio?.hallazgos,
-    estudio?.observaciones,
-    estudio?.resultado,
-  ]
-    .filter(Boolean)
-    .join("").length;
-  const fotosEnPagina1 = imagesToShow.length >= 7 && textoClinico <= 900;
 
   // Calculate patient age if birth date exists
   const calcularEdad = (fechaNac: string) => {
