@@ -97,7 +97,8 @@ const ModalInfoSeccionAI = ({
       onCancel={() => setIsSessionModalOpen(false)}
       footer={null}
       centered
-      width={720}
+      width="92vw"
+      style={{ maxWidth: 1500 }}
       title={
         <div className="flex flex-col gap-1">
           <span className="text-sm font-semibold text-gray-800">
