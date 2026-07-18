@@ -562,7 +562,7 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
                   )
                 }
               >
-                Anestesiólogo
+                Firma del anestesiólogo
               </Checkbox>
             </div>
             <div className={sectionCheckboxStyle}>
@@ -572,7 +572,7 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
                   handleConfigChange("incluirDatosAsistente", e.target.checked)
                 }
               >
-                Asistente
+                Firma del asistente
               </Checkbox>
             </div>
           </div>

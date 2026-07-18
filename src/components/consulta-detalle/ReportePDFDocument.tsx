@@ -385,7 +385,7 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
     true, // fecha
     !!estudio?.motivo_estudio,
     !!(config.incluirDatosMedico && (estudio?.medico_nombre || nombreDoctor)),
-    !!(config.incluirDatosAnestesiologo && estudio?.anestesiologo_nombre),
+    !!estudio?.anestesiologo_nombre,
     !!(config.incluirSedacion && estudio?.metodo_sedacion),
     !!(
       config.incluirEquipo &&
@@ -395,7 +395,7 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
         estudio?.equipo_serie)
     ),
     !!estudio?.enfermeria_nombre,
-    !!(config.incluirDatosAsistente && estudio?.asistente_nombre),
+    !!estudio?.asistente_nombre,
   ].filter(Boolean).length;
 
   const altoEncabezado = 125;
@@ -651,15 +651,14 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
                   </Text>
                 </View>
               )}
-            {config.incluirDatosAnestesiologo &&
-              estudio?.anestesiologo_nombre && (
-                <View style={styles.gridItem3}>
-                  <Text style={styles.fieldLabel}>Anestesiólogo</Text>
-                  <Text style={styles.fieldValue}>
-                    {estudio.anestesiologo_nombre}
-                  </Text>
-                </View>
-              )}
+            {estudio?.anestesiologo_nombre && (
+              <View style={styles.gridItem3}>
+                <Text style={styles.fieldLabel}>Anestesiólogo</Text>
+                <Text style={styles.fieldValue}>
+                  {estudio.anestesiologo_nombre}
+                </Text>
+              </View>
+            )}
             {config.incluirSedacion && estudio?.metodo_sedacion && (
               <View style={styles.gridItem3}>
                 <Text style={styles.fieldLabel}>Sedación</Text>
@@ -710,7 +709,7 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
                 </Text>
               </View>
             )}
-            {config.incluirDatosAsistente && estudio?.asistente_nombre && (
+            {estudio?.asistente_nombre && (
               <View style={styles.gridItem3}>
                 <Text style={styles.fieldLabel}>Asistente</Text>
                 <Text style={styles.fieldValue}>
