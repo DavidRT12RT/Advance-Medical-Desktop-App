@@ -11,6 +11,7 @@ import {
   message,
 } from "antd";
 import { useParams, useNavigate } from "react-router-dom";
+import dayjs from "dayjs";
 import { setOpenModalEstudios, setRefresh } from "../../store/pacientesSlice";
 import FirebaseEstudios from "../../features/FirebaseEstudios";
 import { useElectronStore } from "../../hooks/useElectronStore";
@@ -140,7 +141,13 @@ const ModalEstudioPacienteDetalle = () => {
               name="fecha"
               rules={[{ required: true, message: "Selecciona la fecha" }]}
             >
-              <DatePicker style={{ width: "100%" }} format="DD/MM/YYYY" />
+              <DatePicker
+                style={{ width: "100%" }}
+                format="DD/MM/YYYY"
+                disabledDate={(current) =>
+                  current && current.isBefore(dayjs().startOf("day"))
+                }
+              />
             </Form.Item>
           </Col>
         </Row>
