@@ -2,11 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import HeaderPacienteDetalle from "../components/pacientes-detalle/HeaderPacienteDetalle";
 import InformacionPacienteDetalle from "../components/pacientes-detalle/InformacionPacienteDetalle";
-import EstudiosPacienteDetalle from "../components/pacientes-detalle/EstudiosPacienteDetalle";
-import EstudiosPendientesPacienteDetalle from "../components/pacientes-detalle/EstudiosPendientesPacienteDetalle";
 import ModalEstudioPacienteDetalle from "../components/pacientes-detalle/ModalEstudioPacienteDetalle";
-import ConsultasPacienteDetalle from "../components/pacientes-detalle/ConsultasPacienteDetalle";
-import ConsultasPendientesPacienteDetalle from "../components/pacientes-detalle/ConsultasPendientesPacienteDetalle";
 import ModalConsultaPacienteDetalle from "../components/pacientes-detalle/ModalConsultaPacienteDetalle";
 import EstudiosYConsultasPacienteDetalle from "../components/pacientes-detalle/EstudiosYConsultasPacienteDetalle";
 import RegistrosMedicosPacienteDetalle from "../components/pacientes-detalle/RegistrosMedicosPacienteDetalle";
@@ -32,10 +28,6 @@ const PacienteDetalle = () => {
   const tabs = [
     { id: "estudios_consultas", label: "Estudios y Consultas" },
     { id: "informacion", label: "Información del Paciente" },
-    { id: "consultas", label: "Consultas" },
-    { id: "consultas_pendientes", label: "Consultas Pendientes" },
-    { id: "historial", label: "Historial de Estudios" },
-    { id: "proximos", label: "Próximos Estudios" },
     { id: "registros", label: "Registros Médicos" },
   ];
 
@@ -113,12 +105,6 @@ const PacienteDetalle = () => {
           <EstudiosYConsultasPacienteDetalle />
         )}
         {activeTab === "informacion" && <InformacionPacienteDetalle />}
-        {activeTab === "consultas" && <ConsultasPacienteDetalle />}
-        {activeTab === "consultas_pendientes" && (
-          <ConsultasPendientesPacienteDetalle />
-        )}
-        {activeTab === "historial" && <EstudiosPacienteDetalle />}
-        {activeTab === "proximos" && <EstudiosPendientesPacienteDetalle />}
         {activeTab === "registros" && <RegistrosMedicosPacienteDetalle />}
       </div>
 
