@@ -187,14 +187,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
   },
+  // Ancho y alto se calculan según la cantidad de fotos seleccionadas
   imageWrapper: {
-    width: "24%",
     marginRight: "1%",
     marginBottom: 6,
   },
   studyImage: {
     width: "100%",
-    height: 70,
     objectFit: "cover",
     borderRadius: 4,
     borderWidth: 1,
@@ -364,6 +363,17 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
     0,
     10
   );
+
+  // Acomodo dinámico: las fotos crecen según cuántas se seleccionen,
+  // llenando dos filas de izquierda a derecha (4 → 2 por fila, 6 → 3,
+  // 8 → 4, 10 → 5).
+  const columnasImagenes =
+    imagesToShow.length <= 1
+      ? 1
+      : Math.min(5, Math.max(2, Math.ceil(imagesToShow.length / 2)));
+  const anchoImagen = `${Math.floor(100 / columnasImagenes) - 1}%`;
+  const altoImagen =
+    { 1: 220, 2: 175, 3: 125, 4: 95, 5: 78 }[columnasImagenes] ?? 95;
 
   // Calculate patient age if birth date exists
   const calcularEdad = (fechaNac: string) => {
@@ -721,8 +731,14 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
             <SectionTitle title="Imágenes del Estudio" />
             <View style={styles.imagesGrid}>
               {imagesToShow.map((img, idx) => (
-                <View key={idx} style={styles.imageWrapper}>
-                  <Image src={img.url} style={styles.studyImage} />
+                <View
+                  key={idx}
+                  style={[styles.imageWrapper, { width: anchoImagen }]}
+                >
+                  <Image
+                    src={img.url}
+                    style={[styles.studyImage, { height: altoImagen }]}
+                  />
                   {img.titulo && (
                     <Text style={styles.imageTitle}>{img.titulo}</Text>
                   )}
