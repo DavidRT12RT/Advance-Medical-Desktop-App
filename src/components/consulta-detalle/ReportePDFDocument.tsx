@@ -375,6 +375,11 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
   const altoImagen =
     { 1: 220, 2: 175, 3: 125, 4: 95, 5: 78 }[columnasImagenes] ?? 95;
 
+  // El formato estándar (7+ fotos, compactas a 4-5 por fila) cabe en la
+  // primera página; los formatos grandes (1-6 fotos) ocupan demasiado
+  // espacio y se muestran en la segunda página.
+  const fotosEnPagina1 = imagesToShow.length >= 7;
+
   // Calculate patient age if birth date exists
   const calcularEdad = (fechaNac: string) => {
     if (!fechaNac) return null;
@@ -409,15 +414,12 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
   // La página 2 solo existe si hay contenido secundario REAL que mostrar
   // (una sección habilitada pero sin datos no cuenta)
   const haySegundaPagina = Boolean(
-    imagesToShow.length > 0 ||
+    (imagesToShow.length > 0 && !fotosEnPagina1) ||
       (config.incluirMedicamentos && estudio?.medicamentos) ||
       (config.incluirComplicaciones && estudio?.complicaciones) ||
       (config.incluirSeguimiento && estudio?.seguimiento) ||
       estudio?.intervaloSeguimiento ||
       estudio?.tolerancia ||
-      (config.incluirSedacion && estudio?.metodo_sedacion) ||
-      (config.incluirEquipo && estudio?.equipo_endoscopio) ||
-      (config.incluirDatosClinica && estudio?.clinica_nombre) ||
       (config.incluirAnalisisIA &&
         (lastSession?.ia_cnn?.summary || lastSession?.ia_llm)),
   );
@@ -450,6 +452,23 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
             {organizacion?.emailInstitucional && (
               <Text style={styles.headerAddress}>
                 {organizacion.emailInstitucional}
+              </Text>
+            )}
+            {/* Datos de la clínica del estudio en el encabezado */}
+            {config.incluirDatosClinica && estudio?.clinica_nombre && (
+              <Text style={styles.headerSubtitle}>
+                {estudio.clinica_nombre}
+                {estudio?.clinica_numero ? ` · ${estudio.clinica_numero}` : ""}
+              </Text>
+            )}
+            {config.incluirDatosClinica && estudio?.clinica_direccion && (
+              <Text style={styles.headerAddress}>
+                {estudio.clinica_direccion}
+              </Text>
+            )}
+            {config.incluirDatosClinica && estudio?.clinica_telefono && (
+              <Text style={styles.headerAddress}>
+                Tel: {estudio.clinica_telefono}
               </Text>
             )}
           </View>
@@ -504,31 +523,99 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
                   </Text>
                 </View>
               )}
-              <View style={styles.gridItem2}>
-                <Text style={styles.fieldLabel}>Fecha del Estudio</Text>
-                <Text style={styles.fieldValue}>{fechaEstudio}</Text>
-              </View>
-              <View style={styles.gridItem2}>
-                <Text style={styles.fieldLabel}>Procedimiento</Text>
-                <Text style={styles.fieldValue}>{tipoEstudio}</Text>
-              </View>
             </View>
           </View>
         )}
 
-        {/* Section 2: Clinical Information and Findings.
-            Solo se muestra si hay contenido real, aunque esté habilitada. */}
-        {((config.incluirResultado && estudio?.resultado) ||
-          (config.incluirHallazgos && estudio?.hallazgos) ||
-          estudio?.observaciones) && (
-          <View style={styles.sectionCard} wrap={false}>
-            <SectionTitle title="Información Clínica y Hallazgos" />
-            {config.incluirResultado && estudio?.resultado && (
-              <View style={styles.gridItemFull}>
-                <Text style={styles.fieldLabel}>Resultado general</Text>
-                <Text style={styles.fieldValueLarge}>{estudio.resultado}</Text>
+        {/* Section 2: Datos del Procedimiento */}
+        <View style={styles.sectionCard} wrap={false}>
+          <SectionTitle title="Datos del Procedimiento" />
+          <View style={styles.gridRow}>
+            <View style={styles.gridItem3}>
+              <Text style={styles.fieldLabel}>Procedimiento</Text>
+              <Text style={styles.fieldValue}>{tipoEstudio}</Text>
+            </View>
+            <View style={styles.gridItem3}>
+              <Text style={styles.fieldLabel}>Fecha del Estudio</Text>
+              <Text style={styles.fieldValue}>{fechaEstudio}</Text>
+            </View>
+            {estudio?.motivo_estudio && (
+              <View style={styles.gridItem3}>
+                <Text style={styles.fieldLabel}>Motivo del estudio</Text>
+                <Text style={styles.fieldValue}>{estudio.motivo_estudio}</Text>
               </View>
             )}
+            {config.incluirDatosMedico &&
+              (estudio?.medico_nombre || nombreDoctor) && (
+                <View style={styles.gridItem3}>
+                  <Text style={styles.fieldLabel}>Médico tratante</Text>
+                  <Text style={styles.fieldValue}>
+                    {estudio?.medico_nombre || nombreDoctor}
+                  </Text>
+                </View>
+              )}
+            {config.incluirDatosAnestesiologo &&
+              estudio?.anestesiologo_nombre && (
+                <View style={styles.gridItem3}>
+                  <Text style={styles.fieldLabel}>Anestesiólogo</Text>
+                  <Text style={styles.fieldValue}>
+                    {estudio.anestesiologo_nombre}
+                  </Text>
+                </View>
+              )}
+            {config.incluirSedacion && estudio?.metodo_sedacion && (
+              <View style={styles.gridItem3}>
+                <Text style={styles.fieldLabel}>Sedación</Text>
+                <Text style={styles.fieldValue}>
+                  {estudio.metodo_sedacion}
+                  {estudio?.sedacion_dosis
+                    ? ` · ${estudio.sedacion_dosis}`
+                    : ""}
+                </Text>
+              </View>
+            )}
+            {config.incluirEquipo &&
+              (estudio?.equipo_endoscopio ||
+                estudio?.equipo_marca ||
+                estudio?.equipo_modelo) && (
+                <View style={styles.gridItem3}>
+                  <Text style={styles.fieldLabel}>Equipo</Text>
+                  <Text style={styles.fieldValue}>
+                    {[
+                      estudio?.equipo_endoscopio,
+                      estudio?.equipo_marca,
+                      estudio?.equipo_modelo,
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                  </Text>
+                </View>
+              )}
+            {estudio?.enfermeria_nombre && (
+              <View style={styles.gridItem3}>
+                <Text style={styles.fieldLabel}>Enfermería</Text>
+                <Text style={styles.fieldValue}>
+                  {estudio.enfermeria_nombre}
+                </Text>
+              </View>
+            )}
+            {config.incluirDatosAsistente && estudio?.asistente_nombre && (
+              <View style={styles.gridItem3}>
+                <Text style={styles.fieldLabel}>Asistente</Text>
+                <Text style={styles.fieldValue}>
+                  {estudio.asistente_nombre}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* Section 3: Hallazgos. Puede continuar en la página 2 si el texto
+            es muy extenso (wrap habilitado a propósito). */}
+        {((config.incluirHallazgos && estudio?.hallazgos) ||
+          estudio?.observaciones) && (
+          <View style={styles.sectionCard}>
+            <SectionTitle title="Hallazgos" />
             {config.incluirHallazgos && estudio?.hallazgos && (
               <View style={styles.gridItemFull}>
                 <Text style={styles.fieldLabel}>Hallazgos generales</Text>
@@ -597,6 +684,40 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
               </View>
             </View>
           )}
+
+        {/* Section 5: Diagnóstico */}
+        {config.incluirResultado && estudio?.resultado && (
+          <View style={styles.sectionCard} wrap={false}>
+            <SectionTitle title="Diagnóstico" />
+            <View style={styles.gridItemFull}>
+              <Text style={styles.fieldValueLarge}>{estudio.resultado}</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Section 6: Fotografías en formato estándar (7+, compactas):
+            aparecen en la primera página */}
+        {fotosEnPagina1 && (
+          <View style={styles.sectionCard}>
+            <SectionTitle title="Imágenes del Estudio" />
+            <View style={styles.imagesGrid}>
+              {imagesToShow.map((img, idx) => (
+                <View
+                  key={idx}
+                  style={[styles.imageWrapper, { width: anchoImagen }]}
+                >
+                  <Image
+                    src={img.url}
+                    style={[styles.studyImage, { height: altoImagen }]}
+                  />
+                  {img.titulo && (
+                    <Text style={styles.imageTitle}>{img.titulo}</Text>
+                  )}
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
 
         {/* Espaciador flexible: empuja las firmas al pie de la página 1.
             (El position absolute de react-pdf se rompe en páginas con wrap:
@@ -695,7 +816,7 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
         </View>
       </Page>
 
-      {/* PÁGINA 2: imágenes, plan, sedación, equipo, clínica y análisis IA */}
+      {/* PÁGINA 2: fotografías en formato grande, plan y análisis IA */}
       {haySegundaPagina && (
       <Page size="A4" style={styles.page} wrap>
         {/* Encabezado de continuación */}
@@ -725,8 +846,8 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
           )}
         </View>
 
-        {/* Imágenes del estudio */}
-        {imagesToShow.length > 0 && (
+        {/* Imágenes del estudio en formato grande (1-6 fotos) */}
+        {!fotosEnPagina1 && imagesToShow.length > 0 && (
           <View style={styles.sectionCard}>
             <SectionTitle title="Imágenes del Estudio" />
             <View style={styles.imagesGrid}>
@@ -792,111 +913,6 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
                 <View style={styles.gridItemFull}>
                   <Text style={styles.fieldLabel}>Tolerancia del paciente</Text>
                   <Text style={styles.fieldValue}>{estudio.tolerancia}</Text>
-                </View>
-              )}
-            </View>
-          </View>
-        )}
-
-        {/* Section 5: Sedation Method */}
-        {config.incluirSedacion && estudio?.metodo_sedacion && (
-          <View style={styles.sectionCard} wrap={false}>
-            <SectionTitle title="Método de Sedación" />
-            <View style={styles.gridRow}>
-              <View style={styles.gridItem2}>
-                <Text style={styles.fieldLabel}>Tipo de sedación</Text>
-                <Text style={styles.fieldValue}>{estudio.metodo_sedacion}</Text>
-              </View>
-              {estudio.sedacion_dosis && (
-                <View style={styles.gridItem2}>
-                  <Text style={styles.fieldLabel}>Dosis administrada</Text>
-                  <Text style={styles.fieldValue}>
-                    {estudio.sedacion_dosis}
-                  </Text>
-                </View>
-              )}
-              {estudio.sedacion_observaciones && (
-                <View style={styles.gridItemFull}>
-                  <Text style={styles.fieldLabel}>
-                    Observaciones de sedación
-                  </Text>
-                  <Text style={styles.fieldValue}>
-                    {estudio.sedacion_observaciones}
-                  </Text>
-                </View>
-              )}
-            </View>
-          </View>
-        )}
-
-        {/* Section 6: Equipment Used */}
-        {config.incluirEquipo && estudio?.equipo_endoscopio && (
-          <View style={styles.sectionCard} wrap={false}>
-            <SectionTitle title="Equipo Utilizado" />
-            <View style={styles.gridRow}>
-              <View style={styles.gridItem2}>
-                <Text style={styles.fieldLabel}>Tipo de endoscopio</Text>
-                <Text style={styles.fieldValue}>
-                  {estudio.equipo_endoscopio}
-                </Text>
-              </View>
-              {estudio.equipo_marca && (
-                <View style={styles.gridItem2}>
-                  <Text style={styles.fieldLabel}>Marca</Text>
-                  <Text style={styles.fieldValue}>{estudio.equipo_marca}</Text>
-                </View>
-              )}
-              {estudio.equipo_modelo && (
-                <View style={styles.gridItem2}>
-                  <Text style={styles.fieldLabel}>Modelo</Text>
-                  <Text style={styles.fieldValue}>{estudio.equipo_modelo}</Text>
-                </View>
-              )}
-              {estudio.equipo_serie && (
-                <View style={styles.gridItem2}>
-                  <Text style={styles.fieldLabel}>Número de serie</Text>
-                  <Text style={styles.fieldValue}>{estudio.equipo_serie}</Text>
-                </View>
-              )}
-            </View>
-          </View>
-        )}
-
-        {/* Section 7: Clinic/Hospital Info */}
-        {config.incluirDatosClinica && estudio?.clinica_nombre && (
-          <View style={styles.sectionCard} wrap={false}>
-            <SectionTitle title="Consultorio / Clínica" />
-            <View style={styles.gridRow}>
-              <View style={styles.gridItem2}>
-                <Text style={styles.fieldLabel}>
-                  Nombre del establecimiento
-                </Text>
-                <Text style={styles.fieldValue}>{estudio.clinica_nombre}</Text>
-              </View>
-              {estudio.clinica_numero && (
-                <View style={styles.gridItem2}>
-                  <Text style={styles.fieldLabel}>
-                    Número de consultorio / sala
-                  </Text>
-                  <Text style={styles.fieldValue}>
-                    {estudio.clinica_numero}
-                  </Text>
-                </View>
-              )}
-              {estudio.clinica_direccion && (
-                <View style={styles.gridItemFull}>
-                  <Text style={styles.fieldLabel}>Dirección</Text>
-                  <Text style={styles.fieldValue}>
-                    {estudio.clinica_direccion}
-                  </Text>
-                </View>
-              )}
-              {estudio.clinica_telefono && (
-                <View style={styles.gridItem2}>
-                  <Text style={styles.fieldLabel}>Teléfono</Text>
-                  <Text style={styles.fieldValue}>
-                    {estudio.clinica_telefono}
-                  </Text>
                 </View>
               )}
             </View>
