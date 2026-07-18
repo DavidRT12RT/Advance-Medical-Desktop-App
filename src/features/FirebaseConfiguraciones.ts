@@ -3,6 +3,24 @@ import { firestore } from "../firebaseConfig";
 
 class FirebaseConfiguraciones {
   /**
+   * Leer las configuraciones actuales del usuario directamente de Firestore
+   * (la copia del perfil guardada en la sesión local puede estar desactualizada)
+   */
+  async obtenerConfiguracionesUsuario(
+    idEmpresa: string,
+    idOrganizacion: string,
+    idUsuario: string
+  ) {
+    const userRef = doc(
+      firestore,
+      `empresas/${idEmpresa}/organizaciones/${idOrganizacion}/perfiles/${idUsuario}`
+    );
+    const snapshot = await getDoc(userRef);
+    if (!snapshot.exists()) return null;
+    return (snapshot.data() as any)?.configuraciones || null;
+  }
+
+  /**
    * Actualizar configuraciones del usuario directamente en el documento del usuario
    * @param idEmpresa ID de la empresa
    * @param idOrganizacion ID de la organización

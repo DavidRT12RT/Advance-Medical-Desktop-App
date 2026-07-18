@@ -30,27 +30,41 @@ const DatosMedicoDoctor: React.FC<DatosMedicoDoctorProps> = ({
 
   useEffect(() => {
     cargarDatos();
-  }, [usuarioData]);
+  }, [usuarioData, idEmpresa, idOrganizacion, idUsuario]);
 
-  const cargarDatos = () => {
+  const cargarDatos = async () => {
     try {
-      if (usuarioData) {
-        const configuracionMedica =
-          usuarioData.configuraciones.configuracionDatosMedicos || {};
+      // Preferir lo último guardado en Firestore; la copia del perfil en la
+      // sesión local se llena al iniciar sesión y puede venir desactualizada
+      // o sin el objeto configuraciones (perfiles antiguos o self-service)
+      let configuracionMedica =
+        usuarioData?.configuraciones?.configuracionDatosMedicos || {};
 
-        console.log("Configuracion medica que cargo", configuracionMedica);
-
-        form.setFieldsValue({
-          cedula: configuracionMedica.cedula || "",
-          especialidad: configuracionMedica.especialidad || "",
-          numeroRegistro: configuracionMedica.numeroRegistro || "",
-          institucionFormacion: configuracionMedica.institucionFormacion || "",
-          aniosExperiencia: configuracionMedica.aniosExperiencia || "",
-          telefonoContacto: configuracionMedica.telefonoContacto || "",
-          emailProfesional: configuracionMedica.emailProfesional || "",
-          consultorio: configuracionMedica.consultorio || "",
-        });
+      try {
+        const configuracionesFrescas =
+          await FirebaseConfiguraciones.obtenerConfiguracionesUsuario(
+            idEmpresa,
+            idOrganizacion,
+            idUsuario
+          );
+        if (configuracionesFrescas?.configuracionDatosMedicos) {
+          configuracionMedica = configuracionesFrescas.configuracionDatosMedicos;
+        }
+      } catch (error) {
+        // Sin red: se usa la copia local (o el formulario vacío)
+        console.warn("No se pudieron leer configuraciones frescas:", error);
       }
+
+      form.setFieldsValue({
+        cedula: configuracionMedica.cedula || "",
+        especialidad: configuracionMedica.especialidad || "",
+        numeroRegistro: configuracionMedica.numeroRegistro || "",
+        institucionFormacion: configuracionMedica.institucionFormacion || "",
+        aniosExperiencia: configuracionMedica.aniosExperiencia || "",
+        telefonoContacto: configuracionMedica.telefonoContacto || "",
+        emailProfesional: configuracionMedica.emailProfesional || "",
+        consultorio: configuracionMedica.consultorio || "",
+      });
     } catch (error) {
       console.error("Error cargando datos médicos:", error);
       messageApi.open({
