@@ -18,7 +18,7 @@ export function useCatalogosEstudio() {
   const idOrganizacion = user?.usuarioDetail?.idOrganizacion;
   const idUsuario = user?.usuarioDetail?.id;
 
-  const [catalogos, setCatalogos] = useState<Record<string, string[]>>({});
+  const [catalogos, setCatalogos] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -46,12 +46,12 @@ export function useCatalogosEstudio() {
 
   const items = useCallback(
     (clave: ClaveCatalogo): string[] =>
-      catalogos[clave] ?? CATALOGOS_ESTUDIO_DEFAULTS[clave] ?? [],
+      (catalogos[clave] as string[]) ?? CATALOGOS_ESTUDIO_DEFAULTS[clave] ?? [],
     [catalogos],
   );
 
   const persistir = useCallback(
-    async (clave: ClaveCatalogo, nuevos: string[]) => {
+    async (clave: string, nuevos: any[]) => {
       setCatalogos((prev) => ({ ...prev, [clave]: nuevos }));
       if (!idEmpresa || !idOrganizacion || !idUsuario) {
         console.warn("Sin sesión completa: el catálogo no se persistirá");
@@ -128,12 +128,60 @@ export function useCatalogosEstudio() {
     [items, persistir],
   );
 
+  // --- Detalles por anestesiólogo -----------------------------------------
+  // Además del listado de nombres, se recuerda la cédula y especialidad de
+  // cada anestesiólogo: al seleccionarlo en un estudio se autocompletan, y al
+  // guardar un estudio con esos campos llenos la asociación se actualiza.
+  const detalleAnestesiologo = useCallback(
+    (
+      nombre?: string,
+    ): { nombre: string; cedula?: string; especialidad?: string } | undefined => {
+      if (!nombre) return undefined;
+      const lista = (catalogos[DETALLES_ANESTESIOLOGOS] as any[]) || [];
+      return lista.find((d) => d?.nombre === nombre);
+    },
+    [catalogos],
+  );
+
+  const guardarDetalleAnestesiologo = useCallback(
+    (nombre: string, datos: { cedula?: string; especialidad?: string }) => {
+      const n = (nombre || "").trim();
+      if (!n) return;
+      const lista = ((catalogos[DETALLES_ANESTESIOLOGOS] as any[]) || []).filter(
+        (d) => d?.nombre,
+      );
+      const entrada = {
+        nombre: n,
+        cedula: datos.cedula || "",
+        especialidad: datos.especialidad || "",
+      };
+      const idx = lista.findIndex((d) => d.nombre === n);
+      if (
+        idx >= 0 &&
+        lista[idx].cedula === entrada.cedula &&
+        lista[idx].especialidad === entrada.especialidad
+      ) {
+        return; // sin cambios: evitar escrituras innecesarias
+      }
+      const nuevos =
+        idx >= 0
+          ? lista.map((d, i) => (i === idx ? entrada : d))
+          : [...lista, entrada];
+      persistir(DETALLES_ANESTESIOLOGOS, nuevos);
+    },
+    [catalogos, persistir],
+  );
+
   return {
     items,
     agregarItem,
     eliminarItem,
     renombrarItem,
     restaurarSugeridos,
+    detalleAnestesiologo,
+    guardarDetalleAnestesiologo,
     loading,
   };
 }
+
+const DETALLES_ANESTESIOLOGOS = "anestesiologosDetalles";

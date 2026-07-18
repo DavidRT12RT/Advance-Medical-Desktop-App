@@ -63,6 +63,8 @@ const EstudioDetalle: React.FC = () => {
     items: itemsCatalogo,
     agregarItem,
     eliminarItem,
+    detalleAnestesiologo,
+    guardarDetalleAnestesiologo,
   } = useCatalogosEstudio();
 
   const [loading, setLoading] = useState(true);
@@ -405,6 +407,16 @@ const EstudioDetalle: React.FC = () => {
       );
 
       setEstudio((prev: any) => (prev ? { ...prev, ...payload } : prev));
+
+      // Recordar la cédula/especialidad de este anestesiólogo para
+      // autocompletarlas la próxima vez que se le seleccione
+      if (allValues.anestesiologo_nombre) {
+        guardarDetalleAnestesiologo(allValues.anestesiologo_nombre, {
+          cedula: allValues.anestesiologo_cedula || "",
+          especialidad: allValues.anestesiologo_especialidad || "",
+        });
+      }
+
       if (finalizeOnSave) {
         message.success("Estudio finalizado correctamente");
         navigate(`/paciente-detalle/${pacienteId}`);
@@ -719,6 +731,20 @@ const EstudioDetalle: React.FC = () => {
                 autoComplete="off"
                 size="large"
                 disabled={estudio?.estado === "finalizado"}
+                onValuesChange={(cambios) => {
+                  // Al elegir un anestesiólogo del listado, autocompletar su
+                  // cédula y especialidad recordadas (y limpiar si es nuevo,
+                  // para no arrastrar los datos del anterior)
+                  if ("anestesiologo_nombre" in cambios) {
+                    const detalle = detalleAnestesiologo(
+                      cambios.anestesiologo_nombre,
+                    );
+                    form.setFieldsValue({
+                      anestesiologo_cedula: detalle?.cedula || "",
+                      anestesiologo_especialidad: detalle?.especialidad || "",
+                    });
+                  }
+                }}
               >
                 <div className="space-y-8">
                   {/* Datos del estudio */}
