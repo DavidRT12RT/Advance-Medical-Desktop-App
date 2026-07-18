@@ -1,7 +1,7 @@
 {
   "name": "advance-desktop-app",
   "productName": "AdvanceInteligentSystem",
-  "version": "1.0.0-beta.2",
+  "version": "1.0.0-beta.3",
   "description": "AIM Desktop - Sistema de Gestión Médica Inteligente",
   "main": ".vite/build/main.js",
   "scripts": {
