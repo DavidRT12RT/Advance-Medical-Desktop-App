@@ -555,6 +555,7 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
             <div className={sectionCheckboxStyle}>
               <Checkbox
                 checked={config.incluirDatosAnestesiologo}
+                disabled={!estudio?.anestesiologo_nombre}
                 onChange={(e) =>
                   handleConfigChange(
                     "incluirDatosAnestesiologo",
@@ -564,16 +565,27 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
               >
                 Firma del anestesiólogo
               </Checkbox>
+              {!estudio?.anestesiologo_nombre && (
+                <span className="text-[11px] text-gray-400">
+                  (el estudio no tiene anestesiólogo capturado)
+                </span>
+              )}
             </div>
             <div className={sectionCheckboxStyle}>
               <Checkbox
                 checked={config.incluirDatosAsistente}
+                disabled={!estudio?.asistente_nombre}
                 onChange={(e) =>
                   handleConfigChange("incluirDatosAsistente", e.target.checked)
                 }
               >
                 Firma del asistente
               </Checkbox>
+              {!estudio?.asistente_nombre && (
+                <span className="text-[11px] text-gray-400">
+                  (el estudio no tiene asistente capturado)
+                </span>
+              )}
             </div>
           </div>
         </div>
