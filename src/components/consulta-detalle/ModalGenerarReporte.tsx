@@ -17,6 +17,7 @@ import ReportePDFDocument, {
 import FirebaseConfiguraciones from "../../features/FirebaseConfiguraciones";
 import { useElectronStore } from "../../hooks/useElectronStore";
 import ImageEditorModal from "./ImageEditorModal";
+import VisorImagenesModal from "./VisorImagenesModal";
 
 interface ModalGenerarReporteProps {
   isOpen: boolean;
@@ -54,6 +55,8 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
   const [previewLista, setPreviewLista] = useState(false);
   const previewIframeRef = useRef<HTMLIFrameElement | null>(null);
   const [editingImageUrl, setEditingImageUrl] = useState<string | null>(null);
+  // Visor a pantalla grande: índice dentro de todasLasImagenes, o null
+  const [visorIndice, setVisorIndice] = useState<number | null>(null);
   const [editedImages, setEditedImages] = useState<Map<string, string>>(
     new Map(),
   );
@@ -742,7 +745,8 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
                         <div key={idx} className="relative group">
                           <button
                             type="button"
-                            onClick={() => handleImageToggle(url)}
+                            onClick={() => setVisorIndice(idx)}
+                            title="Ver en grande"
                             className={`relative rounded-md overflow-hidden border-2 transition focus:outline-none w-full ${
                               isSelected
                                 ? "border-blue-400 ring-2 ring-blue-300"
@@ -829,7 +833,10 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
                         <div key={idx} className="relative group">
                           <button
                             type="button"
-                            onClick={() => handleImageToggle(url)}
+                            onClick={() =>
+                              setVisorIndice(capturasManualesTodas.length + idx)
+                            }
+                            title="Ver en grande"
                             className={`relative rounded-md overflow-hidden border-2 transition focus:outline-none w-full ${
                               isSelected
                                 ? "border-green-400 ring-2 ring-green-300"
@@ -1021,6 +1028,26 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
         </div>
       </div>
       </div>
+
+      {/* Visor de imágenes en grande */}
+      <VisorImagenesModal
+        isOpen={visorIndice !== null}
+        imagenes={todasLasImagenes}
+        indiceInicial={visorIndice ?? 0}
+        onClose={() => setVisorIndice(null)}
+        getDisplayUrl={getDisplayUrl}
+        esSeleccionada={(url) =>
+          config.imagenesSeleccionadas.some((img) => img.url === url)
+        }
+        onToggleSeleccion={handleImageToggle}
+        onEditar={(url) => handleEditImage(url)}
+        esEditada={(url) => editedImages.has(url)}
+        etiqueta={(i) =>
+          i < capturasManualesTodas.length
+            ? `Captura manual #${i + 1}`
+            : `Detección IA #${i - capturasManualesTodas.length + 1}`
+        }
+      />
 
       {/* Modal de edición de imagen */}
       {editingImageUrl && (
