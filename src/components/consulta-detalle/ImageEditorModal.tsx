@@ -12,7 +12,9 @@ import {
   RadiusSettingOutlined,
   FontSizeOutlined,
   ClearOutlined,
+  ScissorOutlined,
 } from "@ant-design/icons";
+import { construirFiltro } from "../../utils/videoAjustes";
 
 interface ImageEditorModalProps {
   isOpen: boolean;
@@ -27,7 +29,8 @@ type DrawingTool =
   | "arrow"
   | "rectangle"
   | "circle"
-  | "text";
+  | "text"
+  | "crop";
 
 interface DrawingElement {
   type: DrawingTool;
@@ -50,6 +53,8 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [brightness, setBrightness] = useState(100);
   const [contrast, setContrast] = useState(100);
+  const [saturation, setSaturation] = useState(100);
+  const [gamma, setGamma] = useState(100);
   const [rotation, setRotation] = useState(0);
   const [originalImage, setOriginalImage] = useState<HTMLImageElement | null>(
     null,
@@ -71,7 +76,7 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
       img.crossOrigin = "anonymous";
       img.onload = () => {
         setOriginalImage(img);
-        redrawCanvas(img, 100, 100, 0, []);
+        redrawCanvas(img, 100, 100, 100, 100, 0, []);
       };
       img.src = imageUrl;
     }
@@ -79,14 +84,33 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
 
   useEffect(() => {
     if (originalImage) {
-      redrawCanvas(originalImage, brightness, contrast, rotation, drawings);
+      redrawCanvas(
+        originalImage,
+        brightness,
+        contrast,
+        saturation,
+        gamma,
+        rotation,
+        drawings,
+      );
     }
-  }, [brightness, contrast, rotation, originalImage, drawings, currentDrawing]);
+  }, [
+    brightness,
+    contrast,
+    saturation,
+    gamma,
+    rotation,
+    originalImage,
+    drawings,
+    currentDrawing,
+  ]);
 
   const redrawCanvas = (
     img: HTMLImageElement,
     bright: number,
     cont: number,
+    sat: number,
+    gam: number,
     rot: number,
     drawingsList: DrawingElement[],
   ) => {
@@ -115,7 +139,13 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
     ctx.rotate(angle);
     ctx.translate(-width / 2, -height / 2);
 
-    ctx.filter = `brightness(${bright}%) contrast(${cont}%)`;
+    // Mismo filtro que la captura de video en tiempo real (videoAjustes)
+    ctx.filter = construirFiltro({
+      brillo: bright,
+      contraste: cont,
+      saturacion: sat,
+      gamma: gam,
+    });
     ctx.drawImage(img, 0, 0, width, height);
 
     ctx.restore();
@@ -185,6 +215,22 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
         if (drawing.text) {
           ctx.font = `${drawing.lineWidth * 8}px Arial`;
           ctx.fillText(drawing.text, drawing.startX, drawing.startY);
+        }
+        break;
+
+      case "crop":
+        if (drawing.endX !== undefined && drawing.endY !== undefined) {
+          ctx.save();
+          ctx.setLineDash([8, 5]);
+          ctx.strokeStyle = "#FFFFFF";
+          ctx.lineWidth = 2;
+          ctx.strokeRect(
+            drawing.startX,
+            drawing.startY,
+            drawing.endX - drawing.startX,
+            drawing.endY - drawing.startY,
+          );
+          ctx.restore();
         }
         break;
     }
@@ -299,10 +345,59 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
 
   const handleMouseUp = () => {
     if (isDrawing && currentDrawing) {
-      setDrawings([...drawings, currentDrawing]);
+      if (currentDrawing.type === "crop") {
+        aplicarRecorte(currentDrawing);
+      } else {
+        setDrawings([...drawings, currentDrawing]);
+      }
       setCurrentDrawing(null);
     }
     setIsDrawing(false);
+  };
+
+  // Recorta el área seleccionada: lo ya aplicado (ajustes, rotación y
+  // dibujos) queda horneado en la nueva imagen base y los controles vuelven
+  // a neutro. "Restablecer Todo" regresa a la imagen original completa.
+  const aplicarRecorte = (recorte: DrawingElement) => {
+    const canvas = canvasRef.current;
+    if (!canvas || !originalImage) return;
+    if (recorte.endX === undefined || recorte.endY === undefined) return;
+
+    const x = Math.max(0, Math.min(recorte.startX, recorte.endX));
+    const y = Math.max(0, Math.min(recorte.startY, recorte.endY));
+    const w = Math.min(canvas.width, Math.max(recorte.startX, recorte.endX)) - x;
+    const h =
+      Math.min(canvas.height, Math.max(recorte.startY, recorte.endY)) - y;
+    if (w < 20 || h < 20) return; // selección demasiado chica: ignorar
+
+    // Redibujar sin el recuadro punteado antes de copiar el área
+    redrawCanvas(
+      originalImage,
+      brightness,
+      contrast,
+      saturation,
+      gamma,
+      rotation,
+      drawings,
+    );
+
+    const recortado = document.createElement("canvas");
+    recortado.width = w;
+    recortado.height = h;
+    recortado.getContext("2d")?.drawImage(canvas, x, y, w, h, 0, 0, w, h);
+
+    const nuevaBase = new Image();
+    nuevaBase.onload = () => {
+      setOriginalImage(nuevaBase);
+      setBrightness(100);
+      setContrast(100);
+      setSaturation(100);
+      setGamma(100);
+      setRotation(0);
+      setDrawings([]);
+      setCurrentTool("none");
+    };
+    nuevaBase.src = recortado.toDataURL("image/jpeg", 0.95);
   };
 
   const handleRotateLeft = () => {
@@ -316,9 +411,16 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
   const handleReset = () => {
     setBrightness(100);
     setContrast(100);
+    setSaturation(100);
+    setGamma(100);
     setRotation(0);
     setDrawings([]);
     setCurrentTool("none");
+    // Deshacer también el recorte: recargar la imagen original
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => setOriginalImage(img);
+    img.src = imageUrl;
   };
 
   const handleClearDrawings = () => {
@@ -345,7 +447,8 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
     <Modal
       open={isOpen}
       onCancel={onClose}
-      width={900}
+      width="92vw"
+      style={{ maxWidth: 1400 }}
       centered
       title={
         <div className="flex items-center gap-2">
@@ -427,6 +530,14 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
                 size="small"
               />
             </Tooltip>
+            <Tooltip title="Recortar: arrastra el área que quieres conservar">
+              <Button
+                type={currentTool === "crop" ? "primary" : "default"}
+                icon={<ScissorOutlined />}
+                onClick={() => setCurrentTool("crop")}
+                size="small"
+              />
+            </Tooltip>
 
             <div className="h-6 w-px bg-gray-300 mx-2" />
 
@@ -452,7 +563,7 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
         <div className="bg-gray-900 rounded-lg p-4 flex justify-center items-center min-h-[400px]">
           <canvas
             ref={canvasRef}
-            className="max-w-full max-h-[400px] object-contain cursor-crosshair"
+            className="max-w-full max-h-[55vh] object-contain cursor-crosshair"
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
@@ -461,34 +572,70 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
         </div>
 
         <div className="space-y-4">
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-700">Brillo</span>
-              <span className="text-xs text-gray-500">{brightness}%</span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-700">
+                  Brillo
+                </span>
+                <span className="text-xs text-gray-500">{brightness}%</span>
+              </div>
+              <Slider
+                min={25}
+                max={200}
+                value={brightness}
+                onChange={setBrightness}
+                tooltip={{ formatter: (value) => `${value}%` }}
+              />
             </div>
-            <Slider
-              min={0}
-              max={200}
-              value={brightness}
-              onChange={setBrightness}
-              tooltip={{ formatter: (value) => `${value}%` }}
-            />
-          </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-700">
-                Contraste
-              </span>
-              <span className="text-xs text-gray-500">{contrast}%</span>
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-700">
+                  Contraste
+                </span>
+                <span className="text-xs text-gray-500">{contrast}%</span>
+              </div>
+              <Slider
+                min={25}
+                max={200}
+                value={contrast}
+                onChange={setContrast}
+                tooltip={{ formatter: (value) => `${value}%` }}
+              />
             </div>
-            <Slider
-              min={0}
-              max={200}
-              value={contrast}
-              onChange={setContrast}
-              tooltip={{ formatter: (value) => `${value}%` }}
-            />
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-700">
+                  Saturación
+                </span>
+                <span className="text-xs text-gray-500">{saturation}%</span>
+              </div>
+              <Slider
+                min={25}
+                max={200}
+                value={saturation}
+                onChange={setSaturation}
+                tooltip={{ formatter: (value) => `${value}%` }}
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-700">
+                  Gamma
+                </span>
+                <span className="text-xs text-gray-500">{gamma}%</span>
+              </div>
+              <Slider
+                min={25}
+                max={200}
+                value={gamma}
+                onChange={setGamma}
+                tooltip={{ formatter: (value) => `${value}%` }}
+              />
+            </div>
           </div>
 
           <div>
