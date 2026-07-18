@@ -49,6 +49,9 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
   // Vista previa del PDF (blob URL renderizado en el visor de Chromium)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  // La impresión usa el iframe de la vista previa: solo se permite cuando el
+  // PDF vigente ya terminó de regenerarse Y de cargarse en el iframe
+  const [previewLista, setPreviewLista] = useState(false);
   const previewIframeRef = useRef<HTMLIFrameElement | null>(null);
   const [editingImageUrl, setEditingImageUrl] = useState<string | null>(null);
   const [editedImages, setEditedImages] = useState<Map<string, string>>(
@@ -292,6 +295,7 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
       try {
         const blob = await pdf(construirDocumento()).toBlob();
         if (cancelado) return;
+        setPreviewLista(false);
         setPreviewUrl((prev) => {
           if (prev) URL.revokeObjectURL(prev);
           return URL.createObjectURL(blob);
@@ -361,7 +365,9 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
   const handleExportarCarpeta = async () => {
     const api = (window as any).estudioExport;
     if (!api?.exportarCarpeta) {
-      message.error("La exportación no está disponible en esta versión");
+      message.error(
+        "La exportación no está disponible. Cierra y vuelve a abrir la aplicación e inténtalo de nuevo.",
+      );
       return;
     }
 
@@ -394,24 +400,38 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
       });
       archivos.push({ nombre: `${base} - Reporte.pdf`, dataBase64: pdfBase64 });
 
-      // 2) Todas las fotografías del estudio (con edición aplicada si existe)
-      todasLasImagenes.forEach((url, idx) => {
-        const displayUrl = getDisplayUrl(url);
+      // 2) Todas las fotografías del estudio (con edición aplicada si existe).
+      // Las editadas viven como blob:/data: URLs del renderer — el main
+      // process no puede descargarlas, así que se convierten a base64 aquí.
+      for (let idx = 0; idx < todasLasImagenes.length; idx++) {
+        const displayUrl = getDisplayUrl(todasLasImagenes[idx]);
         const num = String(idx + 1).padStart(2, "0");
         const ext =
           displayUrl.match(/\.(png|jpe?g|webp)(\?|$)/i)?.[1] || "jpg";
-        if (displayUrl.startsWith("data:")) {
-          archivos.push({
-            nombre: `${base} - Foto ${num}.${ext}`,
-            dataBase64: displayUrl.split(",")[1] || "",
-          });
-        } else {
-          archivos.push({
-            nombre: `${base} - Foto ${num}.${ext}`,
-            url: displayUrl,
-          });
+        const nombre = `${base} - Foto ${num}.${ext}`;
+        try {
+          if (
+            displayUrl.startsWith("data:") ||
+            displayUrl.startsWith("blob:")
+          ) {
+            const fotoBlob = await fetch(displayUrl).then((r) => r.blob());
+            const fotoBase64 = await new Promise<string>(
+              (resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () =>
+                  resolve(String(reader.result).split(",")[1] || "");
+                reader.onerror = reject;
+                reader.readAsDataURL(fotoBlob);
+              },
+            );
+            archivos.push({ nombre, dataBase64: fotoBase64 });
+          } else {
+            archivos.push({ nombre, url: displayUrl });
+          }
+        } catch (error) {
+          console.error(`Error preparando ${nombre}:`, error);
         }
-      });
+      }
 
       // 3) Videos de las sesiones del estudio
       const videos = (
@@ -455,8 +475,8 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
   // vista previa ya renderizado en el iframe
   const handleImprimir = () => {
     const iframe = previewIframeRef.current;
-    if (!iframe?.contentWindow || !previewUrl) {
-      message.warning("Espera a que la vista previa termine de generarse");
+    if (!iframe?.contentWindow || !previewUrl || previewLoading || !previewLista) {
+      message.warning("Espera a que la vista previa termine de actualizarse");
       return;
     }
     iframe.contentWindow.focus();
@@ -468,7 +488,12 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
   return (
     <Modal
       open={isOpen}
-      onCancel={onClose}
+      onCancel={() => {
+        if (!generando && !exportando) onClose();
+      }}
+      closable={!generando && !exportando}
+      maskClosable={!generando && !exportando}
+      keyboard={!generando && !exportando}
       footer={null}
       centered
       width="94vw"
@@ -923,35 +948,45 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
       </div>
 
       {/* Botones de acción fijos al pie de la columna (fuera del scroll) */}
-      <div className="flex justify-end gap-3 pt-4 mt-1 border-t border-gray-200 bg-white flex-wrap">
-        <Button onClick={onClose} disabled={generando || exportando}>
-          Cancelar
-        </Button>
-        <Button
-          icon={<FolderOpenOutlined />}
-          onClick={handleExportarCarpeta}
-          loading={exportando}
-          disabled={generando}
-        >
-          {exportando ? "Exportando..." : "Exportar carpeta (PDF, fotos y video)"}
-        </Button>
-        <Button
-          icon={<PrinterOutlined />}
-          onClick={handleImprimir}
-          disabled={generando || exportando || !previewUrl}
-        >
-          Imprimir
-        </Button>
-        <Button
-          type="primary"
-          icon={generando ? <Spin size="small" /> : <DownloadOutlined />}
-          onClick={handleGenerarPDF}
-          loading={generando}
-          disabled={exportando}
-          className="bg-red-500 hover:bg-red-600 border-red-500"
-        >
-          {generando ? "Generando..." : "Generar y Descargar PDF"}
-        </Button>
+      <div className="flex items-center justify-between gap-3 pt-4 mt-1 border-t border-gray-200 bg-white flex-wrap">
+        {/* Acciones secundarias a la izquierda */}
+        <div className="flex items-center gap-2">
+          <Button
+            icon={<PrinterOutlined />}
+            onClick={handleImprimir}
+            disabled={
+              generando || exportando || previewLoading || !previewLista
+            }
+          >
+            Imprimir
+          </Button>
+          <Button
+            icon={<FolderOpenOutlined />}
+            onClick={handleExportarCarpeta}
+            loading={exportando}
+            disabled={generando}
+            title="Guarda una carpeta con el reporte PDF, las fotografías y los videos del estudio (ideal para USB o disco externo)"
+          >
+            {exportando ? "Exportando..." : "Exportar carpeta"}
+          </Button>
+        </div>
+
+        {/* Acciones principales a la derecha */}
+        <div className="flex items-center gap-3">
+          <Button onClick={onClose} disabled={generando || exportando}>
+            Cancelar
+          </Button>
+          <Button
+            type="primary"
+            icon={generando ? <Spin size="small" /> : <DownloadOutlined />}
+            onClick={handleGenerarPDF}
+            loading={generando}
+            disabled={exportando}
+            className="bg-red-500 hover:bg-red-600 border-red-500"
+          >
+            {generando ? "Generando..." : "Descargar PDF"}
+          </Button>
+        </div>
       </div>
       </div>
 
@@ -971,10 +1006,11 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
           {previewUrl ? (
             <iframe
               ref={previewIframeRef}
-              src={previewUrl}
+              src={`${previewUrl}#zoom=100`}
               title="Vista previa del reporte"
               className="w-full h-full"
               style={{ border: 0 }}
+              onLoad={() => setPreviewLista(true)}
             />
           ) : (
             <div className="h-full flex flex-col items-center justify-center gap-3 text-gray-400 text-sm">

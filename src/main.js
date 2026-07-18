@@ -1,5 +1,7 @@
 import path from 'path';
-import { promises as fsPromises } from 'fs';
+import { promises as fsPromises, createWriteStream } from 'fs';
+import { Readable } from 'stream';
+import { pipeline } from 'stream/promises';
 import { fileURLToPath } from 'url';
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import { machineId } from 'node-machine-id';
@@ -443,17 +445,18 @@ ipcMain.handle('estudio:exportarCarpeta', async (event, payload) => {
     const errores = [];
     for (const archivo of archivos) {
       try {
-        let buffer;
+        const rutaDestino = path.join(destino, archivo.nombre);
         if (archivo.dataBase64) {
-          buffer = Buffer.from(archivo.dataBase64, 'base64');
+          await fsPromises.writeFile(rutaDestino, Buffer.from(archivo.dataBase64, 'base64'));
         } else if (archivo.url) {
-          const res = await fetch(archivo.url);
+          // Streaming a disco (los videos pueden pesar cientos de MB) con
+          // timeout generoso por archivo
+          const res = await fetch(archivo.url, { signal: AbortSignal.timeout(10 * 60 * 1000) });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          buffer = Buffer.from(await res.arrayBuffer());
+          await pipeline(Readable.fromWeb(res.body), createWriteStream(rutaDestino));
         } else {
           continue;
         }
-        await fsPromises.writeFile(path.join(destino, archivo.nombre), buffer);
         guardados++;
       } catch (error) {
         console.error(`[IPC] Error guardando ${archivo.nombre}:`, error);

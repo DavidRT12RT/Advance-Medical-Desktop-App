@@ -69,8 +69,8 @@ const styles = StyleSheet.create({
   // Header styles
   header: {
     flexDirection: "row",
-    marginBottom: 20,
-    paddingBottom: 12,
+    marginBottom: 12,
+    paddingBottom: 8,
     borderBottomWidth: 2,
     borderBottomColor: COLORS.indigo,
   },
@@ -80,8 +80,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   logo: {
-    width: 120,
-    height: 120,
+    width: 70,
+    height: 70,
     objectFit: "contain",
   },
   headerCenter: {
@@ -116,8 +116,8 @@ const styles = StyleSheet.create({
   // Section card styles (matching app's bg-white p-6 rounded-xl shadow-sm border border-gray-100)
   sectionCard: {
     backgroundColor: COLORS.white,
-    padding: 14,
-    marginBottom: 12,
+    padding: 10,
+    marginBottom: 8,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: "#e5e7eb",
@@ -373,12 +373,21 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
       : Math.min(5, Math.max(2, Math.ceil(imagesToShow.length / 2)));
   const anchoImagen = `${Math.floor(100 / columnasImagenes) - 1}%`;
   const altoImagen =
-    { 1: 220, 2: 175, 3: 125, 4: 95, 5: 78 }[columnasImagenes] ?? 95;
+    { 1: 220, 2: 175, 3: 125, 4: 85, 5: 72 }[columnasImagenes] ?? 85;
 
-  // El formato estándar (7+ fotos, compactas a 4-5 por fila) cabe en la
-  // primera página; los formatos grandes (1-6 fotos) ocupan demasiado
-  // espacio y se muestran en la segunda página.
-  const fotosEnPagina1 = imagesToShow.length >= 7;
+  // El formato estándar (7+ fotos, compactas a 4-5 por fila) va en la
+  // primera página siempre que el texto clínico deje espacio real; los
+  // formatos grandes (1-6 fotos) ocupan demasiado y van a la página 2.
+  // Con hallazgos muy extensos las fotos también pasan a la página 2 para
+  // no partir la cuadrícula ni desplazar las firmas.
+  const textoClinico = [
+    estudio?.hallazgos,
+    estudio?.observaciones,
+    estudio?.resultado,
+  ]
+    .filter(Boolean)
+    .join("").length;
+  const fotosEnPagina1 = imagesToShow.length >= 7 && textoClinico <= 600;
 
   // Calculate patient age if birth date exists
   const calcularEdad = (fechaNac: string) => {
@@ -574,10 +583,21 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
                 </Text>
               </View>
             )}
+            {config.incluirSedacion && estudio?.sedacion_observaciones && (
+              <View style={styles.gridItemFull}>
+                <Text style={styles.fieldLabel}>
+                  Observaciones de sedación
+                </Text>
+                <Text style={styles.fieldValue}>
+                  {estudio.sedacion_observaciones}
+                </Text>
+              </View>
+            )}
             {config.incluirEquipo &&
               (estudio?.equipo_endoscopio ||
                 estudio?.equipo_marca ||
-                estudio?.equipo_modelo) && (
+                estudio?.equipo_modelo ||
+                estudio?.equipo_serie) && (
                 <View style={styles.gridItem3}>
                   <Text style={styles.fieldLabel}>Equipo</Text>
                   <Text style={styles.fieldValue}>
@@ -585,6 +605,9 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
                       estudio?.equipo_endoscopio,
                       estudio?.equipo_marca,
                       estudio?.equipo_modelo,
+                      estudio?.equipo_serie
+                        ? `Serie ${estudio.equipo_serie}`
+                        : null,
                     ]
                       .filter(Boolean)
                       .join(" ")}
@@ -698,7 +721,7 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
         {/* Section 6: Fotografías en formato estándar (7+, compactas):
             aparecen en la primera página */}
         {fotosEnPagina1 && (
-          <View style={styles.sectionCard}>
+          <View style={styles.sectionCard} wrap={false}>
             <SectionTitle title="Imágenes del Estudio" />
             <View style={styles.imagesGrid}>
               {imagesToShow.map((img, idx) => (
