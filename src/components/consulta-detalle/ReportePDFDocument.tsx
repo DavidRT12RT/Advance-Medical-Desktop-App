@@ -152,6 +152,11 @@ const styles = StyleSheet.create({
     paddingRight: 8,
     marginBottom: 4,
   },
+  gridItem4: {
+    width: "25%",
+    paddingRight: 8,
+    marginBottom: 4,
+  },
   gridItemFull: {
     width: "100%",
     marginBottom: 4,
@@ -394,7 +399,7 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
   ].filter(Boolean).length;
 
   const altoEncabezado = 125;
-  const altoPaciente = config.incluirDatosPaciente && paciente ? 68 : 0;
+  const altoPaciente = config.incluirDatosPaciente && paciente ? 52 : 0;
   const altoProcedimiento =
     30 +
     Math.ceil(camposProcedimiento / 3) * 26 +
@@ -591,24 +596,24 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
           <View style={styles.sectionCard} wrap={false}>
             <SectionTitle title="Paciente" />
             <View style={styles.gridRow}>
-              <View style={styles.gridItem2}>
+              <View style={styles.gridItem4}>
                 <Text style={styles.fieldLabel}>Nombre completo</Text>
                 <Text style={styles.fieldValue}>{nombrePaciente}</Text>
               </View>
               {edadPaciente && (
-                <View style={styles.gridItem3}>
+                <View style={styles.gridItem4}>
                   <Text style={styles.fieldLabel}>Edad</Text>
                   <Text style={styles.fieldValue}>{edadPaciente} Años</Text>
                 </View>
               )}
               {paciente.sexo && (
-                <View style={styles.gridItem3}>
+                <View style={styles.gridItem4}>
                   <Text style={styles.fieldLabel}>Sexo</Text>
                   <Text style={styles.fieldValue}>{paciente.sexo}</Text>
                 </View>
               )}
               {paciente.fechaNacimiento && (
-                <View style={styles.gridItem3}>
+                <View style={styles.gridItem4}>
                   <Text style={styles.fieldLabel}>Fecha de Nacimiento</Text>
                   <Text style={styles.fieldValue}>
                     {paciente.fechaNacimiento}
