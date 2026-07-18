@@ -22,6 +22,7 @@ import {
   cargarAjustes,
   guardarAjustes,
   construirFiltro,
+  kernelNitidez,
   esNeutro,
   type VideoAjustes,
 } from "../utils/videoAjustes";
@@ -1244,6 +1245,17 @@ const Detection: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {contextHolder}
+      {/* Filtro SVG de enfoque: lo referencian los CSS/canvas filters como
+          url(#aim-nitidez) cuando la nitidez es > 0 */}
+      <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden="true">
+        <filter id="aim-nitidez">
+          <feConvolveMatrix
+            order="3"
+            preserveAlpha="true"
+            kernelMatrix={kernelNitidez(ajustes.nitidez)}
+          />
+        </filter>
+      </svg>
 
       {/* Modal bloqueante mientras se guarda el video y los resultados */}
       <Modal
@@ -1537,6 +1549,33 @@ const Detection: React.FC = () => {
                         />
                       </div>
                     ))}
+                    <div>
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Tono (coloración)</span>
+                        <span className="font-mono">{ajustes.tono ?? 0}°</span>
+                      </div>
+                      <Slider
+                        min={-180}
+                        max={180}
+                        value={ajustes.tono ?? 0}
+                        onChange={(v) => actualizarAjustes({ tono: v })}
+                        tooltip={{ formatter: (v) => `${v}°` }}
+                      />
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Nitidez</span>
+                        <span className="font-mono">
+                          {ajustes.nitidez ?? 0}%
+                        </span>
+                      </div>
+                      <Slider
+                        min={0}
+                        max={100}
+                        value={ajustes.nitidez ?? 0}
+                        onChange={(v) => actualizarAjustes({ nitidez: v })}
+                      />
+                    </div>
                     <Button
                       size="small"
                       icon={<UndoOutlined />}
@@ -1554,7 +1593,7 @@ const Detection: React.FC = () => {
                       ? "bg-black/50 hover:bg-black/70"
                       : "bg-[#009b9b]/80 hover:bg-[#009b9b]"
                   }`}
-                  title="Ajustes de imagen (brillo, contraste, color, gamma)"
+                  title="Ajustes de imagen (brillo, contraste, color, gamma, tono, nitidez)"
                 >
                   <SlidersOutlined />
                 </button>
