@@ -8,6 +8,7 @@ import ModalEstudioPacienteDetalle from "../components/pacientes-detalle/ModalEs
 import ConsultasPacienteDetalle from "../components/pacientes-detalle/ConsultasPacienteDetalle";
 import ConsultasPendientesPacienteDetalle from "../components/pacientes-detalle/ConsultasPendientesPacienteDetalle";
 import ModalConsultaPacienteDetalle from "../components/pacientes-detalle/ModalConsultaPacienteDetalle";
+import EstudiosYConsultasPacienteDetalle from "../components/pacientes-detalle/EstudiosYConsultasPacienteDetalle";
 import RegistrosMedicosPacienteDetalle from "../components/pacientes-detalle/RegistrosMedicosPacienteDetalle";
 import FirebasePacientes from "../features/FirebasePacientes";
 import { Skeleton } from "antd";
@@ -24,9 +25,12 @@ const PacienteDetalle = () => {
   const { user } = useElectronStore();
   const empresaId = user?.empresa?.id;
 
-  const [activeTab, setActiveTab] = useState("informacion");
+  // La vista consolidada es la pestaña inicial: al seleccionar o crear un
+  // paciente, lo primero que se ve son sus estudios y consultas
+  const [activeTab, setActiveTab] = useState("estudios_consultas");
 
   const tabs = [
+    { id: "estudios_consultas", label: "Estudios y Consultas" },
     { id: "informacion", label: "Información del Paciente" },
     { id: "consultas", label: "Consultas" },
     { id: "consultas_pendientes", label: "Consultas Pendientes" },
@@ -105,6 +109,9 @@ const PacienteDetalle = () => {
 
       {/* Tab Content */}
       <div className="bg-white rounded-lg p-6">
+        {activeTab === "estudios_consultas" && (
+          <EstudiosYConsultasPacienteDetalle />
+        )}
         {activeTab === "informacion" && <InformacionPacienteDetalle />}
         {activeTab === "consultas" && <ConsultasPacienteDetalle />}
         {activeTab === "consultas_pendientes" && (
