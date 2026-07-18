@@ -10,6 +10,7 @@ import {
   message,
 } from "antd";
 import { useParams } from "react-router-dom";
+import dayjs from "dayjs";
 import { setOpenModalConsultas, setRefresh } from "../../store/pacientesSlice";
 import FirebaseConsultas from "../../features/FirebaseConsultas";
 import { useElectronStore } from "../../hooks/useElectronStore";
@@ -138,7 +139,13 @@ const ModalConsultaPacienteDetalle = () => {
           name="fecha"
           rules={[{ required: true, message: "Selecciona la fecha" }]}
         >
-          <DatePicker style={{ width: "100%" }} format="DD/MM/YYYY" />
+          <DatePicker
+            style={{ width: "100%" }}
+            format="DD/MM/YYYY"
+            disabledDate={(current) =>
+              current && current.isBefore(dayjs().startOf("day"))
+            }
+          />
         </Form.Item>
 
         <Form.Item

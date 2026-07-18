@@ -196,6 +196,9 @@ const ModalNuevaConsulta: React.FC<ModalNuevaConsultaProps> = ({
             style={{ width: "100%" }}
             format="YYYY-MM-DD"
             placeholder="Seleccione fecha"
+            disabledDate={(current) =>
+              current && current.isBefore(dayjs().startOf("day"))
+            }
           />
         </Form.Item>
 
