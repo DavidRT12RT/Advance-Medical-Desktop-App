@@ -90,8 +90,14 @@ export function useCatalogosEstudio() {
         clave,
         items(clave).filter((i) => i !== valor),
       );
+      if (clave === "anestesiologos") {
+        const detalles = (
+          (catalogos[DETALLES_ANESTESIOLOGOS] as any[]) || []
+        ).filter((d) => d?.nombre !== valor);
+        persistir(DETALLES_ANESTESIOLOGOS, detalles);
+      }
     },
-    [items, persistir],
+    [items, persistir, catalogos],
   );
 
   const renombrarItem = useCallback(
@@ -111,8 +117,15 @@ export function useCatalogosEstudio() {
         clave,
         actuales.map((i) => (i === anterior ? v : i)),
       );
+      // Los datos del anestesiólogo (cédula/especialidad) viajan con el nombre
+      if (clave === "anestesiologos") {
+        const detalles = (
+          (catalogos[DETALLES_ANESTESIOLOGOS] as any[]) || []
+        ).map((d) => (d?.nombre === anterior ? { ...d, nombre: v } : d));
+        persistir(DETALLES_ANESTESIOLOGOS, detalles);
+      }
     },
-    [items, persistir],
+    [items, persistir, catalogos],
   );
 
   /** Reincorpora los valores sugeridos del código sin perder los propios. */
