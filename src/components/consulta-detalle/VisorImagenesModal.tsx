@@ -19,6 +19,8 @@ interface VisorImagenesModalProps {
   onEditar: (url: string) => void;
   esEditada: (url: string) => boolean;
   etiqueta: (indice: number) => string;
+  /** Pausa el teclado del visor (p. ej. con el editor abierto encima) */
+  tecladoPausado?: boolean;
 }
 
 /**
@@ -37,6 +39,7 @@ const VisorImagenesModal: React.FC<VisorImagenesModalProps> = ({
   onEditar,
   esEditada,
   etiqueta,
+  tecladoPausado = false,
 }) => {
   const [indice, setIndice] = useState(0);
   const [zoom, setZoom] = useState(1);
@@ -63,8 +66,15 @@ const VisorImagenesModal: React.FC<VisorImagenesModalProps> = ({
 
   // Teclado: flechas para navegar, Espacio/Enter para seleccionar
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || tecladoPausado) return;
     const onKeyDown = (e: KeyboardEvent) => {
+      const objetivo = e.target as HTMLElement | null;
+      if (
+        objetivo &&
+        (objetivo.tagName === "INPUT" || objetivo.tagName === "TEXTAREA")
+      ) {
+        return;
+      }
       if (e.key === "ArrowLeft") {
         e.preventDefault();
         irAnterior();
@@ -78,7 +88,7 @@ const VisorImagenesModal: React.FC<VisorImagenesModalProps> = ({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isOpen, irAnterior, irSiguiente, onToggleSeleccion, url]);
+  }, [isOpen, tecladoPausado, irAnterior, irSiguiente, onToggleSeleccion, url]);
 
   const handleWheel = (e: React.WheelEvent) => {
     setZoom((z) =>

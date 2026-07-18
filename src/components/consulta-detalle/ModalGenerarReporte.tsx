@@ -1042,6 +1042,7 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
         onToggleSeleccion={handleImageToggle}
         onEditar={(url) => handleEditImage(url)}
         esEditada={(url) => editedImages.has(url)}
+        tecladoPausado={!!editingImageUrl}
         etiqueta={(i) =>
           i < capturasManualesTodas.length
             ? `Captura manual #${i + 1}`
