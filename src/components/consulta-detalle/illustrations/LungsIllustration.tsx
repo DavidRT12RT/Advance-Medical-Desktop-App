@@ -22,7 +22,7 @@ interface Props {
 
 const LungsIllustration: React.FC<Props> = ({ marcador }) => {
   return (
-    <Svg viewBox="0 0 200 180" width={140} height={126}>
+    <Svg viewBox="0 0 200 180" width={90} height={81}>
       <Defs>
         {/* Gradiente para pulmones */}
         <LinearGradient id="lungGradient" x1="0%" y1="0%" x2="100%" y2="100%">

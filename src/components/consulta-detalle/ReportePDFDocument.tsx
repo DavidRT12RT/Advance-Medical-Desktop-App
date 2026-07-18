@@ -61,7 +61,8 @@ const COLORS = {
 
 const styles = StyleSheet.create({
   page: {
-    padding: 30,
+    padding: 24,
+    paddingBottom: 42,
     fontSize: 10,
     fontFamily: "Helvetica",
     backgroundColor: COLORS.white,
@@ -69,8 +70,8 @@ const styles = StyleSheet.create({
   // Header styles
   header: {
     flexDirection: "row",
-    marginBottom: 12,
-    paddingBottom: 8,
+    marginBottom: 8,
+    paddingBottom: 6,
     borderBottomWidth: 2,
     borderBottomColor: COLORS.indigo,
   },
@@ -80,8 +81,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   logo: {
-    width: 70,
-    height: 70,
+    width: 52,
+    height: 52,
     objectFit: "contain",
   },
   headerCenter: {
@@ -116,8 +117,8 @@ const styles = StyleSheet.create({
   // Section card styles (matching app's bg-white p-6 rounded-xl shadow-sm border border-gray-100)
   sectionCard: {
     backgroundColor: COLORS.white,
-    padding: 10,
-    marginBottom: 8,
+    padding: 7,
+    marginBottom: 5,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: "#e5e7eb",
@@ -126,13 +127,13 @@ const styles = StyleSheet.create({
   sectionTitleContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 10,
-    paddingLeft: 8,
+    marginBottom: 5,
+    paddingLeft: 6,
     borderLeftWidth: 4,
     borderLeftColor: COLORS.indigo,
   },
   sectionTitle: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "bold",
     color: COLORS.gray800,
   },
@@ -144,16 +145,16 @@ const styles = StyleSheet.create({
   gridItem2: {
     width: "50%",
     paddingRight: 8,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   gridItem3: {
     width: "33.33%",
     paddingRight: 8,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   gridItemFull: {
     width: "100%",
-    marginBottom: 6,
+    marginBottom: 4,
   },
   // Field styles
   fieldLabel: {
@@ -168,7 +169,7 @@ const styles = StyleSheet.create({
   fieldValueLarge: {
     fontSize: 9,
     color: COLORS.gray700,
-    lineHeight: 1.5,
+    lineHeight: 1.35,
     textAlign: "justify",
   },
   // Highlighted section (matching app's bg-indigo-50/50 p-5 rounded-lg border border-indigo-100)
@@ -226,8 +227,8 @@ const styles = StyleSheet.create({
   },
   // Signature section - NOT absolute positioned, flows with content
   signaturesContainer: {
-    marginTop: 30,
-    paddingTop: 20,
+    marginTop: 6,
+    paddingTop: 8,
   },
   signaturesRow: {
     flexDirection: "row",
@@ -237,7 +238,7 @@ const styles = StyleSheet.create({
   signatureBlock: {
     alignItems: "center",
     width: "30%",
-    marginBottom: 20,
+    marginBottom: 8,
   },
   signatureLine: {
     width: 140,
@@ -263,8 +264,10 @@ const styles = StyleSheet.create({
   },
   // Footer
   footer: {
-    marginTop: 20,
-    paddingTop: 10,
+    position: "absolute",
+    bottom: 14,
+    left: 24,
+    right: 24,
     flexDirection: "row",
     justifyContent: "space-between",
   },
@@ -373,7 +376,7 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
       : Math.min(5, Math.max(2, Math.ceil(imagesToShow.length / 2)));
   const anchoImagen = `${Math.floor(100 / columnasImagenes) - 1}%`;
   const altoImagen =
-    { 1: 220, 2: 175, 3: 125, 4: 85, 5: 72 }[columnasImagenes] ?? 85;
+    { 1: 220, 2: 175, 3: 125, 4: 56, 5: 52 }[columnasImagenes] ?? 56;
 
   // El formato estándar (7+ fotos, compactas a 4-5 por fila) va en la
   // primera página siempre que el texto clínico deje espacio real; los
@@ -387,7 +390,7 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
   ]
     .filter(Boolean)
     .join("").length;
-  const fotosEnPagina1 = imagesToShow.length >= 7 && textoClinico <= 600;
+  const fotosEnPagina1 = imagesToShow.length >= 7 && textoClinico <= 900;
 
   // Calculate patient age if birth date exists
   const calcularEdad = (fechaNac: string) => {
@@ -424,6 +427,8 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
   // (una sección habilitada pero sin datos no cuenta)
   const haySegundaPagina = Boolean(
     (imagesToShow.length > 0 && !fotosEnPagina1) ||
+      (config.incluirPolipos &&
+        (estudio?.polipo || estudio?.tamano || estudio?.ubicacion)) ||
       (config.incluirMedicamentos && estudio?.medicamentos) ||
       (config.incluirComplicaciones && estudio?.complicaciones) ||
       (config.incluirSeguimiento && estudio?.seguimiento) ||
@@ -506,7 +511,7 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
         {/* Section 1: Patient Data */}
         {config.incluirDatosPaciente && paciente && (
           <View style={styles.sectionCard} wrap={false}>
-            <SectionTitle title="Datos del Paciente" />
+            <SectionTitle title="Paciente" />
             <View style={styles.gridRow}>
               <View style={styles.gridItem2}>
                 <Text style={styles.fieldLabel}>Nombre completo</Text>
@@ -538,7 +543,7 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
 
         {/* Section 2: Datos del Procedimiento */}
         <View style={styles.sectionCard} wrap={false}>
-          <SectionTitle title="Datos del Procedimiento" />
+          <SectionTitle title="Procedimiento" />
           <View style={styles.gridRow}>
             <View style={styles.gridItem3}>
               <Text style={styles.fieldLabel}>Procedimiento</Text>
@@ -656,59 +661,7 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
           </View>
         )}
 
-        {/* Section 3: Polyp/Lesion Details */}
-        {config.incluirPolipos &&
-          (estudio?.polipo || estudio?.tamano || estudio?.ubicacion) && (
-            <View style={styles.sectionCard} wrap={false}>
-              <SectionTitle title="Detalle de Lesiones / Pólipos" />
-              <View style={styles.highlightedSection}>
-                <View style={styles.gridRow}>
-                  {estudio.polipo && (
-                    <View style={styles.gridItem3}>
-                      <Text style={styles.fieldLabel}>Tipo / Morfología</Text>
-                      <Text style={styles.fieldValue}>{estudio.polipo}</Text>
-                    </View>
-                  )}
-                  {estudio.tamano && (
-                    <View style={styles.gridItem3}>
-                      <Text style={styles.fieldLabel}>Tamaño</Text>
-                      <Text style={styles.fieldValue}>{estudio.tamano} mm</Text>
-                    </View>
-                  )}
-                  {estudio.ubicacion && (
-                    <View style={styles.gridItem3}>
-                      <Text style={styles.fieldLabel}>Ubicación</Text>
-                      <Text style={styles.fieldValue}>{estudio.ubicacion}</Text>
-                    </View>
-                  )}
-                  {estudio.clasificacion && (
-                    <View style={styles.gridItem3}>
-                      <Text style={styles.fieldLabel}>
-                        Clasificación (NICE/JNET)
-                      </Text>
-                      <Text style={styles.fieldValue}>
-                        {estudio.clasificacion}
-                      </Text>
-                    </View>
-                  )}
-                  {estudio.accion && (
-                    <View style={styles.gridItem3}>
-                      <Text style={styles.fieldLabel}>Acción terapéutica</Text>
-                      <Text style={styles.fieldValue}>{estudio.accion}</Text>
-                    </View>
-                  )}
-                  {estudio.biopsia && (
-                    <View style={styles.gridItem3}>
-                      <Text style={styles.fieldLabel}>¿Se tomó biopsia?</Text>
-                      <Text style={styles.fieldValue}>{estudio.biopsia}</Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-            </View>
-          )}
-
-        {/* Section 5: Diagnóstico */}
+        {/* Section 4: Diagnóstico */}
         {config.incluirResultado && estudio?.resultado && (
           <View style={styles.sectionCard} wrap={false}>
             <SectionTitle title="Diagnóstico" />
@@ -718,7 +671,7 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
           </View>
         )}
 
-        {/* Section 6: Fotografías en formato estándar (7+, compactas):
+        {/* Section 5: Fotografías en formato estándar (7+, compactas):
             aparecen en la primera página */}
         {fotosEnPagina1 && (
           <View style={styles.sectionCard} wrap={false}>
@@ -823,7 +776,7 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
         </View>
 
         {/* Footer página 1 */}
-        <View style={styles.footer} wrap={false}>
+        <View style={styles.footer} fixed>
           <Text style={styles.footerText}>
             Generado el {new Date().toLocaleDateString("es-MX")}
           </Text>
@@ -891,6 +844,59 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
             </View>
           </View>
         )}
+
+        {/* Detalle de lesiones / pólipos (campo secundario: página 2) */}
+        {config.incluirPolipos &&
+          (estudio?.polipo || estudio?.tamano || estudio?.ubicacion) && (
+            <View style={styles.sectionCard} wrap={false}>
+              <SectionTitle title="Detalle de Lesiones / Pólipos" />
+              <View style={styles.highlightedSection}>
+                <View style={styles.gridRow}>
+                  {estudio.polipo && (
+                    <View style={styles.gridItem3}>
+                      <Text style={styles.fieldLabel}>Tipo / Morfología</Text>
+                      <Text style={styles.fieldValue}>{estudio.polipo}</Text>
+                    </View>
+                  )}
+                  {estudio.tamano && (
+                    <View style={styles.gridItem3}>
+                      <Text style={styles.fieldLabel}>Tamaño</Text>
+                      <Text style={styles.fieldValue}>{estudio.tamano} mm</Text>
+                    </View>
+                  )}
+                  {estudio.ubicacion && (
+                    <View style={styles.gridItem3}>
+                      <Text style={styles.fieldLabel}>Ubicación</Text>
+                      <Text style={styles.fieldValue}>{estudio.ubicacion}</Text>
+                    </View>
+                  )}
+                  {estudio.clasificacion && (
+                    <View style={styles.gridItem3}>
+                      <Text style={styles.fieldLabel}>
+                        Clasificación (NICE/JNET)
+                      </Text>
+                      <Text style={styles.fieldValue}>
+                        {estudio.clasificacion}
+                      </Text>
+                    </View>
+                  )}
+                  {estudio.accion && (
+                    <View style={styles.gridItem3}>
+                      <Text style={styles.fieldLabel}>Acción terapéutica</Text>
+                      <Text style={styles.fieldValue}>{estudio.accion}</Text>
+                    </View>
+                  )}
+                  {estudio.biopsia && (
+                    <View style={styles.gridItem3}>
+                      <Text style={styles.fieldLabel}>¿Se tomó biopsia?</Text>
+                      <Text style={styles.fieldValue}>{estudio.biopsia}</Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+            </View>
+          )}
+
 
         {/* Section 4: Plan and Follow-up.
             Solo se muestra si hay contenido real, aunque esté habilitada. */}
@@ -984,7 +990,7 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
         )}
 
         {/* Footer página 2 */}
-        <View style={styles.footer}>
+        <View style={styles.footer} fixed>
           <Text style={styles.footerText}>
             Generado el {new Date().toLocaleDateString("es-MX")}
           </Text>
