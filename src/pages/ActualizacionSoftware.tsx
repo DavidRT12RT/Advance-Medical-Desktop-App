@@ -833,12 +833,12 @@ const ActualizacionSoftware: React.FC = () => {
                         </Tag>
                       </Space>
                       <div>
-                        <Text type="secondary" style={{ fontSize: 12 }}>
+                        <Text type="secondary" style={{ fontSize: 14 }}>
                           {dayjs(update.fechaPublicacion).fromNow()}
                         </Text>
                       </div>
                       <div>
-                        <Text style={{ fontSize: 12 }}>{update.nombre}</Text>
+                        <Text style={{ fontSize: 14 }}>{update.nombre}</Text>
                       </div>
                     </div>
                   ),

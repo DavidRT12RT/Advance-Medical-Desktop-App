@@ -83,6 +83,38 @@ class FirebaseConfiguraciones {
   }
 
   /**
+   * Actualizar los ajustes de imagen de la cámara (brillo, contraste, tono,
+   * balance rojo/verde/azul, etc.) en el perfil del usuario
+   * @param idEmpresa ID de la empresa
+   * @param idOrganizacion ID de la organización
+   * @param idUsuario ID del usuario
+   * @param videoAjustes Objeto con los ajustes de video
+   */
+  async actualizarVideoAjustes(
+    idEmpresa: string,
+    idOrganizacion: string,
+    idUsuario: string,
+    videoAjustes: any
+  ) {
+    try {
+      const userRef = doc(
+        firestore,
+        `empresas/${idEmpresa}/organizaciones/${idOrganizacion}/perfiles/${idUsuario}`
+      );
+
+      await updateDoc(userRef, {
+        "configuraciones.videoAjustes": videoAjustes,
+        updatedAt: new Date().toISOString(),
+      });
+
+      return true;
+    } catch (error) {
+      console.error("Error actualizando ajustes de video del usuario:", error);
+      throw error;
+    }
+  }
+
+  /**
    * Actualizar datos médicos del doctor
    * @param idEmpresa ID de la empresa
    * @param idOrganizacion ID de la organización

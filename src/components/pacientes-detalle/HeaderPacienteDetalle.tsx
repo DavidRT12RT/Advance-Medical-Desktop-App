@@ -135,7 +135,7 @@ const HeaderPacienteDetalle = () => {
       <div className="flex items-center gap-2">
         <Avatar size={50} />
         <h1
-          style={{ fontSize: "24px", fontWeight: 600 }}
+          style={{ fontSize: "28px", fontWeight: 600 }}
         >{`${detalleDePaciente?.nombres} ${detalleDePaciente?.apellidoPaterno} ${detalleDePaciente?.apellidoMaterno}`}</h1>
       </div>
       <div className="flex items-center gap-2">

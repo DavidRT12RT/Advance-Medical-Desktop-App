@@ -326,7 +326,7 @@ const DetalleVersion: React.FC<DetalleVersionProps> = ({
                       </Space>
                       <Text
                         type="secondary"
-                        style={{ fontSize: 12, wordBreak: "break-all" }}
+                        style={{ fontSize: 14, wordBreak: "break-all" }}
                       >
                         Checksum: {version.descargas.windows.checksum}
                       </Text>
@@ -345,7 +345,7 @@ const DetalleVersion: React.FC<DetalleVersionProps> = ({
                       </Space>
                       <Text
                         type="secondary"
-                        style={{ fontSize: 12, wordBreak: "break-all" }}
+                        style={{ fontSize: 14, wordBreak: "break-all" }}
                       >
                         Checksum: {version.descargas.mac.checksum}
                       </Text>
@@ -364,7 +364,7 @@ const DetalleVersion: React.FC<DetalleVersionProps> = ({
                       </Space>
                       <Text
                         type="secondary"
-                        style={{ fontSize: 12, wordBreak: "break-all" }}
+                        style={{ fontSize: 14, wordBreak: "break-all" }}
                       >
                         Checksum: {version.descargas.linux.checksum}
                       </Text>

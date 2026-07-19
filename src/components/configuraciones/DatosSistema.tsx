@@ -108,7 +108,7 @@ const DatosSistema: React.FC<DatosSistemaProps> = ({ form, initialValues, onSave
                 height: '50px',
                 backgroundColor: '#ff4d4f',
                 borderColor: '#ff4d4f',
-                fontSize: '16px',
+                fontSize: '18px',
                 fontWeight: 500
               }}
             >

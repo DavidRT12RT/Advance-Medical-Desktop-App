@@ -140,7 +140,7 @@ const ModalInfoSeccionAI = ({
                 {/* Indicador de modo de sesión */}
                 <div className="flex items-center gap-2">
                   <span
-                    className={`px-2 py-1 rounded text-[10px] font-semibold ${
+                    className={`px-2 py-1 rounded text-[12px] font-semibold ${
                       sessionMode === "with_ai"
                         ? "bg-green-600 text-white"
                         : "bg-blue-600 text-white"
@@ -177,7 +177,7 @@ const ModalInfoSeccionAI = ({
                         className="w-full h-full object-contain"
                       />
                     </div>
-                    <p className="text-[10px] text-gray-500">
+                    <p className="text-[12px] text-gray-500">
                       Pausa el video en el momento deseado y pulsa "Capturar
                       fotograma" para agregar esa imagen a las capturas del
                       estudio.
@@ -191,7 +191,7 @@ const ModalInfoSeccionAI = ({
                       <p className="text-xs font-semibold text-green-300 uppercase tracking-wide">
                         Detecciones IA (Pólipos)
                       </p>
-                      <span className="text-[11px] text-gray-400">
+                      <span className="text-[13px] text-gray-400">
                         {polypImages.length === 1
                           ? "1 imagen"
                           : `${polypImages.length} imágenes`}
@@ -210,7 +210,7 @@ const ModalInfoSeccionAI = ({
                             alt={`Pólipo detectado ${idx + 1}`}
                             className="w-full h-20 object-cover transform group-hover:scale-105 transition"
                           />
-                          <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded-full bg-green-600 text-[10px] text-white font-semibold">
+                          <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded-full bg-green-600 text-[12px] text-white font-semibold">
                             IA #{idx + 1}
                           </span>
                         </button>
@@ -225,7 +225,7 @@ const ModalInfoSeccionAI = ({
                       <p className="text-xs font-semibold text-blue-300 uppercase tracking-wide">
                         Capturas Manuales
                       </p>
-                      <span className="text-[11px] text-gray-400">
+                      <span className="text-[13px] text-gray-400">
                         {manualScreenshots.length === 1
                           ? "1 captura"
                           : `${manualScreenshots.length} capturas`}
@@ -244,7 +244,7 @@ const ModalInfoSeccionAI = ({
                             alt={`Captura manual ${idx + 1}`}
                             className="w-full h-20 object-cover transform group-hover:scale-105 transition"
                           />
-                          <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded-full bg-blue-600 text-[10px] text-white font-semibold">
+                          <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded-full bg-blue-600 text-[12px] text-white font-semibold">
                             #{idx + 1}
                           </span>
                         </button>
@@ -341,7 +341,7 @@ const ModalInfoSeccionAI = ({
                       <div>
                         <p className="font-semibold text-gray-800">
                           {`Segmento ${idx + 1}`}
-                          <span className="text-[11px] text-gray-500 ml-1">
+                          <span className="text-[13px] text-gray-500 ml-1">
                             {seg.className || "polyp"}
                           </span>
                         </p>
@@ -356,7 +356,7 @@ const ModalInfoSeccionAI = ({
                             : "-"
                         }`}</p>
                         {seg.startTimestamp && seg.endTimestamp && (
-                          <p className="text-[11px] text-gray-500">
+                          <p className="text-[13px] text-gray-500">
                             {dayjs(seg.startTimestamp).format("HH:mm:ss")}
                             {" – "}
                             {dayjs(seg.endTimestamp).format("HH:mm:ss")}

@@ -566,7 +566,7 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
                 Firma del anestesiólogo
               </Checkbox>
               {!estudio?.anestesiologo_nombre && (
-                <span className="text-[11px] text-gray-400">
+                <span className="text-[13px] text-gray-400">
                   (el estudio no tiene anestesiólogo capturado)
                 </span>
               )}
@@ -582,7 +582,7 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
                 Firma del asistente
               </Checkbox>
               {!estudio?.asistente_nombre && (
-                <span className="text-[11px] text-gray-400">
+                <span className="text-[13px] text-gray-400">
                   (el estudio no tiene asistente capturado)
                 </span>
               )}
@@ -793,11 +793,11 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
                                 </span>
                               </div>
                             )}
-                            <span className="absolute bottom-0.5 right-0.5 px-1 py-0.5 rounded bg-blue-600 text-[9px] text-white font-semibold pointer-events-none">
+                            <span className="absolute bottom-0.5 right-0.5 px-1 py-0.5 rounded bg-blue-600 text-[11px] text-white font-semibold pointer-events-none">
                               #{idx + 1}
                             </span>
                             {isEdited && (
-                              <span className="absolute top-0.5 right-0.5 px-1 py-0.5 rounded bg-green-600 text-[8px] text-white font-semibold pointer-events-none">
+                              <span className="absolute top-0.5 right-0.5 px-1 py-0.5 rounded bg-green-600 text-[10px] text-white font-semibold pointer-events-none">
                                 Editada
                               </span>
                             )}
@@ -883,11 +883,11 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
                                 </span>
                               </div>
                             )}
-                            <span className="absolute bottom-0.5 right-0.5 px-1 py-0.5 rounded bg-green-600 text-[9px] text-white font-semibold pointer-events-none">
+                            <span className="absolute bottom-0.5 right-0.5 px-1 py-0.5 rounded bg-green-600 text-[11px] text-white font-semibold pointer-events-none">
                               IA #{idx + 1}
                             </span>
                             {isEdited && (
-                              <span className="absolute top-0.5 right-0.5 px-1 py-0.5 rounded bg-green-600 text-[8px] text-white font-semibold pointer-events-none">
+                              <span className="absolute top-0.5 right-0.5 px-1 py-0.5 rounded bg-green-600 text-[10px] text-white font-semibold pointer-events-none">
                                 Editada
                               </span>
                             )}
@@ -1016,7 +1016,7 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
             <EyeOutlined /> Vista previa en vivo
           </span>
           {previewLoading && (
-            <span className="text-[11px] text-gray-400 flex items-center gap-1.5">
+            <span className="text-[13px] text-gray-400 flex items-center gap-1.5">
               <Spin size="small" /> actualizando…
             </span>
           )}

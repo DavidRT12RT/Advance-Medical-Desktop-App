@@ -659,7 +659,7 @@ const EstudioDetalle: React.FC = () => {
                                   {`Sesión ${index + 1}`}
                                 </span>
                                 {timestamp && (
-                                  <span className="text-[11px] text-gray-500">
+                                  <span className="text-[13px] text-gray-500">
                                     {dayjs(timestamp).format(
                                       "DD/MM/YYYY HH:mm"
                                     )}

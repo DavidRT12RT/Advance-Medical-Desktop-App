@@ -1,5 +1,20 @@
 @import "tailwindcss";
 
+/* Escala de texto ampliada para usuarios de edad avanzada.
+   text-xs/text-sm suben su proporción para que el texto más pequeño de la
+   app nunca baje de ~14px (con la raíz en 18px: xs≈14.4px, sm≈16.2px). */
+@theme {
+  --text-xs: 0.8rem;
+  --text-sm: 0.9rem;
+}
+
+/* Raíz a 18px (112.5% de 16px): escala uniformemente todo lo dimensionado en
+   rem (texto y espaciados de Tailwind) sin tocar la relación entre tamaños.
+   antd no usa rem: sus tamaños se amplían vía tokens en src/theme.ts. */
+html {
+  font-size: 112.5%;
+}
+
 /* Animación de screenshot estilo iPhone */
 @keyframes screenshot-feedback {
   0% {

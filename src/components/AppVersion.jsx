@@ -27,7 +27,7 @@ export default function AppVersion({ style = {}, className = '' }) {
     <div
       className={`app-version ${className}`}
       style={{
-        fontSize: '12px',
+        fontSize: '13px',
         color: '#999',
         textAlign: 'center',
         ...style

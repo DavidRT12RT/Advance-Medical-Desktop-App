@@ -7,6 +7,7 @@ import LicenseGate from './components/LicenseGate';
 import Login from './components/Login';
 import App from './App';
 import { ConfigProvider } from 'antd';
+import theme from './theme';
 import FirebaseLicense from './features/FirebaseLicense';
 import { useNavigate } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
@@ -224,13 +225,7 @@ export default function Root() {
   // content = <App />;
 
   return (
-    <ConfigProvider
-      theme={{
-        token: {
-          colorPrimary: '#009b9b',
-        },
-      }}
-    >
+    <ConfigProvider theme={theme}>
       {content}
     </ConfigProvider>
   );

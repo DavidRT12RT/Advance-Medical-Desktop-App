@@ -4,6 +4,7 @@ import { Button, message, Modal, Popover, Progress, Slider, Spin } from "antd";
 import {
   ArrowLeftOutlined,
   CameraOutlined,
+  FileTextOutlined,
   FullscreenOutlined,
   FullscreenExitOutlined,
   SlidersOutlined,
@@ -16,15 +17,13 @@ import FirebaseEstudios from "../features/FirebaseEstudios";
 import FirebasePacientes from "../features/FirebasePacientes";
 import FirebaseMedia from "../features/FirebaseMedia";
 import SectionTitle from "../components/common/SectionTitle";
+import FiltrosVideoSVG from "../components/common/FiltrosVideoSVG";
 import { useElectronStore } from "../hooks/useElectronStore";
+import { useVideoAjustes } from "../hooks/useVideoAjustes";
 import {
   AJUSTES_NEUTROS,
-  cargarAjustes,
-  guardarAjustes,
   construirFiltro,
-  kernelNitidez,
   esNeutro,
-  type VideoAjustes,
 } from "../utils/videoAjustes";
 
 // URL del servidor de IA (API Python con YOLO/Ollama).
@@ -302,8 +301,9 @@ const Detection: React.FC = () => {
   const [ahora, setAhora] = useState(() => new Date());
   // Video expandido (pantalla completa dentro de la ventana)
   const [isExpanded, setIsExpanded] = useState(false);
-  // Ajustes de imagen (brillo/contraste/saturación/gamma), persistidos por máquina
-  const [ajustes, setAjustes] = useState<VideoAjustes>(() => cargarAjustes());
+  // Ajustes de imagen (brillo/contraste/tono/balance de color…), persistidos
+  // en el perfil del usuario — misma fuente que Configuración > Cámara y Video
+  const { ajustes, actualizarAjustes } = useVideoAjustes();
   const ajustesRef = useRef(ajustes);
   // Datos para el overlay quemado en el video (el loop de frames es un closure
   // de larga vida: lee estos refs, no el estado)
@@ -482,14 +482,6 @@ const Detection: React.FC = () => {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [isExpanded]);
-
-  const actualizarAjustes = (parciales: Partial<VideoAjustes>) => {
-    setAjustes((prev) => {
-      const nuevos = { ...prev, ...parciales };
-      guardarAjustes(nuevos);
-      return nuevos;
-    });
-  };
 
   const formatTiempo = (total: number) => {
     const m = Math.floor(total / 60).toString().padStart(2, "0");
@@ -1365,17 +1357,9 @@ const Detection: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {contextHolder}
-      {/* Filtro SVG de enfoque: lo referencian los CSS/canvas filters como
-          url(#aim-nitidez) cuando la nitidez es > 0 */}
-      <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden="true">
-        <filter id="aim-nitidez">
-          <feConvolveMatrix
-            order="3"
-            preserveAlpha="true"
-            kernelMatrix={kernelNitidez(ajustes.nitidez)}
-          />
-        </filter>
-      </svg>
+      {/* Filtros SVG (enfoque y balance de color): los referencian los
+          CSS/canvas filters como url(#aim-nitidez) y url(#aim-canales) */}
+      <FiltrosVideoSVG ajustes={ajustes} />
 
       {/* Modal bloqueante mientras se guarda el video y los resultados */}
       <Modal
@@ -1451,12 +1435,13 @@ const Detection: React.FC = () => {
           </Button>
           <Button
             type="primary"
+            icon={<FileTextOutlined />}
             disabled={exportandoFotos || exportandoVideo}
             onClick={() =>
               navigate(`/paciente-detalle/${pacienteId}/estudios/${estudioId}`)
             }
           >
-            Continuar al estudio
+            Generar reporte de hallazgos
           </Button>
         </div>
       </Modal>
@@ -1496,13 +1481,13 @@ const Detection: React.FC = () => {
           <div className="flex items-center gap-4 text-xs text-gray-500">
             <div className="flex items-center gap-2">
               {estudio?.tipo && (
-                <span className="px-2 py-0.5 rounded-full border border-blue-100 bg-blue-50 text-blue-700 text-[11px] font-medium">
+                <span className="px-2 py-0.5 rounded-full border border-blue-100 bg-blue-50 text-blue-700 text-[13px] font-medium">
                   {estudio.tipo}
                 </span>
               )}
               {estudio?.estado && (
                 <span
-                  className={`px-2 py-0.5 rounded-full border text-[11px] font-medium ${
+                  className={`px-2 py-0.5 rounded-full border text-[13px] font-medium ${
                     estudio.estado === "pendiente"
                       ? "bg-orange-50 text-orange-700 border-orange-100"
                       : estudio.estado === "finalizado"
@@ -1515,7 +1500,7 @@ const Detection: React.FC = () => {
               )}
             </div>
 
-            <div className="flex items-center gap-1 text-[11px]">
+            <div className="flex items-center gap-1 text-[13px]">
               <span
                 className={`inline-block w-2 h-2 rounded-full ${
                   isConnected ? "bg-green-500" : "bg-red-500"
@@ -1527,7 +1512,7 @@ const Detection: React.FC = () => {
             </div>
 
             {sessionId && (
-              <span className="hidden sm:inline text-[11px] text-gray-400">
+              <span className="hidden sm:inline text-[13px] text-gray-400">
                 SID: {sessionId.slice(0, 8)}
               </span>
             )}
@@ -1565,13 +1550,13 @@ const Detection: React.FC = () => {
                 <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
                   Capturas
                 </span>
-                <span className="text-[11px] font-bold bg-gray-900 text-white rounded-full min-w-[22px] text-center px-1.5 py-0.5">
+                <span className="text-[13px] font-bold bg-gray-900 text-white rounded-full min-w-[22px] text-center px-1.5 py-0.5">
                   {manualScreenshots.length}
                 </span>
               </div>
               <div className="flex-1 min-h-0 overflow-y-auto p-2 flex flex-col gap-2">
                 {manualScreenshots.length === 0 ? (
-                  <p className="text-[11px] text-gray-400 text-center mt-6 px-1 leading-relaxed">
+                  <p className="text-[13px] text-gray-400 text-center mt-6 px-1 leading-relaxed">
                     Haz <span className="font-semibold">clic en el video</span>{" "}
                     o usa el botón <CameraOutlined /> durante la grabación para
                     capturar
@@ -1590,7 +1575,7 @@ const Detection: React.FC = () => {
                           alt={`Captura ${num}`}
                           className="w-full aspect-video object-cover"
                         />
-                        <span className="absolute bottom-1 right-1 bg-black/60 text-white text-[9px] font-semibold px-1.5 py-0.5 rounded-full">
+                        <span className="absolute bottom-1 right-1 bg-black/60 text-white text-[11px] font-semibold px-1.5 py-0.5 rounded-full">
                           #{num}
                         </span>
                       </div>
@@ -1704,7 +1689,7 @@ const Detection: React.FC = () => {
                   if (!abierto) popoverCierreRef.current = Date.now();
                 }}
                 content={
-                  <div className="w-56 flex flex-col gap-1">
+                  <div className="w-64 max-h-[65vh] overflow-y-auto pr-1 flex flex-col gap-1">
                     {([
                       ["brillo", "Brillo"],
                       ["contraste", "Contraste"],
@@ -1737,6 +1722,29 @@ const Detection: React.FC = () => {
                         tooltip={{ formatter: (v) => `${v}°` }}
                       />
                     </div>
+                    <p className="text-xs font-medium text-gray-500 mt-1 mb-0">
+                      Balance de color
+                    </p>
+                    {([
+                      ["rojo", "Rojo"],
+                      ["verde", "Verde"],
+                      ["azul", "Azul"],
+                    ] as const).map(([clave, etiqueta]) => (
+                      <div key={clave}>
+                        <div className="flex justify-between text-xs text-gray-600">
+                          <span>{etiqueta}</span>
+                          <span className="font-mono">
+                            {ajustes[clave] ?? 100}%
+                          </span>
+                        </div>
+                        <Slider
+                          min={25}
+                          max={200}
+                          value={ajustes[clave] ?? 100}
+                          onChange={(v) => actualizarAjustes({ [clave]: v })}
+                        />
+                      </div>
+                    ))}
                     <div>
                       <div className="flex justify-between text-xs text-gray-600">
                         <span>Nitidez</span>
@@ -1768,7 +1776,7 @@ const Detection: React.FC = () => {
                       ? "bg-black/50 hover:bg-black/70"
                       : "bg-[#009b9b]/80 hover:bg-[#009b9b]"
                   }`}
-                  title="Ajustes de imagen (brillo, contraste, color, gamma, tono, nitidez)"
+                  title="Ajustes de imagen (brillo, contraste, color, gamma, tono, balance rojo/verde/azul, nitidez)"
                 >
                   <SlidersOutlined />
                 </button>
@@ -1785,7 +1793,7 @@ const Detection: React.FC = () => {
             {/* Hint de captura */}
             {isCapturing && !isPaused && (
               <div className="absolute top-16 right-4 z-20 pointer-events-none">
-                <div className="bg-black/40 backdrop-blur-sm px-3 py-1.5 rounded-lg text-[11px] text-gray-200 flex items-center gap-1.5">
+                <div className="bg-black/40 backdrop-blur-sm px-3 py-1.5 rounded-lg text-[13px] text-gray-200 flex items-center gap-1.5">
                   <CameraOutlined />
                   Clic en el video para capturar imagen
                 </div>
@@ -1806,12 +1814,12 @@ const Detection: React.FC = () => {
             {/* Overlay de fecha/hora y datos (también queda grabado en el video) */}
             <div className="absolute bottom-4 left-4 z-20 max-w-[36%] pointer-events-none">
               <div className="bg-black/50 backdrop-blur-sm px-3 py-2 rounded-lg text-white flex flex-col gap-0.5">
-                <span className="font-mono text-[13px] tabular-nums leading-tight whitespace-nowrap">
+                <span className="font-mono text-[15px] tabular-nums leading-tight whitespace-nowrap">
                   {ahora.toLocaleDateString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric" })}{" "}
                   {ahora.toLocaleTimeString("es-MX", { hour12: false })}
                 </span>
                 {(overlayInfoRef.current.paciente || overlayInfoRef.current.estudio) && (
-                  <span className="text-[11px] text-gray-300 leading-tight truncate">
+                  <span className="text-[13px] text-gray-300 leading-tight truncate">
                     {[overlayInfoRef.current.paciente, overlayInfoRef.current.estudio]
                       .filter(Boolean)
                       .join(" • ")}
@@ -1852,11 +1860,11 @@ const Detection: React.FC = () => {
                     >
                       {displayPolyps}
                     </span>
-                    <span className="text-[11px] text-gray-200">Pólipos</span>
+                    <span className="text-[13px] text-gray-200">Pólipos</span>
                   </div>
                   <div className="flex flex-col">
                     <span className="text-sm">Frame {stats.frame}</span>
-                    <span className="text-[11px] text-gray-300">
+                    <span className="text-[13px] text-gray-300">
                       {stats.time.toFixed(2)} ms / frame
                     </span>
                   </div>
@@ -1878,7 +1886,7 @@ const Detection: React.FC = () => {
                     Análisis LLM
                   </span>
                   <span
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                    className={`px-2 py-0.5 rounded-full text-[12px] font-semibold ${
                       llmAnalysis.severity === "benign"
                         ? "bg-green-600"
                         : llmAnalysis.severity === "malignant"
@@ -1896,7 +1904,7 @@ const Detection: React.FC = () => {
                     <div className="flex flex-wrap items-center gap-2 mt-1">
                       <span className="font-semibold">Pólipo:</span>
                       <span
-                        className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                        className={`px-2 py-0.5 rounded-full text-[13px] font-semibold ${
                           llmAnalysis.has_polyp
                             ? "bg-red-500 text-white"
                             : "bg-green-500 text-white"
@@ -1905,14 +1913,14 @@ const Detection: React.FC = () => {
                         {llmAnalysis.has_polyp ? "Detectado" : "No detectado"}
                       </span>
                       {llmAnalysis.confidence_level && (
-                        <span className="text-[11px] text-gray-200">
+                        <span className="text-[13px] text-gray-200">
                           {llmAnalysis.confidence_level}
                         </span>
                       )}
                     </div>
 
                     {llmAnalysis.description && (
-                      <p className="mt-1 text-[11px] text-gray-200 leading-snug">
+                      <p className="mt-1 text-[13px] text-gray-200 leading-snug">
                         {llmAnalysis.description}
                       </p>
                     )}
@@ -1920,10 +1928,10 @@ const Detection: React.FC = () => {
                     {llmAnalysis.recommendations &&
                       llmAnalysis.recommendations.length > 0 && (
                         <div className="border-t border-gray-600 pt-2 mt-1">
-                          <p className="text-[11px] font-semibold text-green-300 mb-1">
+                          <p className="text-[13px] font-semibold text-green-300 mb-1">
                             Recomendaciones
                           </p>
-                          <ul className="text-[11px] text-gray-200 space-y-1 max-h-24 overflow-auto pr-1">
+                          <ul className="text-[13px] text-gray-200 space-y-1 max-h-24 overflow-auto pr-1">
                             {llmAnalysis.recommendations.map((rec, idx) => (
                               <li key={idx} className="flex gap-2">
                                 <span className="text-green-300">•</span>
@@ -1935,7 +1943,7 @@ const Detection: React.FC = () => {
                       )}
                   </>
                 ) : (
-                  <div className="mt-1 text-[11px] text-gray-200">
+                  <div className="mt-1 text-[13px] text-gray-200">
                     {llmAnalysis.description
                       ? llmAnalysis.description.length > 80
                         ? `${llmAnalysis.description.slice(0, 80)}...`

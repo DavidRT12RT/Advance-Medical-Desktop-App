@@ -138,7 +138,7 @@ const ModalHistorialCambios: React.FC<ModalHistorialCambiosProps> = ({
             .reverse()
             .map((record, index) => ({
               color: "gray",
-              dot: <ClockCircleOutlined style={{ fontSize: "16px" }} />,
+              dot: <ClockCircleOutlined style={{ fontSize: "18px" }} />,
               children: (
                 <div className="pb-6">
                   <div className="bg-white border border-gray-200 rounded-lg p-4">

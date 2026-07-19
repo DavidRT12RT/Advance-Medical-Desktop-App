@@ -303,7 +303,7 @@ export default function LicenseGate({ machineId, onLicensed }) {
                 <p className="text-xs text-gray-500 mb-1">
                   Reporte completo — usa "Copiar reporte" y envíanoslo tal cual:
                 </p>
-                <pre className="text-[11px] leading-relaxed bg-gray-900 text-gray-100 rounded-md p-3 overflow-auto max-h-56 whitespace-pre-wrap">
+                <pre className="text-[13px] leading-relaxed bg-gray-900 text-gray-100 rounded-md p-3 overflow-auto max-h-56 whitespace-pre-wrap">
                   {diagReporte}
                 </pre>
               </>

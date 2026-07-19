@@ -181,7 +181,7 @@ const RegistrosMedicosPacienteDetalle: React.FC = () => {
             {llm.confidence_level && ` · Conf: ${llm.confidence_level}`}
           </p>
         )}
-        <p className="mt-1 text-[10px] text-gray-400">
+        <p className="mt-1 text-[12px] text-gray-400">
           Índice de riesgo: {estudio.indiceRiesgo ?? 0}/100
         </p>
       </div>
@@ -248,12 +248,12 @@ const RegistrosMedicosPacienteDetalle: React.FC = () => {
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis
                 dataKey="fechaLabel"
-                tick={{ fontSize: 10 }}
+                tick={{ fontSize: 12 }}
                 interval={0}
               />
               <YAxis
                 domain={[0, 100]}
-                tick={{ fontSize: 10 }}
+                tick={{ fontSize: 12 }}
                 tickFormatter={(v) => `${v}`}
               />
               <Tooltip content={renderTooltip} />

@@ -77,7 +77,7 @@ const Configuracion = () => {
 
   return (
     <div>
-      <h1 style={{ fontSize: "24px", fontWeight: 600, marginBottom: "16px" }}>
+      <h1 style={{ fontSize: "28px", fontWeight: 600, marginBottom: "16px" }}>
         Configuraciones del Sistema
       </h1>
 

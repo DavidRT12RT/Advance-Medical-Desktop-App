@@ -36,7 +36,7 @@ const DoctoresList: React.FC<DoctoresListProps> = ({
           <Avatar icon={<UserOutlined />} style={{ backgroundColor: '#1890ff' }} />
           <div>
             <div style={{ fontWeight: 500 }}>{text}</div>
-            <div style={{ fontSize: '12px', color: '#8c8c8c' }}>
+            <div style={{ fontSize: '14px', color: '#8c8c8c' }}>
               Cédula: {record.cedula}
             </div>
           </div>

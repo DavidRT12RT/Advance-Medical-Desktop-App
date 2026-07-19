@@ -209,7 +209,7 @@ const GestionVersionesAIM: React.FC<GestionVersionesAIMProps> = ({
       render: (version: string, record: Version) => (
         <Space direction="vertical" size="small">
           <Space>
-            <Text strong style={{ fontSize: 16 }}>
+            <Text strong style={{ fontSize: 18 }}>
               v{version}
             </Text>
             {record.activa && !record.retirada && (
@@ -217,7 +217,7 @@ const GestionVersionesAIM: React.FC<GestionVersionesAIMProps> = ({
             )}
             {record.retirada && <Badge status="error" text="Retirada" />}
           </Space>
-          <Text type="secondary" style={{ fontSize: 12 }}>
+          <Text type="secondary" style={{ fontSize: 14 }}>
             {record.nombre}
           </Text>
         </Space>
@@ -249,15 +249,15 @@ const GestionVersionesAIM: React.FC<GestionVersionesAIMProps> = ({
       key: "estadisticas",
       render: (_: any, record: Version) => (
         <Space direction="vertical" size="small">
-          <Text style={{ fontSize: 12 }}>
+          <Text style={{ fontSize: 14 }}>
             <DownloadOutlined /> {record.estadisticas?.descargas || 0} descargas
           </Text>
-          <Text style={{ fontSize: 12 }}>
+          <Text style={{ fontSize: 14 }}>
             <CheckCircleOutlined /> {record.estadisticas?.instalaciones || 0}{" "}
             instalaciones
           </Text>
           {record.estadisticas?.errores > 0 && (
-            <Text type="danger" style={{ fontSize: 12 }}>
+            <Text type="danger" style={{ fontSize: 14 }}>
               <WarningOutlined /> {record.estadisticas.errores} errores
             </Text>
           )}
@@ -271,7 +271,7 @@ const GestionVersionesAIM: React.FC<GestionVersionesAIMProps> = ({
       render: (fecha: string) => (
         <Space direction="vertical" size="small">
           <Text>{dayjs(fecha).format("DD MMM YYYY")}</Text>
-          <Text type="secondary" style={{ fontSize: 12 }}>
+          <Text type="secondary" style={{ fontSize: 14 }}>
             {dayjs(fecha).fromNow()}
           </Text>
         </Space>
@@ -362,7 +362,7 @@ const GestionVersionesAIM: React.FC<GestionVersionesAIMProps> = ({
                   : "N/A"
               }
               prefix={<ClockCircleOutlined />}
-              valueStyle={{ fontSize: 16 }}
+              valueStyle={{ fontSize: 18 }}
             />
           </Card>
         </Col>

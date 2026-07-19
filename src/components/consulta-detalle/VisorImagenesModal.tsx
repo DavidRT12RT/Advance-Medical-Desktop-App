@@ -116,7 +116,7 @@ const VisorImagenesModal: React.FC<VisorImagenesModalProps> = ({
           <span className="text-sm font-semibold text-gray-200">
             {etiqueta(indice)}
             {esEditada(url) && (
-              <span className="ml-2 px-1.5 py-0.5 rounded bg-green-600 text-[10px] text-white font-semibold">
+              <span className="ml-2 px-1.5 py-0.5 rounded bg-green-600 text-[12px] text-white font-semibold">
                 Editada
               </span>
             )}
@@ -176,7 +176,7 @@ const VisorImagenesModal: React.FC<VisorImagenesModalProps> = ({
 
         {/* Barra de acciones */}
         <div className="flex items-center justify-between px-2 flex-wrap gap-2">
-          <span className="text-[11px] text-gray-500">
+          <span className="text-[13px] text-gray-500">
             ← / → navegar · Espacio o Enter seleccionar · rueda del mouse zoom
             · doble clic restablecer zoom
           </span>

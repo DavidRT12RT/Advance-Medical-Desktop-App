@@ -1,5 +1,6 @@
 // Ant design
 import { ConfigProvider } from "antd";
+import theme from "./theme";
 
 //Routes
 import AppRoutes from "./routes/AppRoutes";
@@ -11,13 +12,7 @@ import { store } from "./store";
 const App = () => {
   return (
     <Provider store={store}>
-      <ConfigProvider
-        theme={{
-          token: {
-            colorPrimary: "#009b9b",
-          },
-        }}
-      >
+      <ConfigProvider theme={theme}>
         <AppRoutes />
       </ConfigProvider>
     </Provider>
