@@ -22,10 +22,17 @@ import { useCatalogosEstudio } from "../../hooks/useCatalogosEstudio";
 import {
   CATALOGOS_ESTUDIO_DEFAULTS,
   CATALOGOS_ESTUDIO_LABELS,
+  CLAVES_CON_DETALLES,
   ClaveCatalogo,
 } from "../../utils/catalogosEstudio";
 
 const CLAVES = Object.keys(CATALOGOS_ESTUDIO_LABELS) as ClaveCatalogo[];
+
+/** Placeholder del alta para las claves de personal médico con detalles. */
+const PLACEHOLDERS_NOMBRE: Partial<Record<ClaveCatalogo, string>> = {
+  medicosTratantes: "Nombre completo del médico tratante",
+  anestesiologos: "Nombre completo del anestesiólogo",
+};
 
 /**
  * Administración de los listados personalizables del estudio (procedimientos,
@@ -39,20 +46,20 @@ const CatalogosEstudioConfig = () => {
     eliminarItem,
     renombrarItem,
     restaurarSugeridos,
-    detalleAnestesiologo,
-    guardarDetalleAnestesiologo,
+    detalleDe,
+    guardarDetalleDe,
     loading,
   } = useCatalogosEstudio();
 
   const [nuevos, setNuevos] = useState<Partial<Record<ClaveCatalogo, string>>>(
     {},
   );
-  // Alta de anestesiólogo con sus datos (cédula/especialidad opcionales)
-  const [nuevoAnestesiologo, setNuevoAnestesiologo] = useState({
-    nombre: "",
-    cedula: "",
-    especialidad: "",
-  });
+  // Alta de personal médico con sus datos (cédula/especialidad opcionales)
+  const [nuevosPersonal, setNuevosPersonal] = useState<
+    Partial<
+      Record<ClaveCatalogo, { nombre: string; cedula: string; especialidad: string }>
+    >
+  >({});
   const [editando, setEditando] = useState<{
     clave: ClaveCatalogo;
     valor: string;
@@ -75,9 +82,9 @@ const CatalogosEstudioConfig = () => {
   const confirmarRenombre = () => {
     if (!editando) return;
     renombrarItem(editando.clave, editando.valor, editando.nuevo);
-    if (editando.clave === "anestesiologos") {
+    if (CLAVES_CON_DETALLES[editando.clave]) {
       const nombreFinal = (editando.nuevo || "").trim() || editando.valor;
-      guardarDetalleAnestesiologo(nombreFinal, {
+      guardarDetalleDe(editando.clave, nombreFinal, {
         cedula: editando.cedula || "",
         especialidad: editando.especialidad || "",
       });
@@ -85,17 +92,33 @@ const CatalogosEstudioConfig = () => {
     setEditando(null);
   };
 
-  const agregarAnestesiologo = () => {
-    const nombre = nuevoAnestesiologo.nombre.trim();
+  const nuevoPersonalDe = (clave: ClaveCatalogo) =>
+    nuevosPersonal[clave] || { nombre: "", cedula: "", especialidad: "" };
+
+  const cambiarNuevoPersonal = (
+    clave: ClaveCatalogo,
+    parciales: Partial<{ nombre: string; cedula: string; especialidad: string }>,
+  ) =>
+    setNuevosPersonal((prev) => ({
+      ...prev,
+      [clave]: { ...nuevoPersonalDe(clave), ...parciales },
+    }));
+
+  const agregarPersonal = (clave: ClaveCatalogo) => {
+    const datos = nuevoPersonalDe(clave);
+    const nombre = datos.nombre.trim();
     if (!nombre) return;
-    agregarItem("anestesiologos", nombre);
-    if (nuevoAnestesiologo.cedula || nuevoAnestesiologo.especialidad) {
-      guardarDetalleAnestesiologo(nombre, {
-        cedula: nuevoAnestesiologo.cedula.trim(),
-        especialidad: nuevoAnestesiologo.especialidad.trim(),
+    agregarItem(clave, nombre);
+    if (datos.cedula || datos.especialidad) {
+      guardarDetalleDe(clave, nombre, {
+        cedula: datos.cedula.trim(),
+        especialidad: datos.especialidad.trim(),
       });
     }
-    setNuevoAnestesiologo({ nombre: "", cedula: "", especialidad: "" });
+    setNuevosPersonal((prev) => ({
+      ...prev,
+      [clave]: { nombre: "", cedula: "", especialidad: "" },
+    }));
   };
 
   return (
@@ -145,9 +168,9 @@ const CatalogosEstudioConfig = () => {
                     const enEdicion =
                       editando?.clave === clave && editando.valor === item;
 
-                    const esAnestesiologo = clave === "anestesiologos";
-                    const detalle = esAnestesiologo
-                      ? detalleAnestesiologo(item)
+                    const conDetalles = !!CLAVES_CON_DETALLES[clave];
+                    const detalle = conDetalles
+                      ? detalleDe(clave, item)
                       : undefined;
 
                     return (
@@ -181,16 +204,13 @@ const CatalogosEstudioConfig = () => {
                                       clave,
                                       valor: item,
                                       nuevo: item,
-                                      cedula:
-                                        clave === "anestesiologos"
-                                          ? detalleAnestesiologo(item)?.cedula ||
-                                            ""
-                                          : undefined,
-                                      especialidad:
-                                        clave === "anestesiologos"
-                                          ? detalleAnestesiologo(item)
-                                              ?.especialidad || ""
-                                          : undefined,
+                                      cedula: conDetalles
+                                        ? detalleDe(clave, item)?.cedula || ""
+                                        : undefined,
+                                      especialidad: conDetalles
+                                        ? detalleDe(clave, item)
+                                            ?.especialidad || ""
+                                        : undefined,
                                     })
                                   }
                                 />,
@@ -212,7 +232,7 @@ const CatalogosEstudioConfig = () => {
                         }
                       >
                         {enEdicion ? (
-                          esAnestesiologo ? (
+                          conDetalles ? (
                             <div className="flex flex-col gap-1 w-full pr-2">
                               <Input
                                 size="small"
@@ -266,7 +286,7 @@ const CatalogosEstudioConfig = () => {
                               onPressEnter={confirmarRenombre}
                             />
                           )
-                        ) : esAnestesiologo ? (
+                        ) : conDetalles ? (
                           <div className="flex flex-col min-w-0">
                             <span className="truncate">{item}</span>
                             <span className="text-xs text-gray-400 truncate">
@@ -291,46 +311,39 @@ const CatalogosEstudioConfig = () => {
                 />
               )}
 
-              {clave === "anestesiologos" ? (
+              {CLAVES_CON_DETALLES[clave] ? (
                 <div className="flex flex-col gap-1" style={{ marginTop: 8 }}>
                   <Input
-                    placeholder="Nombre completo del anestesiólogo"
-                    value={nuevoAnestesiologo.nombre}
+                    placeholder={PLACEHOLDERS_NOMBRE[clave] || "Nombre completo"}
+                    value={nuevoPersonalDe(clave).nombre}
                     onChange={(e) =>
-                      setNuevoAnestesiologo((prev) => ({
-                        ...prev,
-                        nombre: e.target.value,
-                      }))
+                      cambiarNuevoPersonal(clave, { nombre: e.target.value })
                     }
-                    onPressEnter={agregarAnestesiologo}
+                    onPressEnter={() => agregarPersonal(clave)}
                   />
                   <Space.Compact style={{ width: "100%" }}>
                     <Input
                       placeholder="Cédula profesional (opcional)"
-                      value={nuevoAnestesiologo.cedula}
+                      value={nuevoPersonalDe(clave).cedula}
                       onChange={(e) =>
-                        setNuevoAnestesiologo((prev) => ({
-                          ...prev,
-                          cedula: e.target.value,
-                        }))
+                        cambiarNuevoPersonal(clave, { cedula: e.target.value })
                       }
-                      onPressEnter={agregarAnestesiologo}
+                      onPressEnter={() => agregarPersonal(clave)}
                     />
                     <Input
                       placeholder="Especialidad (opcional)"
-                      value={nuevoAnestesiologo.especialidad}
+                      value={nuevoPersonalDe(clave).especialidad}
                       onChange={(e) =>
-                        setNuevoAnestesiologo((prev) => ({
-                          ...prev,
+                        cambiarNuevoPersonal(clave, {
                           especialidad: e.target.value,
-                        }))
+                        })
                       }
-                      onPressEnter={agregarAnestesiologo}
+                      onPressEnter={() => agregarPersonal(clave)}
                     />
                     <Button
                       type="primary"
                       icon={<PlusOutlined />}
-                      onClick={agregarAnestesiologo}
+                      onClick={() => agregarPersonal(clave)}
                     />
                   </Space.Compact>
                 </div>

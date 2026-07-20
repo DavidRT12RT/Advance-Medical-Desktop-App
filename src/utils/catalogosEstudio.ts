@@ -13,6 +13,7 @@ export type ClaveCatalogo =
   | "motivosEstudio"
   | "equiposMarca"
   | "equiposModelo"
+  | "medicosTratantes"
   | "anestesiologos"
   | "tiposSedacion"
   | "enfermeras"
@@ -24,10 +25,21 @@ export const CATALOGOS_ESTUDIO_LABELS: Record<ClaveCatalogo, string> = {
   motivosEstudio: "Motivos del estudio",
   equiposMarca: "Marcas de equipo",
   equiposModelo: "Modelos de equipo",
+  medicosTratantes: "Médicos tratantes",
   anestesiologos: "Anestesiólogos",
   tiposSedacion: "Tipos de sedación",
   enfermeras: "Enfermería",
   asistentes: "Asistentes",
+};
+
+/**
+ * Claves cuyas entradas guardan además cédula y especialidad (personal
+ * médico). El valor es la clave hermana en `catalogosEstudio` donde vive el
+ * arreglo de detalles `{ nombre, cedula, especialidad }`.
+ */
+export const CLAVES_CON_DETALLES: Partial<Record<ClaveCatalogo, string>> = {
+  medicosTratantes: "medicosTratantesDetalles",
+  anestesiologos: "anestesiologosDetalles",
 };
 
 export const CATALOGOS_ESTUDIO_DEFAULTS: Record<ClaveCatalogo, string[]> = {
@@ -39,6 +51,7 @@ export const CATALOGOS_ESTUDIO_DEFAULTS: Record<ClaveCatalogo, string[]> = {
   ],
   equiposMarca: ["Olympus", "Fujifilm", "Pentax"],
   equiposModelo: [],
+  medicosTratantes: [],
   anestesiologos: [],
   tiposSedacion: [
     "Sedación consciente",

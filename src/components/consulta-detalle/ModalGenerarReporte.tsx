@@ -65,6 +65,7 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
   const [config, setConfig] = useState<ReportConfig>({
     incluirDatosClinica: true,
     incluirDatosMedico: true,
+    incluirDatosTratante: true,
     incluirDatosAnestesiologo: false,
     incluirDatosAsistente: false,
     incluirDatosPaciente: true, // Obligatorio
@@ -95,6 +96,8 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
       if (configuracionReporte) {
         setConfig({
           ...configuracionReporte,
+          // Configuraciones guardadas antes de que existiera este campo
+          incluirDatosTratante: configuracionReporte.incluirDatosTratante ?? true,
           // Asegurar que los obligatorios siempre estén activos
           incluirDatosPaciente: true,
           incluirSedacion: true,
@@ -106,6 +109,7 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
         setConfig({
           incluirDatosClinica: true,
           incluirDatosMedico: true,
+          incluirDatosTratante: true,
           incluirDatosAnestesiologo: false,
           incluirDatosAsistente: false,
           incluirDatosPaciente: true,
@@ -549,8 +553,24 @@ const ModalGenerarReporte: React.FC<ModalGenerarReporteProps> = ({
                   handleConfigChange("incluirDatosMedico", e.target.checked)
                 }
               >
+                Médico endoscopista
+              </Checkbox>
+            </div>
+            <div className={sectionCheckboxStyle}>
+              <Checkbox
+                checked={config.incluirDatosTratante}
+                disabled={!estudio?.tratante_nombre}
+                onChange={(e) =>
+                  handleConfigChange("incluirDatosTratante", e.target.checked)
+                }
+              >
                 Médico tratante
               </Checkbox>
+              {!estudio?.tratante_nombre && (
+                <span className="text-[13px] text-gray-400">
+                  (el estudio no tiene médico tratante capturado)
+                </span>
+              )}
             </div>
             <div className={sectionCheckboxStyle}>
               <Checkbox

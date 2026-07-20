@@ -1,10 +1,22 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Button, message, Modal, Popover, Progress, Slider, Spin } from "antd";
+import {
+  Button,
+  Checkbox,
+  InputNumber,
+  message,
+  Modal,
+  Popover,
+  Progress,
+  Select,
+  Slider,
+  Spin,
+} from "antd";
 import {
   ArrowLeftOutlined,
   CameraOutlined,
   FileTextOutlined,
+  FolderOpenOutlined,
   FullscreenOutlined,
   FullscreenExitOutlined,
   SlidersOutlined,
@@ -22,8 +34,12 @@ import { useElectronStore } from "../hooks/useElectronStore";
 import { useVideoAjustes } from "../hooks/useVideoAjustes";
 import {
   AJUSTES_NEUTROS,
+  BITRATES_CAPTURA,
+  bitrateEfectivo,
   construirFiltro,
+  dimensionesCaptura,
   esNeutro,
+  resolucionesDisponibles,
 } from "../utils/videoAjustes";
 
 // URL del servidor de IA (API Python con YOLO/Ollama).
@@ -35,11 +51,94 @@ const FRAME_WIDTH = Number(process.env.NEXT_PUBLIC_API_WIDTH) || 640;
 const FRAME_HEIGHT = Number(process.env.NEXT_PUBLIC_API_HEIGHT) || 480;
 const TARGET_FPS = Number(process.env.NEXT_PUBLIC_API_FPS) || 60;
 
-const getVideoConstraints = (deviceId?: string) => ({
-  deviceId: deviceId ? { exact: deviceId } : undefined,
-  width: { exact: FRAME_WIDTH },
-  height: { exact: FRAME_HEIGHT },
-});
+const getVideoConstraints = (deviceId?: string, resolucion?: string) => {
+  // SIN forzar tamaño exacto: forzar 640×480 hacía que la cámara/capturadora
+  // recortara la imagen si su aspecto nativo no era 4:3. La resolución la
+  // elige el usuario (Configuración > Cámara o el popover de ajustes) y se
+  // pide como "ideal": el dispositivo negocia su modo real más cercano y
+  // entrega el cuadro completo original; el ajuste al espacio 640×480 de la
+  // IA se hace con letterbox (rectContain).
+  const dims = dimensionesCaptura(resolucion);
+  return {
+    deviceId: deviceId ? { exact: deviceId } : undefined,
+    width: { ideal: dims.ancho },
+    height: { ideal: dims.alto },
+  };
+};
+
+// Formato de grabación: MP4 (H.264) cuando Chromium lo soporte — se abre en
+// cualquier reproductor sin convertir; si no, WebM como fallback. La elección
+// se congela al iniciar cada grabación (formatoGrabacionRef).
+const FORMATOS_GRABACION = [
+  {
+    mimeType: 'video/mp4;codecs="avc1.640028"',
+    extension: "mp4",
+    contentType: "video/mp4",
+  },
+  { mimeType: "video/mp4", extension: "mp4", contentType: "video/mp4" },
+  {
+    mimeType: "video/webm;codecs=vp9",
+    extension: "webm",
+    contentType: "video/webm",
+  },
+  { mimeType: "video/webm", extension: "webm", contentType: "video/webm" },
+];
+
+const elegirFormatoGrabacion = () =>
+  FORMATOS_GRABACION.find(
+    (f) =>
+      typeof MediaRecorder !== "undefined" &&
+      MediaRecorder.isTypeSupported(f.mimeType),
+  ) ?? FORMATOS_GRABACION[FORMATOS_GRABACION.length - 1];
+
+// Rectángulo destino para dibujar una imagen de sw×sh dentro de dw×dh sin
+// deformarla ni recortarla (letterbox centrado, estilo object-contain)
+const rectContain = (sw: number, sh: number, dw: number, dh: number) => {
+  const escala = Math.min(dw / sw, dh / sh);
+  const w = Math.round(sw * escala);
+  const h = Math.round(sh * escala);
+  return { x: Math.round((dw - w) / 2), y: Math.round((dh - h) / 2), w, h };
+};
+
+// Dibuja las cajas de detección sobre un canvas a la resolución NATIVA del
+// frame. Las coordenadas del servidor viven en el espacio 640×480
+// letterboxeado (rectContain); aquí se mapean de vuelta al tamaño original
+// y los trazos/textos se escalan proporcionalmente.
+const dibujarDeteccionesNativas = (
+  ctx: CanvasRenderingContext2D,
+  detections: any[],
+  nativeW: number,
+  nativeH: number,
+) => {
+  if (!detections?.length) return;
+  const rImg = rectContain(nativeW, nativeH, FRAME_WIDTH, FRAME_HEIGHT);
+  const s = nativeW / rImg.w; // escala uniforme: espacio IA → nativo
+  ctx.strokeStyle = "#00FF00";
+  ctx.lineWidth = Math.max(2, Math.round(2 * s));
+  ctx.font = `${Math.max(14, Math.round(14 * s))}px Arial`;
+  detections.forEach((d: any) => {
+    const bbox = d.bbox;
+    if (!bbox) return;
+    const x1 = (bbox.x1 - rImg.x) * s;
+    const y1 = (bbox.y1 - rImg.y) * s;
+    const x2 = (bbox.x2 - rImg.x) * s;
+    const y2 = (bbox.y2 - rImg.y) * s;
+    ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+
+    const className = d.class ?? d.className ?? "polyp";
+    const confidence = d.confidence ?? 0;
+    const label = `${className} (${(confidence * 100).toFixed(1)}%)`;
+
+    const textMetrics = ctx.measureText(label);
+    const textHeight = Math.round(18 * s);
+
+    ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+    ctx.fillRect(x1, y2 + 2 * s, textMetrics.width + 4 * s, textHeight);
+
+    ctx.fillStyle = "#00FF00";
+    ctx.fillText(label, x1 + 2 * s, y2 + 16 * s);
+  });
+};
 
 interface DetectionResult {
   frame_index: number;
@@ -121,45 +220,19 @@ const drawDetectionsOnImage = (
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
+      // Canvas al tamaño NATIVO del frame: la captura conserva la resolución
+      // original de la fuente (las cajas se mapean desde el espacio de la IA)
       const canvas = document.createElement("canvas");
-      canvas.width = FRAME_WIDTH;
-      canvas.height = FRAME_HEIGHT;
+      canvas.width = img.width;
+      canvas.height = img.height;
       const ctx = canvas.getContext("2d");
       if (!ctx) {
         reject(new Error("No se pudo obtener el contexto del canvas"));
         return;
       }
 
-      // Dibujar la imagen base
-      ctx.drawImage(img, 0, 0, FRAME_WIDTH, FRAME_HEIGHT);
-
-      // Dibujar detecciones en verde (mismo estilo que overlay)
-      ctx.strokeStyle = "#00FF00";
-      ctx.lineWidth = 2;
-      ctx.font = "14px Arial";
-
-      (detections || []).forEach((d: any) => {
-        const bbox = d.bbox;
-        if (!bbox) return;
-        const { x1, y1, x2, y2 } = bbox;
-        const width = x2 - x1;
-        const height = y2 - y1;
-
-        ctx.strokeRect(x1, y1, width, height);
-
-        const className = d.class ?? d.className ?? "polyp";
-        const confidence = d.confidence ?? 0;
-        const label = `${className} (${(confidence * 100).toFixed(1)}%)`;
-
-        const textMetrics = ctx.measureText(label);
-        const textHeight = 18;
-
-        ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
-        ctx.fillRect(x1, y2 + 2, textMetrics.width + 4, textHeight);
-
-        ctx.fillStyle = "#00FF00";
-        ctx.fillText(label, x1 + 2, y2 + 16);
-      });
+      ctx.drawImage(img, 0, 0);
+      dibujarDeteccionesNativas(ctx, detections || [], img.width, img.height);
 
       canvas.toBlob(
         (blob) => {
@@ -254,6 +327,12 @@ const Detection: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Rectángulo 4:3 centrado dentro del panel donde viven video y overlay
+  const stageRef = useRef<HTMLDivElement>(null);
+  // Canvas de grabación a la resolución NATIVA de la entrada de video: el
+  // video guardado conserva la calidad original de la fuente (1080p/4K…);
+  // canvasRef queda solo para el frame 640×480 que consume la IA
+  const recordCanvasRef = useRef<HTMLCanvasElement>(null);
   const socketRef = useRef<Socket | null>(null);
   const frameIndexRef = useRef(0);
   const isCapturingRef = useRef(false);
@@ -291,6 +370,21 @@ const Detection: React.FC = () => {
   const [manualScreenshots, setManualScreenshots] = useState<string[]>([]);
   // Modal bloqueante mientras se sube el video y se guardan los resultados
   const [isSaving, setIsSaving] = useState(false);
+  // Ancho máximo real que soporta la cámara activa (para listar solo
+  // resoluciones que el dispositivo puede dar)
+  const [maxAnchoCamara, setMaxAnchoCamara] = useState<number | undefined>();
+  // Velocidad de subida del video (se muestra en el modal de guardado para
+  // que el usuario vea que la duración depende de su internet)
+  const [velocidadSubida, setVelocidadSubida] = useState<{
+    mbps: number | null;
+    subidoMB: number;
+    totalMB: number;
+  } | null>(null);
+  const muestrasSubidaRef = useRef<Array<{ t: number; bytes: number }>>([]);
+  // Cancela la subida en curso ("Omitir subida": el video queda solo local)
+  const cancelarSubidaRef = useRef<(() => void) | null>(null);
+  // Formato elegido para la grabación actual (MP4 si está soportado)
+  const formatoGrabacionRef = useRef(elegirFormatoGrabacion());
   const [saveProgress, setSaveProgress] = useState(0);
   const [saveStage, setSaveStage] = useState("Preparando…");
   // Cronómetro de grabación (segundos). El ref refleja el estado para que el
@@ -412,7 +506,7 @@ const Detection: React.FC = () => {
         setEstudio(estudioData);
         if (estudioData?.estado === "finalizado") {
           messageApi.info(
-            "Este estudio ya está finalizado. El módulo de detección solo está disponible para estudios en progreso.",
+            "Este estudio ya está finalizado. La captura de imagen solo está disponible para estudios en progreso.",
           );
           navigate(`/paciente-detalle/${pacienteId}/estudios/${estudioId}`);
           return;
@@ -534,7 +628,7 @@ const Detection: React.FC = () => {
           if (!nombreVideoLocalRef.current) {
             nombreVideoLocalRef.current = `Video ${new Date()
               .toISOString()
-              .replace(/[:.]/g, "-")}.webm`;
+              .replace(/[:.]/g, "-")}.${formatoGrabacionRef.current.extension}`;
             // La carpeta se congela al primer chunk: los appends siguientes
             // deben ir siempre al mismo archivo
             carpetaVideoLocalRef.current = obtenerCarpetaLocal();
@@ -730,16 +824,23 @@ const Detection: React.FC = () => {
     const syncSize = () => {
       const canvas = overlayCanvasRef.current;
       const container = containerRef.current;
-      if (!canvas || !container) return;
+      const stage = stageRef.current;
+      if (!canvas || !container || !stage) return;
       const rect = container.getBoundingClientRect();
+      // El "stage" es el rectángulo 4:3 más grande que cabe en el panel:
+      // misma geometría que el espacio 640×480 donde la IA reporta las
+      // detecciones, así video, overlay y grabación quedan alineados
+      const r = rectContain(FRAME_WIDTH, FRAME_HEIGHT, rect.width, rect.height);
+      stage.style.width = `${r.w}px`;
+      stage.style.height = `${r.h}px`;
       const dpr = window.devicePixelRatio || 1;
-      const targetWidth = Math.floor(rect.width * dpr);
-      const targetHeight = Math.floor(rect.height * dpr);
+      const targetWidth = Math.floor(r.w * dpr);
+      const targetHeight = Math.floor(r.h * dpr);
       if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
         canvas.width = targetWidth;
         canvas.height = targetHeight;
-        canvas.style.width = `${rect.width}px`;
-        canvas.style.height = `${rect.height}px`;
+        canvas.style.width = `${r.w}px`;
+        canvas.style.height = `${r.h}px`;
       }
     };
 
@@ -993,15 +1094,38 @@ const Detection: React.FC = () => {
     // Reiniciar detecciones para video
     lastDetectionsRef.current = [];
 
-    const canvas = canvasRef.current as HTMLCanvasElement | null;
+    // La grabación sale del canvas nativo, no del 640×480 de la IA: el video
+    // guardado conserva la resolución que entrega la fuente (1080p, 4K, etc.)
+    const videoEl = webcamRef.current?.video as HTMLVideoElement | null;
+    const recW = videoEl?.videoWidth || FRAME_WIDTH;
+    const recH = videoEl?.videoHeight || FRAME_HEIGHT;
+    const recordCanvas = recordCanvasRef.current as HTMLCanvasElement | null;
+    if (recordCanvas) {
+      recordCanvas.width = recW;
+      recordCanvas.height = recH;
+      const rctx = recordCanvas.getContext("2d");
+      if (rctx) {
+        rctx.fillStyle = "#000";
+        rctx.fillRect(0, 0, recW, recH);
+      }
+    }
     const mediaStream =
-      canvas && (canvas as any).captureStream
-        ? (canvas as any).captureStream(TARGET_FPS)
+      recordCanvas && (recordCanvas as any).captureStream
+        ? (recordCanvas as any).captureStream(TARGET_FPS)
         : undefined;
     if (mediaStream && typeof MediaRecorder !== "undefined") {
       try {
+        formatoGrabacionRef.current = elegirFormatoGrabacion();
         const recorder = new MediaRecorder(mediaStream, {
-          mimeType: "video/webm",
+          mimeType: formatoGrabacionRef.current.mimeType,
+          // Bitrate configurado por el usuario, o automático según la
+          // resolución negociada (sin esto MediaRecorder usa ~2.5 Mbps y un
+          // video HD/4K sale pixelado)
+          videoBitsPerSecond: bitrateEfectivo(
+            ajustesRef.current?.bitrate,
+            recW,
+            recH,
+          ),
         });
         mediaRecorderRef.current = recorder;
         recorder.ondataavailable = (event: BlobEvent) => {
@@ -1046,8 +1170,18 @@ const Detection: React.FC = () => {
 
             // 1) Dibujar el frame CRUDO y extraerlo para la IA: el modelo debe
             // recibir la imagen sin ajustes de color ni overlays (los ajustes
-            // son preferencia visual del médico, no deben alterar la detección)
-            ctx.drawImage(img, 0, 0, FRAME_WIDTH, FRAME_HEIGHT);
+            // son preferencia visual del médico, no deben alterar la detección).
+            // Letterbox: el cuadro conserva su relación de aspecto original
+            // dentro del espacio 640×480 (sin estirar ni recortar).
+            const rFrame = rectContain(
+              img.width,
+              img.height,
+              FRAME_WIDTH,
+              FRAME_HEIGHT,
+            );
+            ctx.fillStyle = "#000";
+            ctx.fillRect(0, 0, FRAME_WIDTH, FRAME_HEIGHT);
+            ctx.drawImage(img, rFrame.x, rFrame.y, rFrame.w, rFrame.h);
             const imageData = ctx.getImageData(0, 0, FRAME_WIDTH, FRAME_HEIGHT);
             const data = imageData.data;
 
@@ -1070,85 +1204,98 @@ const Detection: React.FC = () => {
               frameIndexRef.current++;
             }
 
-            // 2) Redibujar con los ajustes de imagen del médico: la grabación
-            // (canvas → MediaRecorder) refleja lo que él ve en pantalla
+            // 2) Canvas de grabación a la resolución NATIVA de la fuente,
+            // con los ajustes de imagen del médico (refleja lo que él ve)
+            const recordCanvas = recordCanvasRef.current;
+            if (!recordCanvas) return;
+            if (
+              recordCanvas.width !== img.width ||
+              recordCanvas.height !== img.height
+            ) {
+              // La fuente cambió de resolución a mitad de sesión
+              recordCanvas.width = img.width;
+              recordCanvas.height = img.height;
+            }
+            const rctx = recordCanvas.getContext("2d");
+            if (!rctx) return;
+
             const ajustesActuales = ajustesRef.current;
-            if (!esNeutro(ajustesActuales)) {
-              ctx.filter = construirFiltro(ajustesActuales);
-              ctx.drawImage(img, 0, 0, FRAME_WIDTH, FRAME_HEIGHT);
-              ctx.filter = "none";
-            }
+            rctx.filter = esNeutro(ajustesActuales)
+              ? "none"
+              : construirFiltro(ajustesActuales);
+            rctx.drawImage(img, 0, 0);
+            rctx.filter = "none";
 
-            // 3) Dibujar los bounding boxes (quedan en la grabación)
-            const detections = lastDetectionsRef.current || [];
-            ctx.strokeStyle = "#00FF00";
-            ctx.lineWidth = 2;
-            ctx.font = "14px Arial";
+            // 3) Bounding boxes mapeados al tamaño nativo (quedan en la
+            // grabación)
+            dibujarDeteccionesNativas(
+              rctx,
+              lastDetectionsRef.current || [],
+              recordCanvas.width,
+              recordCanvas.height,
+            );
 
-            (detections || []).forEach((d: any) => {
-              const bbox = d.bbox;
-              if (!bbox) return;
-              const { x1, y1, x2, y2 } = bbox;
-              const width = x2 - x1;
-              const height = y2 - y1;
-
-              ctx.strokeRect(x1, y1, width, height);
-
-              const className = d.class ?? d.className ?? "polyp";
-              const confidence = d.confidence ?? 0;
-              const label = `${className} (${(confidence * 100).toFixed(1)}%)`;
-
-              const textMetrics = ctx.measureText(label);
-              const textHeight = 18;
-
-              ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
-              ctx.fillRect(x1, y2 + 2, textMetrics.width + 4, textHeight);
-
-              ctx.fillStyle = "#00FF00";
-              ctx.fillText(label, x1 + 2, y2 + 16);
-            });
-
-            // Banner de contexto clínico quemado en la grabación: fecha/hora,
-            // paciente y estudio. Los datos de grabación (REC, tiempo,
-            // contador de fotos) solo se muestran en pantalla — no deben
-            // quedar visibles en el video guardado.
+            // Banner de contexto clínico quemado en la grabación: fecha/hora
+            // y paciente/estudio, cada uno activable por el usuario en los
+            // ajustes. Los datos de grabación (REC, tiempo, contador de
+            // fotos) solo se muestran en pantalla — no deben quedar visibles
+            // en el video guardado.
             const info = overlayInfoRef.current;
-            const fechaHora = new Date().toLocaleString("es-MX", {
-              day: "2-digit",
-              month: "2-digit",
-              year: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-              second: "2-digit",
-              hour12: false,
-            });
-            const partes = [fechaHora];
-            if (info.paciente) partes.push(info.paciente);
-            if (info.estudio) partes.push(info.estudio);
-
-            const bannerH = 26;
-            ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
-            ctx.fillRect(0, FRAME_HEIGHT - bannerH, FRAME_WIDTH, bannerH);
-
-            ctx.font = "13px Arial";
-            ctx.textBaseline = "middle";
-
-            // Truncar con elipsis en vez de comprimir el texto (maxWidth de
-            // fillText deforma tipográficamente los nombres largos)
-            let textoIzq = partes.join("  •  ");
-            const maxAnchoIzq = FRAME_WIDTH - 16;
-            if (ctx.measureText(textoIzq).width > maxAnchoIzq) {
-              while (
-                textoIzq.length > 1 &&
-                ctx.measureText(textoIzq + "…").width > maxAnchoIzq
-              ) {
-                textoIzq = textoIzq.slice(0, -1);
-              }
-              textoIzq += "…";
+            const partes: string[] = [];
+            if (ajustesActuales.overlayFechaHora !== false) {
+              partes.push(
+                new Date().toLocaleString("es-MX", {
+                  day: "2-digit",
+                  month: "2-digit",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  second: "2-digit",
+                  hour12: false,
+                }),
+              );
             }
-            ctx.fillStyle = "#FFFFFF";
-            ctx.fillText(textoIzq, 8, FRAME_HEIGHT - bannerH / 2);
-            ctx.textBaseline = "alphabetic";
+            if (ajustesActuales.overlayNombre !== false) {
+              if (info.paciente) partes.push(info.paciente);
+              if (info.estudio) partes.push(info.estudio);
+            }
+
+            if (partes.length > 0) {
+              // Tamaños proporcionales a la resolución de grabación
+              const esc = Math.max(1, recordCanvas.width / FRAME_WIDTH);
+              const bannerH = Math.round(26 * esc);
+              rctx.fillStyle = "rgba(0, 0, 0, 0.55)";
+              rctx.fillRect(
+                0,
+                recordCanvas.height - bannerH,
+                recordCanvas.width,
+                bannerH,
+              );
+
+              rctx.font = `${Math.round(13 * esc)}px Arial`;
+              rctx.textBaseline = "middle";
+
+              // Truncar con elipsis en vez de comprimir el texto (maxWidth de
+              // fillText deforma tipográficamente los nombres largos)
+              let textoIzq = partes.join("  •  ");
+              const maxAnchoIzq = recordCanvas.width - Math.round(16 * esc);
+              if (rctx.measureText(textoIzq).width > maxAnchoIzq) {
+                while (
+                  textoIzq.length > 1 &&
+                  rctx.measureText(textoIzq + "…").width > maxAnchoIzq
+                ) {
+                  textoIzq = textoIzq.slice(0, -1);
+                }
+                textoIzq += "…";
+              }
+              rctx.fillStyle = "#FFFFFF";
+              rctx.fillText(
+                textoIzq,
+                Math.round(8 * esc),
+                recordCanvas.height - bannerH / 2,
+              );
+              rctx.textBaseline = "alphabetic";
+            }
           };
           img.src = imageSrc;
 
@@ -1278,11 +1425,13 @@ const Detection: React.FC = () => {
       let videoUrl: string | null = null;
       if (recordedChunksRef.current.length > 0) {
         try {
+          const formato = formatoGrabacionRef.current;
           const videoBlob = new Blob(recordedChunksRef.current, {
-            type: "video/webm",
+            type: formato.contentType,
           });
           const sessionKey = sessionId || "general";
           setSaveStage("Subiendo video de captura…");
+          muestrasSubidaRef.current = [];
           // La subida del video es ~90% del trabajo; el resto es guardar resultados
           videoUrl = await FirebaseMedia.subirVideoDeEstudio(
             empresaId,
@@ -1290,10 +1439,51 @@ const Detection: React.FC = () => {
             estudioId,
             sessionKey,
             videoBlob,
-            (percent) => setSaveProgress(Math.round(percent * 0.9)),
+            (percent, bytes, total) => {
+              setSaveProgress(Math.round(percent * 0.9));
+              if (bytes === undefined || !total) return;
+              // Velocidad de subida sobre una ventana móvil de ~5 segundos
+              const ahora = Date.now();
+              const muestras = muestrasSubidaRef.current;
+              muestras.push({ t: ahora, bytes });
+              while (muestras.length > 1 && ahora - muestras[0].t > 5000) {
+                muestras.shift();
+              }
+              const primera = muestras[0];
+              const dt = (ahora - primera.t) / 1000;
+              setVelocidadSubida({
+                mbps:
+                  dt > 0.5
+                    ? ((bytes - primera.bytes) * 8) / dt / 1_000_000
+                    : null,
+                subidoMB: bytes / 1_000_000,
+                totalMB: total / 1_000_000,
+              });
+            },
+            {
+              extension: formato.extension,
+              contentType: formato.contentType,
+              registrarCancelacion: (cancelar) => {
+                cancelarSubidaRef.current = cancelar;
+              },
+            },
           );
-        } catch (error) {
-          console.error("Error subiendo video de consulta:", error);
+        } catch (error: any) {
+          if (error?.code === "storage/canceled") {
+            messageApi.info(
+              "Subida omitida. El video quedó guardado en esta computadora: puedes subirlo cuando quieras desde la sección del estudio.",
+              8,
+            );
+          } else {
+            console.error("Error subiendo video de consulta:", error);
+            messageApi.warning(
+              "No se pudo subir el video a la nube. Quedó respaldado en esta computadora: podrás subirlo desde la sección del estudio.",
+              8,
+            );
+          }
+        } finally {
+          cancelarSubidaRef.current = null;
+          setVelocidadSubida(null);
         }
       } else {
         setSaveProgress(80);
@@ -1301,11 +1491,13 @@ const Detection: React.FC = () => {
       setSaveStage("Guardando resultados del estudio…");
       setSaveProgress((p) => Math.max(p, 90));
 
-      // Solo agregar sección si hay datos de IA, video o capturas manuales
+      // Solo agregar sección si hay datos de IA, video (subido o local) o
+      // capturas manuales
       if (
         cnnData ||
         llmAnalysis ||
         videoUrl ||
+        rutaVideoLocalRef.current ||
         manualScreenshotsRef.current.length > 0
       ) {
         newSecciones.push({
@@ -1315,6 +1507,10 @@ const Detection: React.FC = () => {
           polypImages: polypImageUrlsRef.current,
           manualScreenshots: manualScreenshotsRef.current,
           videoUrl,
+          // Respaldo local en esta computadora: permite volver a subir el
+          // video (si falló por internet) o copiarlo a memoria después
+          videoLocalPath: rutaVideoLocalRef.current || null,
+          fotosLocales: rutasFotosLocalesRef.current,
           mode: socketRef.current?.connected ? "with_ai" : "video_only",
         });
       }
@@ -1382,6 +1578,30 @@ const Detection: React.FC = () => {
             strokeColor="#009b9b"
             className="w-full px-2"
           />
+          {velocidadSubida && (
+            <>
+              <p className="text-sm text-gray-600 text-center leading-relaxed mb-0">
+                {velocidadSubida.mbps !== null
+                  ? `Velocidad de subida: ${velocidadSubida.mbps.toFixed(1)} Mbps`
+                  : "Midiendo velocidad de subida…"}
+                <br />
+                <span className="text-xs text-gray-400">
+                  {velocidadSubida.subidoMB.toFixed(0)} de{" "}
+                  {velocidadSubida.totalMB.toFixed(0)} MB — la duración
+                  depende de la velocidad de internet de este equipo
+                </span>
+              </p>
+              <Button
+                size="small"
+                onClick={() => cancelarSubidaRef.current?.()}
+              >
+                Omitir subida — guardar solo en esta computadora
+              </Button>
+              <p className="text-[12px] text-gray-400 text-center mb-0">
+                Podrás subirlo después desde la sección del estudio
+              </p>
+            </>
+          )}
           <p className="text-xs text-gray-500 text-center leading-relaxed">
             {saveStage}
             <br />
@@ -1433,6 +1653,23 @@ const Detection: React.FC = () => {
           >
             Guardar video en memoria
           </Button>
+          {exporteFinal?.rutaVideo && (
+            <Button
+              icon={<FolderOpenOutlined />}
+              onClick={() => {
+                const api = (window as any).estudioExport;
+                if (!api?.mostrarEnCarpeta) {
+                  messageApi.warning(
+                    "Cierra y vuelve a abrir la aplicación para habilitar esta función.",
+                  );
+                  return;
+                }
+                api.mostrarEnCarpeta({ ruta: exporteFinal.rutaVideo });
+              }}
+            >
+              Abrir carpeta de los archivos locales
+            </Button>
+          )}
           <Button
             type="primary"
             icon={<FileTextOutlined />}
@@ -1465,14 +1702,14 @@ const Detection: React.FC = () => {
             <SectionTitle
               title={
                 paciente
-                  ? `Detección IA - ${[
+                  ? `Procedimiento endoscópico - ${[
                       paciente.nombres,
                       paciente.apellidoPaterno,
                       paciente.apellidoMaterno,
                     ]
                       .filter(Boolean)
                       .join(" ")}`
-                  : "Detección asistida por IA"
+                  : "Procedimiento endoscópico"
               }
               icon={<VideoCameraOutlined className="text-indigo-600" />}
             />
@@ -1545,7 +1782,7 @@ const Detection: React.FC = () => {
         <div className="flex gap-4 min-h-[360px] h-[calc(100vh-300px)]">
           {/* Panel izquierdo: capturas manuales */}
           {(isCapturing || manualScreenshots.length > 0) && (
-            <div className="w-36 shrink-0 h-full bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col overflow-hidden">
+            <div className="w-56 shrink-0 h-full bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col overflow-hidden">
               <div className="px-3 py-2.5 border-b border-gray-100 flex items-center justify-between">
                 <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
                   Capturas
@@ -1599,34 +1836,56 @@ const Detection: React.FC = () => {
                   }`
             }
           >
-          <div ref={containerRef} className="relative w-full h-full">
-            <Webcam
-              audio={false}
-              ref={webcamRef}
-              videoConstraints={getVideoConstraints(selectedDeviceId)}
-              style={{ filter: esNeutro(ajustes) ? undefined : construirFiltro(ajustes) }}
-              className="w-full h-full object-contain relative z-0"
-              disablePictureInPicture={true}
-              forceScreenshotSourceSize={true}
-              imageSmoothing={true}
-              mirrored={false}
-              screenshotFormat="image/jpeg"
-              screenshotQuality={0.95}
-            />
+          <div
+            ref={containerRef}
+            className="relative w-full h-full flex items-center justify-center"
+          >
+            {/* Stage 4:3: el video se letterboxea aquí igual que en el canvas
+                de proceso, así el overlay de detecciones queda alineado */}
+            <div ref={stageRef} className="relative">
+              <Webcam
+                audio={false}
+                ref={webcamRef}
+                videoConstraints={getVideoConstraints(
+                  selectedDeviceId,
+                  ajustes.resolucion,
+                )}
+                onUserMedia={(stream) => {
+                  // Capacidades reales del dispositivo: limitan qué
+                  // resoluciones se listan en el selector
+                  try {
+                    const track = stream?.getVideoTracks?.()[0];
+                    const caps = track?.getCapabilities?.();
+                    setMaxAnchoCamara(caps?.width?.max ?? undefined);
+                  } catch {
+                    setMaxAnchoCamara(undefined);
+                  }
+                }}
+                style={{ filter: esNeutro(ajustes) ? undefined : construirFiltro(ajustes) }}
+                className="w-full h-full object-contain relative z-0"
+                disablePictureInPicture={true}
+                forceScreenshotSourceSize={true}
+                imageSmoothing={true}
+                mirrored={false}
+                screenshotFormat="image/jpeg"
+                screenshotQuality={0.95}
+              />
 
-            {/* Canvas oculto (procesamiento interno) */}
-            <canvas ref={canvasRef} className="hidden" />
+              {/* Canvas ocultos: frame 640×480 para la IA y grabación nativa */}
+              <canvas ref={canvasRef} className="hidden" />
+              <canvas ref={recordCanvasRef} className="hidden" />
 
-            {/* Canvas overlay para detecciones. Clic izquierdo = capturar imagen */}
-            <canvas
-              ref={overlayCanvasRef}
-              width={FRAME_WIDTH}
-              height={FRAME_HEIGHT}
-              className="absolute top-0 left-0 w-full h-full z-10"
-              style={{ cursor: isCapturing && !isPaused ? "crosshair" : "default" }}
-              onClick={capturarImagen}
-              title={isCapturing ? "Clic para capturar imagen" : undefined}
-            />
+              {/* Canvas overlay para detecciones. Clic izquierdo = capturar imagen */}
+              <canvas
+                ref={overlayCanvasRef}
+                width={FRAME_WIDTH}
+                height={FRAME_HEIGHT}
+                className="absolute top-0 left-0 w-full h-full z-10"
+                style={{ cursor: isCapturing && !isPaused ? "crosshair" : "default" }}
+                onClick={capturarImagen}
+                title={isCapturing ? "Clic para capturar imagen" : undefined}
+              />
+            </div>
 
             {/* Controles de sesión en modo expandido (los de abajo quedan tapados) */}
             {isExpanded && (
@@ -1689,7 +1948,69 @@ const Detection: React.FC = () => {
                   if (!abierto) popoverCierreRef.current = Date.now();
                 }}
                 content={
-                  <div className="w-64 max-h-[65vh] overflow-y-auto pr-1 flex flex-col gap-1">
+                  <div className="w-72 max-h-[65vh] overflow-y-auto pr-1 flex flex-col gap-1">
+                    <div className="mb-1">
+                      <div className="text-xs text-gray-600 mb-0.5">
+                        Resolución de captura
+                      </div>
+                      <Select
+                        size="small"
+                        className="w-full"
+                        value={ajustes.resolucion ?? "auto"}
+                        disabled={isCapturing}
+                        onChange={(v) => actualizarAjustes({ resolucion: v })}
+                        options={resolucionesDisponibles(
+                          maxAnchoCamara,
+                          ajustes.resolucion,
+                        ).map((o) => ({ value: o.value, label: o.label }))}
+                      />
+                      <div className="text-xs text-gray-600 mb-0.5 mt-1.5">
+                        Calidad de grabación
+                      </div>
+                      <Select
+                        size="small"
+                        className="w-full"
+                        value={ajustes.bitrate ?? "auto"}
+                        disabled={isCapturing}
+                        onChange={(v) => actualizarAjustes({ bitrate: v })}
+                        options={BITRATES_CAPTURA.map((o) => ({
+                          value: o.value,
+                          label: o.label,
+                        }))}
+                      />
+                      {isCapturing && (
+                        <p className="text-[12px] text-gray-400 mt-0.5 mb-0">
+                          No se pueden cambiar durante la grabación
+                        </p>
+                      )}
+                      <div className="text-xs text-gray-600 mb-0.5 mt-1.5">
+                        Datos sobre el video grabado
+                      </div>
+                      <div className="flex flex-col">
+                        <Checkbox
+                          checked={ajustes.overlayFechaHora !== false}
+                          onChange={(e) =>
+                            actualizarAjustes({
+                              overlayFechaHora: e.target.checked,
+                            })
+                          }
+                        >
+                          <span className="text-xs">Fecha y hora</span>
+                        </Checkbox>
+                        <Checkbox
+                          checked={ajustes.overlayNombre !== false}
+                          onChange={(e) =>
+                            actualizarAjustes({
+                              overlayNombre: e.target.checked,
+                            })
+                          }
+                        >
+                          <span className="text-xs">
+                            Nombre del paciente y estudio
+                          </span>
+                        </Checkbox>
+                      </div>
+                    </div>
                     {([
                       ["brillo", "Brillo"],
                       ["contraste", "Contraste"],
@@ -1697,9 +2018,29 @@ const Detection: React.FC = () => {
                       ["gamma", "Gamma"],
                     ] as const).map(([clave, etiqueta]) => (
                       <div key={clave}>
-                        <div className="flex justify-between text-xs text-gray-600">
+                        <div className="flex justify-between items-center text-xs text-gray-600">
                           <span>{etiqueta}</span>
-                          <span className="font-mono">{ajustes[clave]}%</span>
+                          <span className="flex items-center gap-0.5">
+                            <InputNumber
+                              size="small"
+                              className="w-16"
+                              min={25}
+                              max={200}
+                              value={ajustes[clave]}
+                              onChange={(v) => {
+                                if (typeof v === "number")
+                                  actualizarAjustes({ [clave]: Math.round(v) });
+                              }}
+                            />
+                            <Button
+                              size="small"
+                              type="text"
+                              icon={<UndoOutlined />}
+                              disabled={ajustes[clave] === 100}
+                              onClick={() => actualizarAjustes({ [clave]: 100 })}
+                              title="Restablecer este ajuste"
+                            />
+                          </span>
                         </div>
                         <Slider
                           min={25}
@@ -1710,9 +2051,29 @@ const Detection: React.FC = () => {
                       </div>
                     ))}
                     <div>
-                      <div className="flex justify-between text-xs text-gray-600">
+                      <div className="flex justify-between items-center text-xs text-gray-600">
                         <span>Tono (coloración)</span>
-                        <span className="font-mono">{ajustes.tono ?? 0}°</span>
+                        <span className="flex items-center gap-0.5">
+                          <InputNumber
+                            size="small"
+                            className="w-16"
+                            min={-180}
+                            max={180}
+                            value={ajustes.tono ?? 0}
+                            onChange={(v) => {
+                              if (typeof v === "number")
+                                actualizarAjustes({ tono: Math.round(v) });
+                            }}
+                          />
+                          <Button
+                            size="small"
+                            type="text"
+                            icon={<UndoOutlined />}
+                            disabled={!ajustes.tono}
+                            onClick={() => actualizarAjustes({ tono: 0 })}
+                            title="Restablecer este ajuste"
+                          />
+                        </span>
                       </div>
                       <Slider
                         min={-180}
@@ -1731,10 +2092,28 @@ const Detection: React.FC = () => {
                       ["azul", "Azul"],
                     ] as const).map(([clave, etiqueta]) => (
                       <div key={clave}>
-                        <div className="flex justify-between text-xs text-gray-600">
+                        <div className="flex justify-between items-center text-xs text-gray-600">
                           <span>{etiqueta}</span>
-                          <span className="font-mono">
-                            {ajustes[clave] ?? 100}%
+                          <span className="flex items-center gap-0.5">
+                            <InputNumber
+                              size="small"
+                              className="w-16"
+                              min={25}
+                              max={200}
+                              value={ajustes[clave] ?? 100}
+                              onChange={(v) => {
+                                if (typeof v === "number")
+                                  actualizarAjustes({ [clave]: Math.round(v) });
+                              }}
+                            />
+                            <Button
+                              size="small"
+                              type="text"
+                              icon={<UndoOutlined />}
+                              disabled={(ajustes[clave] ?? 100) === 100}
+                              onClick={() => actualizarAjustes({ [clave]: 100 })}
+                              title="Restablecer este ajuste"
+                            />
                           </span>
                         </div>
                         <Slider
@@ -1746,10 +2125,28 @@ const Detection: React.FC = () => {
                       </div>
                     ))}
                     <div>
-                      <div className="flex justify-between text-xs text-gray-600">
+                      <div className="flex justify-between items-center text-xs text-gray-600">
                         <span>Nitidez</span>
-                        <span className="font-mono">
-                          {ajustes.nitidez ?? 0}%
+                        <span className="flex items-center gap-0.5">
+                          <InputNumber
+                            size="small"
+                            className="w-16"
+                            min={0}
+                            max={100}
+                            value={ajustes.nitidez ?? 0}
+                            onChange={(v) => {
+                              if (typeof v === "number")
+                                actualizarAjustes({ nitidez: Math.round(v) });
+                            }}
+                          />
+                          <Button
+                            size="small"
+                            type="text"
+                            icon={<UndoOutlined />}
+                            disabled={!ajustes.nitidez}
+                            onClick={() => actualizarAjustes({ nitidez: 0 })}
+                            title="Restablecer este ajuste"
+                          />
                         </span>
                       </div>
                       <Slider
@@ -1762,7 +2159,18 @@ const Detection: React.FC = () => {
                     <Button
                       size="small"
                       icon={<UndoOutlined />}
-                      onClick={() => actualizarAjustes({ ...AJUSTES_NEUTROS })}
+                      onClick={() =>
+                        // Restablece los ajustes de imagen; las preferencias
+                        // técnicas (resolución, bitrate, datos del video) se
+                        // conservan
+                        actualizarAjustes({
+                          ...AJUSTES_NEUTROS,
+                          resolucion: ajustes.resolucion,
+                          bitrate: ajustes.bitrate,
+                          overlayNombre: ajustes.overlayNombre,
+                          overlayFechaHora: ajustes.overlayFechaHora,
+                        })
+                      }
                       disabled={esNeutro(ajustes)}
                     >
                       Restablecer
@@ -1776,7 +2184,7 @@ const Detection: React.FC = () => {
                       ? "bg-black/50 hover:bg-black/70"
                       : "bg-[#009b9b]/80 hover:bg-[#009b9b]"
                   }`}
-                  title="Ajustes de imagen (brillo, contraste, color, gamma, tono, balance rojo/verde/azul, nitidez)"
+                  title="Ajustes de imagen (resolución, brillo, contraste, color, gamma, tono, balance rojo/verde/azul, nitidez)"
                 >
                   <SlidersOutlined />
                 </button>
@@ -1811,22 +2219,72 @@ const Detection: React.FC = () => {
               </button>
             )}
 
-            {/* Overlay de fecha/hora y datos (también queda grabado en el video) */}
-            <div className="absolute bottom-4 left-4 z-20 max-w-[36%] pointer-events-none">
-              <div className="bg-black/50 backdrop-blur-sm px-3 py-2 rounded-lg text-white flex flex-col gap-0.5">
-                <span className="font-mono text-[15px] tabular-nums leading-tight whitespace-nowrap">
-                  {ahora.toLocaleDateString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric" })}{" "}
-                  {ahora.toLocaleTimeString("es-MX", { hour12: false })}
-                </span>
-                {(overlayInfoRef.current.paciente || overlayInfoRef.current.estudio) && (
-                  <span className="text-[13px] text-gray-300 leading-tight truncate">
-                    {[overlayInfoRef.current.paciente, overlayInfoRef.current.estudio]
-                      .filter(Boolean)
-                      .join(" • ")}
-                  </span>
-                )}
+            {/* Overlay de fecha/hora y datos (también queda grabado en el
+                video). Cada línea obedece su checkbox en los ajustes. */}
+            {(ajustes.overlayFechaHora !== false ||
+              ajustes.overlayNombre !== false) && (
+              <div className="absolute bottom-4 left-4 z-20 max-w-[36%] pointer-events-none">
+                <div className="bg-black/50 backdrop-blur-sm px-3 py-2 rounded-lg text-white flex flex-col gap-0.5">
+                  {ajustes.overlayFechaHora !== false && (
+                    <span className="font-mono text-[15px] tabular-nums leading-tight whitespace-nowrap">
+                      {ahora.toLocaleDateString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric" })}{" "}
+                      {ahora.toLocaleTimeString("es-MX", { hour12: false })}
+                    </span>
+                  )}
+                  {ajustes.overlayNombre !== false &&
+                    (overlayInfoRef.current.paciente ||
+                      overlayInfoRef.current.estudio) && (
+                      <span className="text-[13px] text-gray-300 leading-tight truncate">
+                        {[overlayInfoRef.current.paciente, overlayInfoRef.current.estudio]
+                          .filter(Boolean)
+                          .join(" • ")}
+                      </span>
+                    )}
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Panel flotante de capturas en modo expandido (la columna
+                normal queda tapada por el video a pantalla completa) */}
+            {isExpanded &&
+              (isCapturing || manualScreenshots.length > 0) && (
+                <div className="absolute left-4 top-20 bottom-28 w-48 z-20 bg-black/55 backdrop-blur-md border border-white/15 rounded-xl flex flex-col overflow-hidden">
+                  <div className="px-3 py-2 border-b border-white/10 flex items-center justify-between">
+                    <span className="text-xs font-semibold text-gray-200 uppercase tracking-wide">
+                      Capturas
+                    </span>
+                    <span className="text-[13px] font-bold bg-white/20 text-white rounded-full min-w-[22px] text-center px-1.5 py-0.5">
+                      {manualScreenshots.length}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-h-0 overflow-y-auto p-2 flex flex-col gap-2">
+                    {manualScreenshots.length === 0 ? (
+                      <p className="text-[13px] text-gray-300 text-center mt-6 px-1 leading-relaxed">
+                        Haz clic en el video para capturar
+                      </p>
+                    ) : (
+                      [...manualScreenshots]
+                        .map((src, i) => ({ src, num: i + 1 }))
+                        .reverse()
+                        .map(({ src, num }) => (
+                          <div
+                            key={num}
+                            className="relative rounded-lg overflow-hidden border border-white/20 shrink-0"
+                          >
+                            <img
+                              src={src}
+                              alt={`Captura ${num}`}
+                              className="w-full aspect-video object-cover"
+                            />
+                            <span className="absolute bottom-1 right-1 bg-black/60 text-white text-[11px] font-semibold px-1.5 py-0.5 rounded-full">
+                              #{num}
+                            </span>
+                          </div>
+                        ))
+                    )}
+                  </div>
+                </div>
+              )}
 
             {/* Animación de feedback de screenshot (estilo iPhone) */}
             {showScreenshotAnimation && screenshotFeedback && (

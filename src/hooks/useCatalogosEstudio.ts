@@ -4,6 +4,7 @@ import { useElectronStore } from "./useElectronStore";
 import FirebaseCatalogos from "../features/FirebaseCatalogos";
 import {
   CATALOGOS_ESTUDIO_DEFAULTS,
+  CLAVES_CON_DETALLES,
   ClaveCatalogo,
 } from "../utils/catalogosEstudio";
 
@@ -90,11 +91,12 @@ export function useCatalogosEstudio() {
         clave,
         items(clave).filter((i) => i !== valor),
       );
-      if (clave === "anestesiologos") {
-        const detalles = (
-          (catalogos[DETALLES_ANESTESIOLOGOS] as any[]) || []
-        ).filter((d) => d?.nombre !== valor);
-        persistir(DETALLES_ANESTESIOLOGOS, detalles);
+      const claveDetalles = CLAVES_CON_DETALLES[clave];
+      if (claveDetalles) {
+        const detalles = ((catalogos[claveDetalles] as any[]) || []).filter(
+          (d) => d?.nombre !== valor,
+        );
+        persistir(claveDetalles, detalles);
       }
     },
     [items, persistir, catalogos],
@@ -117,12 +119,13 @@ export function useCatalogosEstudio() {
         clave,
         actuales.map((i) => (i === anterior ? v : i)),
       );
-      // Los datos del anestesiólogo (cédula/especialidad) viajan con el nombre
-      if (clave === "anestesiologos") {
-        const detalles = (
-          (catalogos[DETALLES_ANESTESIOLOGOS] as any[]) || []
-        ).map((d) => (d?.nombre === anterior ? { ...d, nombre: v } : d));
-        persistir(DETALLES_ANESTESIOLOGOS, detalles);
+      // La cédula/especialidad del personal médico viajan con el nombre
+      const claveDetalles = CLAVES_CON_DETALLES[clave];
+      if (claveDetalles) {
+        const detalles = ((catalogos[claveDetalles] as any[]) || []).map((d) =>
+          d?.nombre === anterior ? { ...d, nombre: v } : d,
+        );
+        persistir(claveDetalles, detalles);
       }
     },
     [items, persistir, catalogos],
@@ -141,26 +144,33 @@ export function useCatalogosEstudio() {
     [items, persistir],
   );
 
-  // --- Detalles por anestesiólogo -----------------------------------------
+  // --- Detalles por persona (médicos tratantes, anestesiólogos) -----------
   // Además del listado de nombres, se recuerda la cédula y especialidad de
-  // cada anestesiólogo: al seleccionarlo en un estudio se autocompletan, y al
+  // cada persona: al seleccionarla en un estudio se autocompletan, y al
   // guardar un estudio con esos campos llenos la asociación se actualiza.
-  const detalleAnestesiologo = useCallback(
+  const detalleDe = useCallback(
     (
+      clave: ClaveCatalogo,
       nombre?: string,
     ): { nombre: string; cedula?: string; especialidad?: string } | undefined => {
-      if (!nombre) return undefined;
-      const lista = (catalogos[DETALLES_ANESTESIOLOGOS] as any[]) || [];
+      const claveDetalles = CLAVES_CON_DETALLES[clave];
+      if (!nombre || !claveDetalles) return undefined;
+      const lista = (catalogos[claveDetalles] as any[]) || [];
       return lista.find((d) => d?.nombre === nombre);
     },
     [catalogos],
   );
 
-  const guardarDetalleAnestesiologo = useCallback(
-    (nombre: string, datos: { cedula?: string; especialidad?: string }) => {
+  const guardarDetalleDe = useCallback(
+    (
+      clave: ClaveCatalogo,
+      nombre: string,
+      datos: { cedula?: string; especialidad?: string },
+    ) => {
+      const claveDetalles = CLAVES_CON_DETALLES[clave];
       const n = (nombre || "").trim();
-      if (!n) return;
-      const lista = ((catalogos[DETALLES_ANESTESIOLOGOS] as any[]) || []).filter(
+      if (!n || !claveDetalles) return;
+      const lista = ((catalogos[claveDetalles] as any[]) || []).filter(
         (d) => d?.nombre,
       );
       const entrada = {
@@ -180,7 +190,7 @@ export function useCatalogosEstudio() {
         idx >= 0
           ? lista.map((d, i) => (i === idx ? entrada : d))
           : [...lista, entrada];
-      persistir(DETALLES_ANESTESIOLOGOS, nuevos);
+      persistir(claveDetalles, nuevos);
     },
     [catalogos, persistir],
   );
@@ -191,10 +201,8 @@ export function useCatalogosEstudio() {
     eliminarItem,
     renombrarItem,
     restaurarSugeridos,
-    detalleAnestesiologo,
-    guardarDetalleAnestesiologo,
+    detalleDe,
+    guardarDetalleDe,
     loading,
   };
 }
-
-const DETALLES_ANESTESIOLOGOS = "anestesiologosDetalles";

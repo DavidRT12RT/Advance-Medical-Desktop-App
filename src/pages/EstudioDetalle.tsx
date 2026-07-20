@@ -63,8 +63,8 @@ const EstudioDetalle: React.FC = () => {
     items: itemsCatalogo,
     agregarItem,
     eliminarItem,
-    detalleAnestesiologo,
-    guardarDetalleAnestesiologo,
+    detalleDe,
+    guardarDetalleDe,
   } = useCatalogosEstudio();
 
   const [loading, setLoading] = useState(true);
@@ -129,7 +129,7 @@ const EstudioDetalle: React.FC = () => {
           user?.usuarioDetail?.configuraciones?.configuracionDatosMedicos;
         const nombreUsuario = user?.usuarioDetail?.nombre;
 
-        // Auto-llenar datos del médico tratante con datos del usuario actual
+        // Auto-llenar datos del médico endoscopista (siempre el usuario activo)
         // Si el estudio ya tiene datos guardados, usarlos; si no, usar datos del usuario
         const medicoNombre = data.medico_nombre || nombreUsuario || "";
         const medicoCedula =
@@ -165,10 +165,14 @@ const EstudioDetalle: React.FC = () => {
           clinica_numero: data.clinica_numero,
           clinica_direccion: data.clinica_direccion,
           clinica_telefono: data.clinica_telefono,
-          // Datos del médico tratante (auto-llenados con datos del estudio o usuario actual)
+          // Datos del médico endoscopista (auto-llenados con datos del estudio o usuario actual)
           medico_nombre: medicoNombre,
           medico_cedula: medicoCedula,
           medico_especialidad: medicoEspecialidad,
+          // Datos del médico tratante (seleccionado del listado)
+          tratante_nombre: data.tratante_nombre,
+          tratante_cedula: data.tratante_cedula,
+          tratante_especialidad: data.tratante_especialidad,
           // Método de sedación
           metodo_sedacion: data.metodo_sedacion,
           sedacion_dosis: data.sedacion_dosis,
@@ -205,7 +209,7 @@ const EstudioDetalle: React.FC = () => {
       user?.usuarioDetail?.configuraciones?.configuracionDatosMedicos;
     const nombreUsuario = user?.usuarioDetail?.nombre;
 
-    // Auto-llenar datos del médico tratante
+    // Auto-llenar datos del médico endoscopista (siempre el usuario activo)
     const medicoNombre = estudio.medico_nombre || nombreUsuario || "";
     const medicoCedula =
       estudio.medico_cedula || configuracionMedica?.cedula || "";
@@ -240,10 +244,14 @@ const EstudioDetalle: React.FC = () => {
       clinica_numero: estudio.clinica_numero,
       clinica_direccion: estudio.clinica_direccion,
       clinica_telefono: estudio.clinica_telefono,
-      // Datos del médico tratante
+      // Datos del médico endoscopista
       medico_nombre: medicoNombre,
       medico_cedula: medicoCedula,
       medico_especialidad: medicoEspecialidad,
+      // Datos del médico tratante (seleccionado del listado)
+      tratante_nombre: estudio.tratante_nombre,
+      tratante_cedula: estudio.tratante_cedula,
+      tratante_especialidad: estudio.tratante_especialidad,
       // Método de sedación
       metodo_sedacion: estudio.metodo_sedacion,
       sedacion_dosis: estudio.sedacion_dosis,
@@ -325,10 +333,14 @@ const EstudioDetalle: React.FC = () => {
         clinica_numero: allValues.clinica_numero ?? null,
         clinica_direccion: allValues.clinica_direccion ?? null,
         clinica_telefono: allValues.clinica_telefono ?? null,
-        // Datos del médico tratante
+        // Datos del médico endoscopista (usuario activo)
         medico_nombre: allValues.medico_nombre ?? null,
         medico_cedula: allValues.medico_cedula ?? null,
         medico_especialidad: allValues.medico_especialidad ?? null,
+        // Datos del médico tratante (seleccionado del listado)
+        tratante_nombre: allValues.tratante_nombre ?? null,
+        tratante_cedula: allValues.tratante_cedula ?? null,
+        tratante_especialidad: allValues.tratante_especialidad ?? null,
         // Método de sedación
         metodo_sedacion: allValues.metodo_sedacion ?? null,
         sedacion_dosis: allValues.sedacion_dosis ?? null,
@@ -408,12 +420,18 @@ const EstudioDetalle: React.FC = () => {
 
       setEstudio((prev: any) => (prev ? { ...prev, ...payload } : prev));
 
-      // Recordar la cédula/especialidad de este anestesiólogo para
-      // autocompletarlas la próxima vez que se le seleccione
+      // Recordar la cédula/especialidad del anestesiólogo y del médico
+      // tratante para autocompletarlas la próxima vez que se les seleccione
       if (allValues.anestesiologo_nombre) {
-        guardarDetalleAnestesiologo(allValues.anestesiologo_nombre, {
+        guardarDetalleDe("anestesiologos", allValues.anestesiologo_nombre, {
           cedula: allValues.anestesiologo_cedula || "",
           especialidad: allValues.anestesiologo_especialidad || "",
+        });
+      }
+      if (allValues.tratante_nombre) {
+        guardarDetalleDe("medicosTratantes", allValues.tratante_nombre, {
+          cedula: allValues.tratante_cedula || "",
+          especialidad: allValues.tratante_especialidad || "",
         });
       }
 
@@ -589,7 +607,7 @@ const EstudioDetalle: React.FC = () => {
             <section className="my-8">
               <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                 <SectionTitle
-                  title="Detección asistida por IA"
+                  title="Procedimiento endoscópico"
                   icon={<RobotOutlined className="text-indigo-600" />}
                 />
                 {!hasIaData ? (
@@ -609,7 +627,7 @@ const EstudioDetalle: React.FC = () => {
                             );
                           }}
                         >
-                          Comenzar detección con IA
+                          Abrir captura de imagen
                         </Button>
                       </div>
                     )}
@@ -631,7 +649,7 @@ const EstudioDetalle: React.FC = () => {
                               );
                             }}
                           >
-                            Nueva detección con IA
+                            Abrir captura de imagen
                           </Button>
                         </div>
                       )}
@@ -642,18 +660,25 @@ const EstudioDetalle: React.FC = () => {
                         const cnnSummary = session?.ia_cnn?.summary;
                         const llm = session?.ia_llm;
                         const timestamp = session?.timestamp;
+                        const videoPendiente =
+                          !session?.videoUrl && !!session?.videoLocalPath;
+                        const totalCapturas =
+                          (session?.polypImages?.length || 0) +
+                          (session?.manualScreenshots?.length || 0) ||
+                          session?.fotosLocales?.length ||
+                          0;
 
                         return (
                           <button
                             key={index}
                             type="button"
-                            className="w-full text-left border border-gray-200 rounded-lg px-4 py-3 hover:border-indigo-400 hover:bg-indigo-50/40 transition flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+                            className="w-full text-left border border-gray-200 rounded-lg px-4 py-3 hover:border-indigo-400 hover:bg-indigo-50/40 transition flex flex-col gap-1.5"
                             onClick={() => {
                               setSelectedSessionIndex(index);
                               setIsSessionModalOpen(true);
                             }}
                           >
-                            <div className="flex-1 space-y-1">
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
                               <div className="flex items-center gap-2">
                                 <span className="text-xs font-semibold text-indigo-600 uppercase">
                                   {`Sesión ${index + 1}`}
@@ -666,45 +691,53 @@ const EstudioDetalle: React.FC = () => {
                                   </span>
                                 )}
                               </div>
-                              <p className="text-xs text-gray-600">
-                                {cnnSummary ? (
-                                  <>
-                                    {`Segmentos: ${
+                              {/* Indicadores de estado (las acciones viven
+                                  dentro del detalle de la sesión) */}
+                              <div className="flex items-center gap-1 flex-wrap">
+                                {videoPendiente ? (
+                                  <Tag color="orange" className="mr-0">
+                                    Video sin respaldar en la nube
+                                  </Tag>
+                                ) : session?.videoUrl ? (
+                                  <Tag color="green" className="mr-0">
+                                    Video en la nube
+                                  </Tag>
+                                ) : null}
+                                {totalCapturas > 0 && (
+                                  <Tag className="mr-0">
+                                    {totalCapturas} captura
+                                    {totalCapturas === 1 ? "" : "s"}
+                                  </Tag>
+                                )}
+                              </div>
+                            </div>
+                            <p className="text-xs text-gray-600 mb-0">
+                              {cnnSummary || llm ? (
+                                <>
+                                  {cnnSummary &&
+                                    `Segmentos: ${
                                       cnnSummary.totalSegments ??
                                       session?.ia_cnn?.segments?.length ??
                                       0
-                                    }`}
-                                    {" · "}
-                                    {`Último conteo de pólipos: ${
+                                    } · Último conteo de pólipos: ${
                                       cnnSummary.lastPolypCount ?? 0
                                     }`}
-                                  </>
-                                ) : (
-                                  "Sin datos CNN"
-                                )}
-                              </p>
-                            </div>
-
-                            <div className="flex-1 md:text-right space-y-1">
-                              <p className="text-xs font-semibold text-gray-500 uppercase">
-                                Resumen LLM
-                              </p>
-                              {llm ? (
-                                <p className="text-xs text-gray-600">
-                                  {llm.has_polyp
-                                    ? "Pólipo detectado"
-                                    : "Sin pólipos"}
-                                  {llm.severity &&
-                                    ` · Severidad: ${llm.severity}`}
-                                  {llm.confidence_level &&
-                                    ` · Confianza: ${llm.confidence_level}`}
-                                </p>
+                                  {cnnSummary && llm && " · "}
+                                  {llm &&
+                                    `${
+                                      llm.has_polyp
+                                        ? "Pólipo detectado"
+                                        : "Sin pólipos"
+                                    }${
+                                      llm.severity
+                                        ? ` · Severidad: ${llm.severity}`
+                                        : ""
+                                    }`}
+                                </>
                               ) : (
-                                <p className="text-xs text-gray-500">
-                                  Sin análisis LLM
-                                </p>
+                                "Sin información de IA"
                               )}
-                            </div>
+                            </p>
                           </button>
                         );
                       })}
@@ -732,16 +765,27 @@ const EstudioDetalle: React.FC = () => {
                 size="large"
                 disabled={estudio?.estado === "finalizado"}
                 onValuesChange={(cambios) => {
-                  // Al elegir un anestesiólogo del listado, autocompletar su
-                  // cédula y especialidad recordadas (y limpiar si es nuevo,
-                  // para no arrastrar los datos del anterior)
+                  // Al elegir un anestesiólogo o médico tratante del listado,
+                  // autocompletar su cédula y especialidad recordadas (y
+                  // limpiar si es nuevo, para no arrastrar las del anterior)
                   if ("anestesiologo_nombre" in cambios) {
-                    const detalle = detalleAnestesiologo(
+                    const detalle = detalleDe(
+                      "anestesiologos",
                       cambios.anestesiologo_nombre,
                     );
                     form.setFieldsValue({
                       anestesiologo_cedula: detalle?.cedula || "",
                       anestesiologo_especialidad: detalle?.especialidad || "",
+                    });
+                  }
+                  if ("tratante_nombre" in cambios) {
+                    const detalle = detalleDe(
+                      "medicosTratantes",
+                      cambios.tratante_nombre,
+                    );
+                    form.setFieldsValue({
+                      tratante_cedula: detalle?.cedula || "",
+                      tratante_especialidad: detalle?.especialidad || "",
                     });
                   }
                 }}
@@ -829,17 +873,18 @@ const EstudioDetalle: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Médico Tratante */}
+                  {/* Médico Endoscopista (usuario activo) */}
                   <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                     <SectionTitle
-                      title="Médico Tratante"
+                      title="Médico Endoscopista"
                       icon={<UserOutlined className="text-blue-600" />}
                     />
                     <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                       <p className="text-sm text-blue-700 flex items-center gap-2">
                         <InfoCircleOutlined className="text-blue-600" />
                         <span>
-                          Estos datos corresponden a tu información profesional.
+                          El médico endoscopista es quien realiza el estudio:
+                          estos datos corresponden a tu información profesional.
                           Para modificarlos, ve a{" "}
                           <strong>
                             Configuración → Datos Médicos Profesionales
@@ -874,6 +919,41 @@ const EstudioDetalle: React.FC = () => {
                           disabled
                           className="bg-gray-50"
                         />
+                      </Form.Item>
+                    </div>
+                  </div>
+
+                  {/* Médico Tratante (seleccionado del listado del usuario) */}
+                  <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <SectionTitle
+                      title="Médico Tratante"
+                      icon={<UserOutlined className="text-green-600" />}
+                    />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <Form.Item
+                        label="Nombre completo"
+                        name="tratante_nombre"
+                      >
+                        <SelectCatalogo
+                          items={itemsCatalogo("medicosTratantes")}
+                          onAgregar={(v) => agregarItem("medicosTratantes", v)}
+                          onEliminar={(v) =>
+                            eliminarItem("medicosTratantes", v)
+                          }
+                          placeholder="Dr. Carlos Sánchez Vega"
+                        />
+                      </Form.Item>
+                      <Form.Item
+                        label="Cédula profesional"
+                        name="tratante_cedula"
+                      >
+                        <Input placeholder="12345678" />
+                      </Form.Item>
+                      <Form.Item
+                        label="Especialidad"
+                        name="tratante_especialidad"
+                      >
+                        <Input placeholder="Medicina interna" />
                       </Form.Item>
                     </div>
                   </div>
@@ -1354,6 +1434,17 @@ const EstudioDetalle: React.FC = () => {
               secciones_ai: nuevasSecciones,
             }))
           }
+          nombreCarpetaBase={`${
+            paciente
+              ? [
+                  paciente.nombres,
+                  paciente.apellidoPaterno,
+                  paciente.apellidoMaterno,
+                ]
+                  .filter(Boolean)
+                  .join(" ")
+              : "Paciente"
+          } - ${estudio?.tipo || "Estudio"}`}
         />
       )}
       {isFinalizado && (
@@ -1371,6 +1462,7 @@ const EstudioDetalle: React.FC = () => {
         motivo_reapertura={estudio?.motivo_reapertura}
         fecha_reapertura={estudio?.fecha_reapertura}
       />
+
     </div>
   );
 };

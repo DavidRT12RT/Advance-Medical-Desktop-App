@@ -452,6 +452,30 @@ ipcMain.handle('estudio:leerArchivoLocal', async (event, payload) => {
   }
 });
 
+// Zoom de la aplicación (accesibilidad): escala toda la UI de la ventana
+ipcMain.handle('app:setZoomFactor', async (event, factor) => {
+  try {
+    const f = Math.min(1.6, Math.max(0.75, Number(factor) || 1));
+    event.sender.setZoomFactor(f);
+    return { success: true, factor: f };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Muestra un archivo local en el explorador del sistema (Finder/Explorer)
+ipcMain.handle('estudio:mostrarEnCarpeta', async (event, payload) => {
+  try {
+    const ruta = payload?.ruta;
+    if (!ruta) return { success: false, error: 'Sin ruta' };
+    await fsPromises.access(ruta);
+    require('electron').shell.showItemInFolder(ruta);
+    return { success: true };
+  } catch {
+    return { success: false, error: 'El archivo no existe en esta computadora' };
+  }
+});
+
 // Copia archivos locales ya guardados (fotos o video) a la ubicación que
 // elija el usuario (memoria USB, disco externo...).
 ipcMain.handle('estudio:exportarArchivosLocales', async (event, payload) => {

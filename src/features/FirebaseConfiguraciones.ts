@@ -115,6 +115,34 @@ class FirebaseConfiguraciones {
   }
 
   /**
+   * Actualizar el zoom de accesibilidad de la aplicación (porcentaje, 100 =
+   * tamaño normal) en el perfil del usuario
+   */
+  async actualizarZoomApp(
+    idEmpresa: string,
+    idOrganizacion: string,
+    idUsuario: string,
+    zoomApp: number
+  ) {
+    try {
+      const userRef = doc(
+        firestore,
+        `empresas/${idEmpresa}/organizaciones/${idOrganizacion}/perfiles/${idUsuario}`
+      );
+
+      await updateDoc(userRef, {
+        "configuraciones.zoomApp": zoomApp,
+        updatedAt: new Date().toISOString(),
+      });
+
+      return true;
+    } catch (error) {
+      console.error("Error actualizando zoom de la aplicación:", error);
+      throw error;
+    }
+  }
+
+  /**
    * Actualizar datos médicos del doctor
    * @param idEmpresa ID de la empresa
    * @param idOrganizacion ID de la organización

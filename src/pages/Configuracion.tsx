@@ -5,10 +5,12 @@ import {
   UserOutlined,
   VideoCameraOutlined,
   UnorderedListOutlined,
+  DesktopOutlined,
 } from "@ant-design/icons";
 import ConfiguracionReporte from "../components/configuraciones/ConfiguracionReporte";
 import DatosMedicoDoctor from "../components/configuraciones/DatosMedicoDoctor";
 import ConfiguracionCamara from "../components/configuraciones/ConfiguracionCamara";
+import ConfiguracionPantalla from "../components/configuraciones/ConfiguracionPantalla";
 import CatalogosEstudioConfig from "../components/configuraciones/CatalogosEstudioConfig";
 import { useElectronStore } from "../hooks/useElectronStore";
 
@@ -72,6 +74,15 @@ const Configuracion = () => {
         </span>
       ),
       children: <ConfiguracionCamara />,
+    },
+    {
+      key: "pantalla",
+      label: (
+        <span>
+          <DesktopOutlined /> Pantalla
+        </span>
+      ),
+      children: <ConfiguracionPantalla />,
     },
   ];
 

@@ -246,7 +246,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   signatureLine: {
-    width: 140,
+    width: "90%",
+    maxWidth: 140,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.gray800,
     marginBottom: 4,
@@ -318,6 +319,7 @@ export interface ImagenSeleccionada {
 export interface ReportConfig {
   incluirDatosClinica: boolean;
   incluirDatosMedico: boolean;
+  incluirDatosTratante: boolean;
   incluirDatosAnestesiologo: boolean;
   incluirDatosAsistente: boolean;
   incluirDatosPaciente: boolean;
@@ -352,6 +354,16 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
 }) => {
   const fechaEstudio = estudio?.fecha || "No especificada";
   const tipoEstudio = estudio?.tipo || "Estudio";
+
+  // Con 4 firmas activas se reduce el ancho de cada bloque para que todas
+  // quepan en una sola fila al pie de la primera página
+  const firmasActivas = [
+    config.incluirDatosMedico,
+    config.incluirDatosTratante && !!estudio?.tratante_nombre,
+    config.incluirDatosAnestesiologo && !!estudio?.anestesiologo_nombre,
+    config.incluirDatosAsistente && !!estudio?.asistente_nombre,
+  ].filter(Boolean).length;
+  const anchoFirma = firmasActivas >= 4 ? "23%" : "30%";
 
   const nombrePaciente = paciente
     ? [paciente.nombres, paciente.apellidoPaterno, paciente.apellidoMaterno]
@@ -645,12 +657,25 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
             {config.incluirDatosMedico &&
               (estudio?.medico_nombre || nombreDoctor) && (
                 <View style={styles.gridItem3}>
-                  <Text style={styles.fieldLabel}>Médico tratante</Text>
+                  <Text style={styles.fieldLabel}>Médico endoscopista</Text>
                   <Text style={styles.fieldValue}>
                     {estudio?.medico_nombre || nombreDoctor}
                   </Text>
                 </View>
               )}
+            {config.incluirDatosTratante && estudio?.tratante_nombre && (
+              <View style={styles.gridItem3}>
+                <Text style={styles.fieldLabel}>Médico tratante</Text>
+                <Text style={styles.fieldValue}>
+                  {[
+                    estudio.tratante_nombre,
+                    estudio?.tratante_especialidad,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </Text>
+              </View>
+            )}
             {estudio?.anestesiologo_nombre && (
               <View style={styles.gridItem3}>
                 <Text style={styles.fieldLabel}>Anestesiólogo</Text>
@@ -787,16 +812,16 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
           <View style={styles.signaturesRow}>
             {/* Doctor signature */}
             {config.incluirDatosMedico && (
-              <View style={styles.signatureBlock}>
+              <View style={[styles.signatureBlock, { width: anchoFirma }]}>
                 <View style={styles.signatureLine} />
                 <Text style={styles.signatureName}>
                   {(
                     nombreDoctor ||
                     estudio?.medico_nombre ||
-                    "MÉDICO TRATANTE"
+                    "MÉDICO ENDOSCOPISTA"
                   ).toUpperCase()}
                 </Text>
-                <Text style={styles.signatureRole}>Médico Tratante</Text>
+                <Text style={styles.signatureRole}>Médico Endoscopista</Text>
                 {(configuracionMedica?.cedula || estudio?.medico_cedula) && (
                   <Text style={styles.signatureCedula}>
                     Céd. Prof.{" "}
@@ -818,10 +843,31 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
               </View>
             )}
 
+            {/* Treating physician signature */}
+            {config.incluirDatosTratante && estudio?.tratante_nombre && (
+              <View style={[styles.signatureBlock, { width: anchoFirma }]}>
+                <View style={styles.signatureLine} />
+                <Text style={styles.signatureName}>
+                  {estudio.tratante_nombre.toUpperCase()}
+                </Text>
+                <Text style={styles.signatureRole}>Médico Tratante</Text>
+                {estudio?.tratante_cedula && (
+                  <Text style={styles.signatureCedula}>
+                    Céd. Prof. {estudio.tratante_cedula}
+                  </Text>
+                )}
+                {estudio?.tratante_especialidad && (
+                  <Text style={styles.signatureCedula}>
+                    {estudio.tratante_especialidad}
+                  </Text>
+                )}
+              </View>
+            )}
+
             {/* Anesthesiologist signature */}
             {config.incluirDatosAnestesiologo &&
               estudio?.anestesiologo_nombre && (
-                <View style={styles.signatureBlock}>
+                <View style={[styles.signatureBlock, { width: anchoFirma }]}>
                   <View style={styles.signatureLine} />
                   <Text style={styles.signatureName}>
                     {(
@@ -844,7 +890,7 @@ const ReportePDFDocument: React.FC<ReportePDFDocumentProps> = ({
 
             {/* Assistant/Nurse signature */}
             {config.incluirDatosAsistente && estudio?.asistente_nombre && (
-              <View style={styles.signatureBlock}>
+              <View style={[styles.signatureBlock, { width: anchoFirma }]}>
                 <View style={styles.signatureLine} />
                 <Text style={styles.signatureName}>
                   {estudio.asistente_nombre.toUpperCase()}

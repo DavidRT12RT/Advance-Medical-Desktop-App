@@ -41,3 +41,12 @@ html {
 .animate-screenshot-feedback {
   animation: screenshot-feedback 0.8s ease-out forwards;
 }
+
+/* Selector de velocidad del reproductor de video (fondo oscuro) */
+.reproductor-velocidad .ant-select-selection-item {
+  color: #fff;
+  font-weight: 600;
+}
+.reproductor-velocidad .ant-select-arrow {
+  color: rgba(255, 255, 255, 0.7);
+}

@@ -1,4 +1,4 @@
-const { ipcRenderer } = require('electron');
+const { ipcRenderer, webFrame } = require('electron');
 
 // Sin contextIsolation, exponemos directamente en window
 window.device = {
@@ -76,6 +76,22 @@ window.estudioExport = {
   guardarArchivoLocal: (payload) => ipcRenderer.invoke('estudio:guardarArchivoLocal', payload),
   leerArchivoLocal: (payload) => ipcRenderer.invoke('estudio:leerArchivoLocal', payload),
   exportarArchivosLocales: (payload) => ipcRenderer.invoke('estudio:exportarArchivosLocales', payload),
+  // Mostrar un archivo local en el explorador del sistema
+  mostrarEnCarpeta: (payload) => ipcRenderer.invoke('estudio:mostrarEnCarpeta', payload),
+};
+
+window.appZoom = {
+  // Zoom de accesibilidad de toda la aplicación (1 = 100%). Se aplica
+  // directo en el renderer con webFrame (síncrono); el IPC queda de respaldo.
+  setZoomFactor: async (factor) => {
+    const f = Math.min(1.6, Math.max(0.75, Number(factor) || 1));
+    try {
+      webFrame.setZoomFactor(f);
+      return { success: true, factor: f };
+    } catch (e) {
+      return ipcRenderer.invoke('app:setZoomFactor', f);
+    }
+  },
 };
 
 window.updater = {

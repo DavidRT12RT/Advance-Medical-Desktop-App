@@ -27,6 +27,101 @@ export interface VideoAjustes {
   verde?: number;
   /** Ganancia del canal azul; 100 = neutro (25..200) */
   azul?: number;
+  /** Resolución de captura preferida; "auto" = la máxima del dispositivo */
+  resolucion?: ResolucionCaptura;
+  /** Bitrate de grabación en Mbps; "auto" = calculado según la resolución */
+  bitrate?: BitrateCaptura;
+  /** Quemar el nombre del paciente y el estudio en el video grabado */
+  overlayNombre?: boolean;
+  /** Quemar la fecha y hora en el video grabado */
+  overlayFechaHora?: boolean;
+}
+
+export type ResolucionCaptura = "auto" | "2160p" | "1080p" | "720p" | "480p";
+
+/**
+ * Opciones de resolución de captura. Se piden como "ideal" a getUserMedia:
+ * el dispositivo negocia su modo real más cercano (no falla si no existe el
+ * modo exacto). "auto" pide 4K para que gane el mejor modo disponible.
+ */
+export const RESOLUCIONES_CAPTURA: Array<{
+  value: ResolucionCaptura;
+  label: string;
+  ancho: number;
+  alto: number;
+}> = [
+  { value: "auto", label: "Automática (máxima del dispositivo)", ancho: 3840, alto: 2160 },
+  { value: "2160p", label: "4K · 3840×2160", ancho: 3840, alto: 2160 },
+  { value: "1080p", label: "Full HD · 1920×1080", ancho: 1920, alto: 1080 },
+  { value: "720p", label: "HD · 1280×720", ancho: 1280, alto: 720 },
+  { value: "480p", label: "SD · 640×480", ancho: 640, alto: 480 },
+];
+
+/** Dimensiones a solicitar para una resolución guardada (fallback: auto). */
+export function dimensionesCaptura(r?: string) {
+  return (
+    RESOLUCIONES_CAPTURA.find((o) => o.value === r) ?? RESOLUCIONES_CAPTURA[0]
+  );
+}
+
+/**
+ * Opciones de resolución que el dispositivo actual realmente puede dar
+ * (según track.getCapabilities). Sin capacidades conocidas, devuelve todas.
+ * "auto" siempre se incluye; `seleccionada` también (p. ej. una preferencia
+ * guardada desde otra computadora con mejor cámara).
+ */
+export function resolucionesDisponibles(
+  maxAncho?: number,
+  seleccionada?: string,
+) {
+  if (!maxAncho) return RESOLUCIONES_CAPTURA;
+  return RESOLUCIONES_CAPTURA.filter(
+    (o) =>
+      o.value === "auto" || o.ancho <= maxAncho || o.value === seleccionada,
+  );
+}
+
+function clampResolucion(valor: unknown): ResolucionCaptura {
+  return RESOLUCIONES_CAPTURA.some((o) => o.value === valor)
+    ? (valor as ResolucionCaptura)
+    : "auto";
+}
+
+export type BitrateCaptura = "auto" | "4" | "8" | "16" | "25";
+
+/** Opciones de bitrate de grabación (Mbps). */
+export const BITRATES_CAPTURA: Array<{
+  value: BitrateCaptura;
+  label: string;
+}> = [
+  { value: "auto", label: "Automático (según resolución)" },
+  { value: "4", label: "4 Mbps · estándar" },
+  { value: "8", label: "8 Mbps · alta (Full HD)" },
+  { value: "16", label: "16 Mbps · muy alta" },
+  { value: "25", label: "25 Mbps · máxima (4K)" },
+];
+
+/**
+ * Bitrate real a usar en la grabación (bits/segundo). En "auto" se calcula
+ * ~3 bits/pixel sobre la resolución negociada: 1080p ≈ 6 Mbps, 4K ≈ 25 Mbps
+ * (mínimo 3, tope 30 — el video se sube completo a Firebase Storage).
+ */
+export function bitrateEfectivo(
+  bitrate: string | undefined,
+  ancho: number,
+  alto: number,
+): number {
+  const fijo = BITRATES_CAPTURA.find(
+    (o) => o.value === bitrate && o.value !== "auto",
+  );
+  if (fijo) return Number(fijo.value) * 1_000_000;
+  return Math.min(30_000_000, Math.max(3_000_000, ancho * alto * 3));
+}
+
+function clampBitrate(valor: unknown): BitrateCaptura {
+  return BITRATES_CAPTURA.some((o) => o.value === valor)
+    ? (valor as BitrateCaptura)
+    : "auto";
 }
 
 export const AJUSTES_NEUTROS: VideoAjustes = {
@@ -39,6 +134,10 @@ export const AJUSTES_NEUTROS: VideoAjustes = {
   rojo: 100,
   verde: 100,
   azul: 100,
+  resolucion: "auto",
+  bitrate: "auto",
+  overlayNombre: true,
+  overlayFechaHora: true,
 };
 
 /** Sanea un objeto de ajustes de origen externo (Firestore). */
@@ -54,6 +153,10 @@ export function validarAjustes(parsed: unknown): VideoAjustes {
     rojo: clamp(p.rojo),
     verde: clamp(p.verde),
     azul: clamp(p.azul),
+    resolucion: clampResolucion(p.resolucion),
+    bitrate: clampBitrate(p.bitrate),
+    overlayNombre: p.overlayNombre !== false,
+    overlayFechaHora: p.overlayFechaHora !== false,
   };
 }
 

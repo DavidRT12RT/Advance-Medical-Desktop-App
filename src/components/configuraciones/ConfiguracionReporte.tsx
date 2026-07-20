@@ -51,7 +51,11 @@ const ConfiguracionReporte: React.FC<ConfiguracionReporteProps> = ({
 
       if (configuracionReporte) {
         form.setFieldsValue({
-          configuracionReporte: configuracionReporte,
+          configuracionReporte: {
+            // Configuraciones guardadas antes de que existiera este campo
+            incluirDatosTratante: true,
+            ...configuracionReporte,
+          },
         });
       } else {
         // Valores por defecto
@@ -60,6 +64,7 @@ const ConfiguracionReporte: React.FC<ConfiguracionReporteProps> = ({
             incluirDatosPaciente: true,
             incluirDatosClinica: true,
             incluirDatosMedico: true,
+            incluirDatosTratante: true,
             incluirDatosAnestesiologo: false,
             incluirDatosAsistente: false,
             incluirResultado: true,
@@ -147,6 +152,15 @@ const ConfiguracionReporte: React.FC<ConfiguracionReporteProps> = ({
               <div className={sectionCheckboxStyle}>
                 <Form.Item
                   name={["configuracionReporte", "incluirDatosMedico"]}
+                  valuePropName="checked"
+                  noStyle
+                >
+                  <Checkbox>Médico endoscopista</Checkbox>
+                </Form.Item>
+              </div>
+              <div className={sectionCheckboxStyle}>
+                <Form.Item
+                  name={["configuracionReporte", "incluirDatosTratante"]}
                   valuePropName="checked"
                   noStyle
                 >
