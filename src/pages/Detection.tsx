@@ -34,11 +34,14 @@ import { useElectronStore } from "../hooks/useElectronStore";
 import { useVideoAjustes } from "../hooks/useVideoAjustes";
 import {
   AJUSTES_NEUTROS,
+  ASPECTOS_FUENTE,
   BITRATES_CAPTURA,
   bitrateEfectivo,
   construirFiltro,
   dimensionesCaptura,
+  dimensionesCorregidas,
   esNeutro,
+  ratioAspectoFuente,
   resolucionesDisponibles,
 } from "../utils/videoAjustes";
 
@@ -216,23 +219,26 @@ const dataUrlToBlob = (dataUrl: string): Blob => {
 const drawDetectionsOnImage = (
   base64Image: string,
   detections: any[],
+  aspectoFuente?: string,
 ): Promise<Blob> => {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
-      // Canvas al tamaño NATIVO del frame: la captura conserva la resolución
-      // original de la fuente (las cajas se mapean desde el espacio de la IA)
+      // Canvas al tamaño nativo CORREGIDO del frame: la captura conserva la
+      // resolución de la fuente con su relación de aspecto real (las cajas
+      // se mapean desde el espacio de la IA)
+      const dims = dimensionesCorregidas(img.width, img.height, aspectoFuente);
       const canvas = document.createElement("canvas");
-      canvas.width = img.width;
-      canvas.height = img.height;
+      canvas.width = dims.w;
+      canvas.height = dims.h;
       const ctx = canvas.getContext("2d");
       if (!ctx) {
         reject(new Error("No se pudo obtener el contexto del canvas"));
         return;
       }
 
-      ctx.drawImage(img, 0, 0);
-      dibujarDeteccionesNativas(ctx, detections || [], img.width, img.height);
+      ctx.drawImage(img, 0, 0, dims.w, dims.h);
+      dibujarDeteccionesNativas(ctx, detections || [], dims.w, dims.h);
 
       canvas.toBlob(
         (blob) => {
@@ -687,16 +693,22 @@ const Detection: React.FC = () => {
   const aplicarAjustesACaptura = useCallback((dataUrl: string): Promise<string> => {
     return new Promise((resolve) => {
       const a = ajustesRef.current;
-      if (esNeutro(a)) return resolve(dataUrl);
+      const sinCorreccion = !ratioAspectoFuente(a.aspectoFuente);
+      if (esNeutro(a) && sinCorreccion) return resolve(dataUrl);
       const img = new Image();
       img.onload = () => {
+        const dims = dimensionesCorregidas(
+          img.width,
+          img.height,
+          a.aspectoFuente,
+        );
         const c = document.createElement("canvas");
-        c.width = img.width;
-        c.height = img.height;
+        c.width = dims.w;
+        c.height = dims.h;
         const cx = c.getContext("2d");
         if (!cx) return resolve(dataUrl);
-        cx.filter = construirFiltro(a);
-        cx.drawImage(img, 0, 0);
+        if (!esNeutro(a)) cx.filter = construirFiltro(a);
+        cx.drawImage(img, 0, 0, dims.w, dims.h);
         resolve(c.toDataURL("image/jpeg", 0.95));
       };
       img.onerror = () => resolve(dataUrl);
@@ -962,7 +974,11 @@ const Detection: React.FC = () => {
 
               aplicarAjustesACaptura(screenshot)
                 .then((ajustado) =>
-                  drawDetectionsOnImage(ajustado, data.detections || []),
+                  drawDetectionsOnImage(
+                    ajustado,
+                    data.detections || [],
+                    ajustesRef.current?.aspectoFuente,
+                  ),
                 )
                 .then((blob) =>
                   FirebaseMedia.subirFrameDeEstudio(
@@ -1096,9 +1112,15 @@ const Detection: React.FC = () => {
 
     // La grabación sale del canvas nativo, no del 640×480 de la IA: el video
     // guardado conserva la resolución que entrega la fuente (1080p, 4K, etc.)
+    // corregida a la relación de aspecto real elegida por el usuario
     const videoEl = webcamRef.current?.video as HTMLVideoElement | null;
-    const recW = videoEl?.videoWidth || FRAME_WIDTH;
-    const recH = videoEl?.videoHeight || FRAME_HEIGHT;
+    const dimsRec = dimensionesCorregidas(
+      videoEl?.videoWidth || FRAME_WIDTH,
+      videoEl?.videoHeight || FRAME_HEIGHT,
+      ajustesRef.current?.aspectoFuente,
+    );
+    const recW = dimsRec.w;
+    const recH = dimsRec.h;
     const recordCanvas = recordCanvasRef.current as HTMLCanvasElement | null;
     if (recordCanvas) {
       recordCanvas.width = recW;
@@ -1168,14 +1190,24 @@ const Detection: React.FC = () => {
             const ctx = canvasRef.current.getContext("2d");
             if (!ctx) return;
 
+            // Corrección de aspecto de la fuente: si la capturadora entrega
+            // la señal estirada (p. ej. 4:3 ensanchada a 16:9), se trabaja
+            // con las dimensiones REALES elegidas por el usuario
+            const ajustesActuales = ajustesRef.current;
+            const dims = dimensionesCorregidas(
+              img.width,
+              img.height,
+              ajustesActuales.aspectoFuente,
+            );
+
             // 1) Dibujar el frame CRUDO y extraerlo para la IA: el modelo debe
             // recibir la imagen sin ajustes de color ni overlays (los ajustes
             // son preferencia visual del médico, no deben alterar la detección).
-            // Letterbox: el cuadro conserva su relación de aspecto original
+            // Letterbox: el cuadro conserva su relación de aspecto corregida
             // dentro del espacio 640×480 (sin estirar ni recortar).
             const rFrame = rectContain(
-              img.width,
-              img.height,
+              dims.w,
+              dims.h,
               FRAME_WIDTH,
               FRAME_HEIGHT,
             );
@@ -1204,26 +1236,26 @@ const Detection: React.FC = () => {
               frameIndexRef.current++;
             }
 
-            // 2) Canvas de grabación a la resolución NATIVA de la fuente,
-            // con los ajustes de imagen del médico (refleja lo que él ve)
+            // 2) Canvas de grabación a la resolución nativa CORREGIDA de la
+            // fuente, con los ajustes de imagen del médico (refleja lo que
+            // él ve)
             const recordCanvas = recordCanvasRef.current;
             if (!recordCanvas) return;
             if (
-              recordCanvas.width !== img.width ||
-              recordCanvas.height !== img.height
+              recordCanvas.width !== dims.w ||
+              recordCanvas.height !== dims.h
             ) {
-              // La fuente cambió de resolución a mitad de sesión
-              recordCanvas.width = img.width;
-              recordCanvas.height = img.height;
+              // La fuente (o la corrección de aspecto) cambió a mitad de sesión
+              recordCanvas.width = dims.w;
+              recordCanvas.height = dims.h;
             }
             const rctx = recordCanvas.getContext("2d");
             if (!rctx) return;
 
-            const ajustesActuales = ajustesRef.current;
             rctx.filter = esNeutro(ajustesActuales)
               ? "none"
               : construirFiltro(ajustesActuales);
-            rctx.drawImage(img, 0, 0);
+            rctx.drawImage(img, 0, 0, dims.w, dims.h);
             rctx.filter = "none";
 
             // 3) Bounding boxes mapeados al tamaño nativo (quedan en la
@@ -1850,6 +1882,43 @@ const Detection: React.FC = () => {
                   selectedDeviceId,
                   ajustes.resolucion,
                 )}
+                // Con corrección de aspecto activa, el video se dibuja en una
+                // caja con la relación REAL (contain dentro del stage 4:3) y
+                // object-fill lo "des-estira"; igual que en grabación e IA
+                {...(() => {
+                  const ratioCorreccion = ratioAspectoFuente(
+                    ajustes.aspectoFuente,
+                  );
+                  const filtro = esNeutro(ajustes)
+                    ? undefined
+                    : construirFiltro(ajustes);
+                  if (!ratioCorreccion) {
+                    return {
+                      className: "w-full h-full object-contain relative z-0",
+                      style: { filter: filtro },
+                    };
+                  }
+                  const cajaCorreccion =
+                    ratioCorreccion <= 4 / 3 + 0.0001
+                      ? {
+                          height: "100%",
+                          maxWidth: "100%",
+                          aspectRatio: String(ratioCorreccion),
+                        }
+                      : {
+                          width: "100%",
+                          maxHeight: "100%",
+                          aspectRatio: String(ratioCorreccion),
+                        };
+                  return {
+                    className: "absolute inset-0 m-auto z-0",
+                    style: {
+                      filter: filtro,
+                      objectFit: "fill" as const,
+                      ...cajaCorreccion,
+                    },
+                  };
+                })()}
                 onUserMedia={(stream) => {
                   // Capacidades reales del dispositivo: limitan qué
                   // resoluciones se listan en el selector
@@ -1861,8 +1930,6 @@ const Detection: React.FC = () => {
                     setMaxAnchoCamara(undefined);
                   }
                 }}
-                style={{ filter: esNeutro(ajustes) ? undefined : construirFiltro(ajustes) }}
-                className="w-full h-full object-contain relative z-0"
                 disablePictureInPicture={true}
                 forceScreenshotSourceSize={true}
                 imageSmoothing={true}
@@ -1887,25 +1954,41 @@ const Detection: React.FC = () => {
               />
             </div>
 
-            {/* Controles de sesión en modo expandido (los de abajo quedan tapados) */}
+            {/* Controles de sesión en modo expandido (los de abajo quedan
+                tapados). Mismo lenguaje visual que el resto del HUD (cristal
+                oscuro translúcido); sin botones deshabilitados — el estilo
+                disabled es ilegible sobre negro, cada acción aparece solo
+                cuando aplica. La captura la cubre el obturador central. */}
             {isExpanded && (
               <div className="absolute bottom-5 right-5 z-20 flex gap-2">
-                <Button
-                  icon={<CameraOutlined />}
-                  onClick={capturarImagen}
-                  disabled={!isCapturing || isPaused}
-                >
-                  Capturar
-                </Button>
-                <Button
-                  onClick={isPaused ? handleResume : handlePause}
-                  disabled={!isCapturing}
-                >
-                  {isPaused ? "Reanudar" : "Pausar"}
-                </Button>
-                <Button danger onClick={handleFinish} disabled={!isCapturing}>
-                  Finalizar y guardar
-                </Button>
+                {!isCapturing ? (
+                  <button
+                    onClick={startSession}
+                    className="px-5 h-11 rounded-full bg-[#009b9b]/85 hover:bg-[#009b9b] text-white text-sm font-semibold shadow-lg backdrop-blur-md border border-white/20 transition-colors"
+                    title={
+                      !isConnected
+                        ? "Modo sin IA - Solo grabación"
+                        : "Iniciar con análisis IA"
+                    }
+                  >
+                    {isConnected ? "Iniciar con IA" : "Iniciar (sin IA)"}
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={isPaused ? handleResume : handlePause}
+                      className="px-4 h-11 rounded-full bg-black/50 hover:bg-black/70 text-white text-sm font-semibold shadow-lg backdrop-blur-md border border-white/15 transition-colors"
+                    >
+                      {isPaused ? "Reanudar" : "Pausar"}
+                    </button>
+                    <button
+                      onClick={handleFinish}
+                      className="px-4 h-11 rounded-full bg-red-600/80 hover:bg-red-600 text-white text-sm font-semibold shadow-lg backdrop-blur-md border border-white/20 transition-colors"
+                    >
+                      Finalizar y guardar
+                    </button>
+                  </>
+                )}
               </div>
             )}
 
@@ -1978,6 +2061,25 @@ const Detection: React.FC = () => {
                           label: o.label,
                         }))}
                       />
+                      <div className="text-xs text-gray-600 mb-0.5 mt-1.5">
+                        Aspecto real de la fuente
+                      </div>
+                      <Select
+                        size="small"
+                        className="w-full"
+                        value={ajustes.aspectoFuente ?? "auto"}
+                        onChange={(v) =>
+                          actualizarAjustes({ aspectoFuente: v })
+                        }
+                        options={ASPECTOS_FUENTE.map((o) => ({
+                          value: o.value,
+                          label: o.label,
+                        }))}
+                      />
+                      <p className="text-[12px] text-gray-400 mt-0.5 mb-0">
+                        Si la imagen se ve ensanchada (un círculo se ve
+                        ovalado), elige la relación real de tu torre
+                      </p>
                       {isCapturing && (
                         <p className="text-[12px] text-gray-400 mt-0.5 mb-0">
                           No se pueden cambiar durante la grabación
@@ -2169,6 +2271,7 @@ const Detection: React.FC = () => {
                           bitrate: ajustes.bitrate,
                           overlayNombre: ajustes.overlayNombre,
                           overlayFechaHora: ajustes.overlayFechaHora,
+                          aspectoFuente: ajustes.aspectoFuente,
                         })
                       }
                       disabled={esNeutro(ajustes)}

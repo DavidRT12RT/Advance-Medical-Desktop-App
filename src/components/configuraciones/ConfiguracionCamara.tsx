@@ -3,6 +3,7 @@ import { Slider, Button, Alert, Select, Checkbox, InputNumber } from "antd";
 import { UndoOutlined } from "@ant-design/icons";
 import {
   AJUSTES_NEUTROS,
+  ASPECTOS_FUENTE,
   BITRATES_CAPTURA,
   construirFiltro,
   esNeutro,
@@ -114,6 +115,31 @@ const ConfiguracionCamara: React.FC = () => {
             value={ajustes.bitrate ?? "auto"}
             onChange={(v) => actualizar({ bitrate: v })}
             options={BITRATES_CAPTURA.map((o) => ({
+              value: o.value,
+              label: o.label,
+            }))}
+          />
+        </div>
+
+        {/* Relación de aspecto real de la fuente (corrige capturadoras que
+            estiran la señal de la torre) */}
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="mb-2">
+            <span className="text-sm font-medium text-gray-800">
+              Aspecto real de la fuente
+            </span>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Algunas capturadoras estiran la señal de la torre de endoscopia
+              (un círculo se ve ovalado). Elige la relación de aspecto real
+              del equipo para corregir la imagen en el video en vivo, la
+              grabación, las capturas y el análisis de IA.
+            </p>
+          </div>
+          <Select
+            className="w-full max-w-sm"
+            value={ajustes.aspectoFuente ?? "auto"}
+            onChange={(v) => actualizar({ aspectoFuente: v })}
+            options={ASPECTOS_FUENTE.map((o) => ({
               value: o.value,
               label: o.label,
             }))}
@@ -357,6 +383,7 @@ const ConfiguracionCamara: React.FC = () => {
                 bitrate: ajustes.bitrate,
                 overlayNombre: ajustes.overlayNombre,
                 overlayFechaHora: ajustes.overlayFechaHora,
+                aspectoFuente: ajustes.aspectoFuente,
               })
             }
             disabled={esNeutro(ajustes)}

@@ -35,6 +35,51 @@ export interface VideoAjustes {
   overlayNombre?: boolean;
   /** Quemar la fecha y hora en el video grabado */
   overlayFechaHora?: boolean;
+  /** Relación de aspecto REAL de la fuente; "auto" = confiar en la
+   *  capturadora. Muchas capturadoras estiran la señal 4:3 de la torre a
+   *  16:9 (o entregan pixeles no cuadrados): elegir la relación correcta
+   *  "des-estira" la imagen en vista, grabación, capturas e IA. */
+  aspectoFuente?: AspectoFuente;
+}
+
+export type AspectoFuente = "auto" | "4:3" | "5:4" | "16:9";
+
+/** Opciones de relación de aspecto de la fuente. */
+export const ASPECTOS_FUENTE: Array<{
+  value: AspectoFuente;
+  label: string;
+  ratio: number | null;
+}> = [
+  { value: "auto", label: "Automática (como llega de la capturadora)", ratio: null },
+  { value: "4:3", label: "4:3 · torre de endoscopia clásica", ratio: 4 / 3 },
+  { value: "5:4", label: "5:4 · monitores médicos SXGA", ratio: 5 / 4 },
+  { value: "16:9", label: "16:9 · panorámica", ratio: 16 / 9 },
+];
+
+/** Ratio numérico de la corrección elegida (null = sin corrección). */
+export function ratioAspectoFuente(a?: string): number | null {
+  return ASPECTOS_FUENTE.find((o) => o.value === a)?.ratio ?? null;
+}
+
+/**
+ * Dimensiones corregidas de un frame según la relación de aspecto real de la
+ * fuente: se conserva la altura y se recalcula el ancho (des-estirar una
+ * señal ensanchada). En "auto" devuelve las dimensiones originales.
+ */
+export function dimensionesCorregidas(
+  nativoW: number,
+  nativoH: number,
+  aspecto?: string,
+): { w: number; h: number } {
+  const ratio = ratioAspectoFuente(aspecto);
+  if (!ratio || !nativoW || !nativoH) return { w: nativoW, h: nativoH };
+  return { w: Math.round(nativoH * ratio), h: nativoH };
+}
+
+function clampAspecto(valor: unknown): AspectoFuente {
+  return ASPECTOS_FUENTE.some((o) => o.value === valor)
+    ? (valor as AspectoFuente)
+    : "auto";
 }
 
 export type ResolucionCaptura = "auto" | "2160p" | "1080p" | "720p" | "480p";
@@ -138,6 +183,7 @@ export const AJUSTES_NEUTROS: VideoAjustes = {
   bitrate: "auto",
   overlayNombre: true,
   overlayFechaHora: true,
+  aspectoFuente: "auto",
 };
 
 /** Sanea un objeto de ajustes de origen externo (Firestore). */
@@ -157,6 +203,7 @@ export function validarAjustes(parsed: unknown): VideoAjustes {
     bitrate: clampBitrate(p.bitrate),
     overlayNombre: p.overlayNombre !== false,
     overlayFechaHora: p.overlayFechaHora !== false,
+    aspectoFuente: clampAspecto(p.aspectoFuente),
   };
 }
 
